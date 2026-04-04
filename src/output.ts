@@ -311,6 +311,70 @@ function truncateLine(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 3) + '...' : s
 }
 
+// ── Separator + Status Line ────────────────────────────────────────
+
+/**
+ * Print a separator line between output and prompt (like Claude Code).
+ */
+export function printSeparator(): void {
+  const cols = process.stdout.columns || 80
+  console.log(chalk.gray('─'.repeat(Math.min(cols - 2, 80))))
+}
+
+export interface StatusLineInfo {
+  model: string
+  provider: string
+  mode: 'yolo' | 'safe'
+  contextChars: number
+  totalTokens: number
+  cwd: string
+  gitBranch?: string
+}
+
+/**
+ * Print the status line below the separator, above the prompt.
+ * Shows: model · context bar · project · git branch · tokens · mode
+ */
+export function printStatusLine(info: StatusLineInfo): void {
+  const cols = process.stdout.columns || 80
+
+  // Context bar
+  const estimatedTokens = Math.round(info.contextChars / 4)
+  const maxTokens = 200_000
+  const pct = Math.min(100, Math.round((estimatedTokens / maxTokens) * 100))
+  const barLen = 6
+  const filled = Math.round((pct / 100) * barLen)
+  const empty = barLen - filled
+  let barColor = '\x1b[32m'  // green
+  if (pct >= 60) barColor = '\x1b[31m'
+  else if (pct >= 40) barColor = '\x1b[33m'
+  const bar = `${barColor}${'█'.repeat(filled)}${'░'.repeat(empty)}\x1b[0m`
+
+  // Git branch
+  const gitPart = info.gitBranch ? ` \x1b[90mgit:(\x1b[32m${info.gitBranch}\x1b[90m)\x1b[0m` : ''
+
+  // Project name (last directory component)
+  const project = info.cwd.split('/').filter(Boolean).pop() || '~'
+
+  // Mode
+  const modeTag = info.mode === 'yolo'
+    ? '\x1b[33m▸▸ yolo\x1b[0m'
+    : '\x1b[32m▸▸ safe\x1b[0m'
+
+  // Model short
+  const modelShort = info.model.length > 20 ? info.model.slice(0, 18) + '..' : info.model
+
+  // Tokens right-aligned
+  const tokenStr = `${info.totalTokens.toLocaleString()} tokens`
+
+  // Left side
+  const left = `\x1b[36m◇\x1b[0m \x1b[1;37mFORGE\x1b[0m \x1b[90m│\x1b[0m ${modelShort} \x1b[90m│\x1b[0m ${bar} ${pct}% \x1b[90m│\x1b[0m \x1b[36m${project}\x1b[0m${gitPart}`
+
+  // Print status line
+  console.log(`${left}`)
+  console.log(`${modeTag} \x1b[90m(--safe to change)\x1b[0m${' '.repeat(Math.max(0, cols - 40 - tokenStr.length))}\x1b[90m${tokenStr}\x1b[0m`)
+}
+
 // ── Streaming Text ──────────────────────────────────────────────────
 
 let lastWasNewline = true

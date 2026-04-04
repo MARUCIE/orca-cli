@@ -18,6 +18,7 @@ import {
   streamToken, ensureNewline, setLastNewline, printToolUse, printToolResult,
   printUsageSummary, printSessionSummary, emitJson,
   askPermission, printDiffPreview,
+  printSeparator, printStatusLine,
 } from '../output.js'
 import type { OutputMode } from '../output.js'
 import { streamChat } from '../providers/openai-compat.js'
@@ -244,15 +245,40 @@ async function runREPL(
 
   const shortModel = (m: string) => m.length > 24 ? m.slice(0, 22) + '..' : m
 
-  const buildPrompt = (): string => {
+  // Get git branch (cached)
+  let gitBranch: string | undefined
+  try {
+    const { execSync: execSyncImport } = await import('node:child_process')
+    gitBranch = execSyncImport('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd, encoding: 'utf-8' }).trim() || undefined
+  } catch { /* not a git repo */ }
+
+  const renderStatusAndPrompt = (): string => {
+    const contextChars = history.reduce((sum, m) => sum + m.content.length, 0)
+    const totalTokens = stats.totalInputTokens + stats.totalOutputTokens
+
+    // Separator
+    printSeparator()
+
+    // Status line
+    printStatusLine({
+      model: currentModel,
+      provider: resolved.provider,
+      mode: opts.safe ? 'safe' : 'yolo',
+      contextChars,
+      totalTokens,
+      cwd,
+      gitBranch,
+    })
+
+    // Return the actual prompt string
     const turnNum = stats.turns + 1
-    return `\x1b[90m${dirName}\x1b[0m \x1b[36m${shortModel(currentModel)}\x1b[0m \x1b[90m#${turnNum}\x1b[0m\x1b[36m❯\x1b[0m `
+    return `\x1b[36m❯\x1b[0m `
   }
 
   const promptUser = (): Promise<string | null> => new Promise((resolve) => {
     if (stdinEnded) { resolve(null); return }
-    rl.question(buildPrompt(), (answer) => resolve(answer.trim()))
-    // If stdin is piped and exhausted, resolve null after a tick
+    const promptStr = renderStatusAndPrompt()
+    rl.question(promptStr, (answer) => resolve(answer.trim()))
     rl.once('close', () => resolve(null))
   })
 
