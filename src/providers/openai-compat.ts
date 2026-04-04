@@ -103,10 +103,10 @@ export async function* streamChat(
 
   let totalInputTokens = 0
   let totalOutputTokens = 0
-  const maxToolRounds = 8 // prevent runaway tool loops
+  const maxRounds = 20 // allow complex multi-step tasks
 
   try {
-    for (let round = 0; round <= maxToolRounds; round++) {
+    for (let round = 0; round <= maxRounds; round++) {
       // Check abort signal between rounds
       if (toolCallbacks?.abortSignal?.aborted) {
         yield { type: 'text', text: '\n\n[interrupted]' }
@@ -118,7 +118,7 @@ export async function* streamChat(
         model: options.model,
         messages,
         stream: true,
-        max_tokens: options.maxTokens || 4096,
+        max_tokens: options.maxTokens || 16384,
       }
 
       // Include tools if available (function calling)
@@ -214,7 +214,29 @@ export async function* streamChat(
         continue
       }
 
-      // No more tool calls — we're done
+      // Handle model hitting max_tokens — auto-continue
+      if (finishReason === 'length') {
+        messages.push({ role: 'assistant', content: textContent || '' })
+        messages.push({ role: 'user', content: 'Continue from where you left off. Complete the task.' })
+        yield { type: 'text', text: '\n[continuing...]\n' }
+        continue
+      }
+
+      // Handle model stopping mid-task: if previous rounds had tool calls but
+      // this final round has none, and text looks incomplete, auto-continue once
+      if (finishReason === 'stop' && round > 0 && toolCalls.length === 0 && textContent) {
+        const trimmed = textContent.trimEnd()
+        const looksIncomplete = /[：:，,]$/.test(trimmed) ||
+          /(?:现在|接下来|下面|I'll|Let me|I will|Now I|Here's|Let's)\s*\S*$/i.test(trimmed)
+        if (looksIncomplete) {
+          messages.push({ role: 'assistant', content: textContent })
+          messages.push({ role: 'user', content: 'Continue. Execute the remaining steps to complete the task.' })
+          yield { type: 'text', text: '\n[auto-continuing task...]\n' }
+          continue
+        }
+      }
+
+      // No more tool calls and task appears complete — we're done
       yield { type: 'usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens }
       yield { type: 'done' }
       break
