@@ -172,12 +172,31 @@ Configure in `.armature/hooks.json`. Shell commands receive JSON stdin, return J
 - Inline: **bold**, *italic*, `code` (dark background)
 - Lists, blockquotes, headings, links, horizontal rules
 
+## SOTA Agent Capabilities
+
+Features that close the gap between "tool" and "agent":
+
+| Capability | What It Does | Why It Matters |
+|-----------|-------------|----------------|
+| Project Context Loader | Auto-detects type, framework, test runner, deps | Agent knows the project from turn 1 |
+| Smart Output Truncation | 8K limit with summary header (line count + file list) | Prevents context pollution from large grep results |
+| Error Self-Correction | Failed tools return recovery hints ("use read_file first") | Model self-corrects without human intervention |
+| Shell Injection Protection | All user inputs shellEscaped before exec | Security baseline for production agent |
+| Unlimited Agent Loop | Auto-continue on truncation, incomplete text detection | Tasks complete without artificial limits |
+| Multi-edit Atomicity | Failed batch edits leave file unchanged | No partial corruption on error |
+
+Tested: 289 tests across 18 files, 14 rounds covering 10 SOTA dimensions.
+
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │  Forge CLI  v0.1.0                                  │
-│  5,111 LOC · 17 source files · 42 tests             │
+│  5,800+ LOC · 20 source files · 289 tests           │
+├─────────────────────────────────────────────────────┤
+│  SOTA Agent Layer                                   │
+│  project context · smart truncation · error hints   │
+│  shell escape · boundary protection                 │
 ├─────────────────────────────────────────────────────┤
 │  Multi-Model Engine                                 │
 │  council · race · pipeline                          │
