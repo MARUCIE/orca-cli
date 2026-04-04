@@ -32,6 +32,9 @@ import { runCommandPicker } from '../command-picker.js'
 import { runCouncil, runRace, runPipeline, pickDiverseModels } from '../multi-model.js'
 import type { PipelineStage } from '../multi-model.js'
 import { TOOL_DEFINITIONS, executeTool, DANGEROUS_TOOLS } from '../tools.js'
+import { autoVerify, formatVerifyOutput } from '../auto-verify.js'
+import { TokenBudgetManager } from '../token-budget.js'
+import { RetryTracker } from '../retry-intelligence.js'
 
 interface ChatOptions {
   model?: string
@@ -246,6 +249,10 @@ async function runREPL(
   let lastPrompt = '' // for /retry
   let currentEffort: import('../output.js').ThinkingEffort =
     (opts.effort as import('../output.js').ThinkingEffort) || 'high'
+
+  // SOTA agent intelligence modules
+  const tokenBudget = new TokenBudgetManager(currentModel)
+  const retryTracker = new RetryTracker(2)
 
   const shortModel = (m: string) => m.length > 24 ? m.slice(0, 22) + '..' : m
 
@@ -589,6 +596,7 @@ async function runREPL(
         stats.turns++
         stats.totalInputTokens += result.inputTokens
         stats.totalOutputTokens += result.outputTokens
+        tokenBudget.recordUsage(result.inputTokens, result.outputTokens)
       } else if (!abortController.signal.aborted) {
         firstToken = true
         clearInterval(spinner)
@@ -611,40 +619,24 @@ async function runREPL(
     }
     console.log()
 
-    // ── Auto-compact: context management ──────────────────────
-    // Thresholds (chars, ~4 chars/token, ~200K token window):
-    //   40% = 320K chars → suggest
-    //   60% = 480K chars → auto-compact (keep last 4 turns)
-    //   80% = 640K chars → aggressive compact (keep last 2 turns)
-    const ctxChars = history.reduce((sum, m) => sum + m.content.length, 0)
-    const ctxPct = Math.round((ctxChars / 4 / 200_000) * 100)
+    // ── Auto-compact: smart context management via TokenBudgetManager ──
+    const budget = tokenBudget.getBudget(history)
 
-    if (ctxPct >= 80) {
-      // Aggressive: keep only system + last 2 messages
+    if (budget.risk === 'red') {
+      // Aggressive: smart compact keeping only last turn + decisions
       hooks.run('PreCompact', { event: 'PreCompact', cwd })
-      const sysMsg = history.find(m => m.role === 'system')
-      const convMsgs = history.filter(m => m.role !== 'system')
-      const keep = convMsgs.slice(-2)
-      const dropped = convMsgs.length - keep.length
-      history.length = 0
-      if (sysMsg) history.push(sysMsg)
-      history.push(...keep)
+      const result = tokenBudget.smartCompact(history, 1)
       hooks.run('PostCompact', { event: 'PostCompact', cwd })
-      console.log(`\x1b[31m  auto-compact (${ctxPct}%): dropped ${dropped} messages, kept last 1 turn.\x1b[0m`)
-    } else if (ctxPct >= 60) {
-      // Standard: keep system + last 4 messages
+      console.log(`\x1b[31m  auto-compact (${budget.utilizationPct}%): ${result.summary}\x1b[0m`)
+      retryTracker.cleanup()
+    } else if (budget.risk === 'orange') {
+      // Standard: smart compact keeping last 2 turns + decisions
       hooks.run('PreCompact', { event: 'PreCompact', cwd })
-      const sysMsg = history.find(m => m.role === 'system')
-      const convMsgs = history.filter(m => m.role !== 'system')
-      const keep = convMsgs.slice(-4)
-      const dropped = convMsgs.length - keep.length
-      history.length = 0
-      if (sysMsg) history.push(sysMsg)
-      history.push(...keep)
+      const result = tokenBudget.smartCompact(history, 2)
       hooks.run('PostCompact', { event: 'PostCompact', cwd })
-      console.log(`\x1b[33m  auto-compact (${ctxPct}%): dropped ${dropped} messages, kept last 2 turns.\x1b[0m`)
-    } else if (ctxPct >= 40) {
-      console.log(`\x1b[33m  context: ${ctxPct}% — consider /compact to free space.\x1b[0m`)
+      console.log(`\x1b[33m  auto-compact (${budget.utilizationPct}%): ${result.summary}\x1b[0m`)
+    } else if (budget.risk === 'yellow') {
+      console.log(`\x1b[33m  context: ${budget.utilizationPct}% — consider /compact to free space.\x1b[0m`)
     }
   }
 
@@ -1213,6 +1205,27 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
         }
 
         const result = executeTool(name, args, cwd)
+
+        // ── Retry intelligence: track success/failure ──
+        if (result.success) {
+          retryTracker.recordSuccess(name, args)
+        } else {
+          const hint = retryTracker.recordFailure(name, args, result.output)
+          if (hint.shouldWarn) {
+            result.output += `\n\n${hint.hint}`
+          }
+        }
+
+        // ── Auto-verify: run checks after file modifications ──
+        if (result.success && ['write_file', 'edit_file', 'multi_edit'].includes(name) && args.path) {
+          const { resolve: resolvePath } = await import('node:path')
+          const fullPath = resolvePath(cwd, String(args.path))
+          const verifyResult = autoVerify(fullPath, cwd)
+          const verifyOutput = formatVerifyOutput(verifyResult)
+          if (verifyOutput) {
+            result.output += verifyOutput
+          }
+        }
 
         // PostToolUse hook — for logging/modification
         if (hooks.hasHooks('PostToolUse')) {
