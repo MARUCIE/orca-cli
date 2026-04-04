@@ -9,6 +9,7 @@ import { createInitCommand } from './commands/init.js'
 import { createChatCommand } from './commands/chat.js'
 import { createRunCommand } from './commands/run.js'
 import { createCouncilCommand, createRaceCommand, createPipelineCommand } from './commands/multi.js'
+import { createBenchCommand } from './commands/bench.js'
 
 export function createProgram(): Command {
   const program = new Command()
@@ -22,6 +23,7 @@ export function createProgram(): Command {
       '  council           Ask N models, judge synthesizes (multi-model)\n' +
       '  race              First model to answer wins (speed race)\n' +
       '  pipeline           Plan → Code → Review chain across models\n' +
+      '  bench             Run agent benchmark (self-evaluation)\n' +
       '  init              Initialize project configuration'
     )
 
@@ -31,6 +33,7 @@ export function createProgram(): Command {
   program.addCommand(createRaceCommand())
   program.addCommand(createPipelineCommand())
   program.addCommand(createInitCommand())
+  program.addCommand(createBenchCommand())
 
   // Default: no subcommand → enter interactive REPL (like `claude` without args)
   program.argument('[prompt...]', 'Prompt text (omit for interactive REPL)')
