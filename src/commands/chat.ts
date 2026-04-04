@@ -24,6 +24,8 @@ import { streamChat } from '../providers/openai-compat.js'
 import type { ChatMessage } from '../providers/openai-compat.js'
 import { StreamMarkdown } from '../markdown.js'
 import { buildSystemPrompt } from '../system-prompt.js'
+import { hooks } from '../hooks.js'
+import type { HookInput } from '../hooks.js'
 import { TOOL_DEFINITIONS, executeTool, DANGEROUS_TOOLS } from '../tools.js'
 
 interface ChatOptions {
@@ -226,6 +228,13 @@ async function runREPL(
     rl.once('close', () => resolve(null))
   })
 
+  // Load and run hooks
+  hooks.load(cwd)
+  if (hooks.totalHooks > 0) {
+    hooks.printStatus()
+  }
+  await hooks.run('SessionStart', { event: 'SessionStart', cwd, model: currentModel })
+
   console.log('\x1b[90m  Type your message. /help for commands. Ctrl+C to quit.\x1b[0m')
   console.log('\x1b[90m  Up/Down arrows browse history. Start with ``` for multi-line.\x1b[0m\n')
 
@@ -283,6 +292,7 @@ async function runREPL(
         }, { lastWrite })
         if (handled === 'exit') {
           saveInputHistory(historyFile, inputHistory)
+          await hooks.run('SessionEnd', { event: 'SessionEnd', cwd, model: currentModel })
           // Auto-save session on clean exit (if there was any conversation)
           if (stats.turns > 0) {
             autoSaveSession(currentModel, history, stats)
@@ -323,6 +333,15 @@ async function runREPL(
 
     lastPrompt = messageToSend
     inputHistory.push(messageToSend)
+
+    // UserPromptSubmit hook
+    if (hooks.hasHooks('UserPromptSubmit')) {
+      const hookResult = await hooks.run('UserPromptSubmit', { event: 'UserPromptSubmit', prompt: messageToSend, cwd })
+      if (!hookResult.continue) {
+        console.log(`\x1b[33m  hook blocked prompt: ${hookResult.stopReason || ''}\x1b[0m`)
+        continue
+      }
+    }
 
     // Context size warning
     const contextChars = history.reduce((sum, m) => sum + m.content.length, 0)
@@ -503,6 +522,7 @@ function handleSlashCommand(
       console.log('  /load [name]           Load a saved session')
       console.log('  /sessions              List saved sessions')
       console.log('  /undo                  Revert last file write')
+      console.log('  /hooks                 Show registered hooks')
       console.log('  /cwd                   Working directory')
       console.log('  /exit, /quit, /q       Exit')
       console.log('')
@@ -626,6 +646,10 @@ function handleSlashCommand(
 
     case '/cwd':
       console.log(`\x1b[90m  ${cwd}\x1b[0m`)
+      return 'handled'
+
+    case '/hooks':
+      hooks.printStatus()
       return 'handled'
 
     case '/diff': {
@@ -867,6 +891,22 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
           }
         }
 
+        // PreToolUse hook — can block or modify tool input
+        if (hooks.hasHooks('PreToolUse')) {
+          const hookResult = await hooks.run('PreToolUse', {
+            event: 'PreToolUse', toolName: name, toolInput: args, cwd,
+          })
+          if (!hookResult.continue) {
+            return { success: false, output: `Blocked by hook: ${hookResult.stopReason || 'PreToolUse hook denied'}` }
+          }
+          if (hookResult.updatedInput) {
+            Object.assign(args, hookResult.updatedInput)
+          }
+          if (hookResult.systemMessage) {
+            console.log(`\x1b[33m  hook: ${hookResult.systemMessage}\x1b[0m`)
+          }
+        }
+
         // Sub-agent tools — spawn a new streamChat conversation
         if (name === 'spawn_agent' || name === 'delegate_task') {
           const subTask = String(args.task || args.context || '')
@@ -894,7 +934,17 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
           return { success: true, output: subResult.slice(0, 10_000) || '(sub-agent produced no output)' }
         }
 
-        return executeTool(name, args, cwd)
+        const result = executeTool(name, args, cwd)
+
+        // PostToolUse hook — for logging/modification
+        if (hooks.hasHooks('PostToolUse')) {
+          await hooks.run('PostToolUse', {
+            event: 'PostToolUse', toolName: name, toolInput: args,
+            toolOutput: result.output, toolSuccess: result.success, cwd,
+          })
+        }
+
+        return result
       },
       abortSignal,
     },
