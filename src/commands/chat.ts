@@ -27,6 +27,8 @@ import { buildSystemPrompt } from '../system-prompt.js'
 import { hooks } from '../hooks.js'
 import type { HookInput } from '../hooks.js'
 import { mcpClient } from '../mcp-client.js'
+import { runCouncil, runRace, runPipeline, pickDiverseModels } from '../multi-model.js'
+import type { PipelineStage } from '../multi-model.js'
 import { TOOL_DEFINITIONS, executeTool, DANGEROUS_TOOLS } from '../tools.js'
 
 interface ChatOptions {
@@ -165,7 +167,8 @@ async function runREPL(
   const SLASH_COMMANDS = [
     '/help', '/model', '/models', '/clear', '/compact', '/system',
     '/history', '/tokens', '/stats', '/retry', '/diff', '/git',
-    '/save', '/load', '/sessions', '/undo', '/cwd', '/exit', '/quit',
+    '/save', '/load', '/sessions', '/undo', '/council', '/race', '/pipeline',
+    '/cwd', '/exit', '/quit',
   ]
   const completer = (line: string): [string[], string] => {
     if (line.startsWith('/')) {
@@ -335,6 +338,89 @@ async function runREPL(
           continue
         }
         if (handled === 'handled') continue
+
+        // Multi-model commands (need async + baseURL)
+        if ((handled as string) === 'council' || (handled as string) === 'race' || (handled as string) === 'pipeline') {
+          const mmPrompt = input.replace(/^\/(council|race|pipeline)\s*/, '').trim()
+          if (!mmPrompt) continue
+          if (!resolved.baseURL) {
+            console.log('\x1b[33m  multi-model requires proxy provider (poe). Use -p poe.\x1b[0m')
+            continue
+          }
+
+          if ((handled as string) === 'council') {
+            const models = pickDiverseModels(3)
+            console.log(`\n\x1b[36m  ╭── Council: ${models.length} models ──╮\x1b[0m`)
+            const result = await runCouncil({
+              prompt: mmPrompt,
+              models,
+              judgeModel: models[0]!,
+              apiKey: resolved.apiKey,
+              baseURL: resolved.baseURL,
+              onModelStart: (m) => process.stdout.write(`\x1b[90m  ● ${m}...\x1b[0m`),
+              onModelDone: (m, ms) => console.log(` \x1b[32m${(ms/1000).toFixed(1)}s\x1b[0m`),
+            })
+            console.log()
+            for (const r of result.responses) {
+              if (r.error) {
+                console.log(`\x1b[31m  ✗ ${r.model}: ${r.error}\x1b[0m`)
+              } else {
+                console.log(`\x1b[90m  ── ${r.model} (${(r.durationMs/1000).toFixed(1)}s) ──\x1b[0m`)
+                console.log(`  ${r.text.slice(0, 500)}${r.text.length > 500 ? '...' : ''}\n`)
+              }
+            }
+            console.log(`\x1b[36m  ★ Verdict\x1b[0m \x1b[90m(${result.verdict.model}, ${(result.verdict.durationMs/1000).toFixed(1)}s)\x1b[0m`)
+            console.log(`  ${result.verdict.text}\n`)
+            console.log(`\x1b[90m  ─ ${result.responses.length} models · ${(result.totalDurationMs/1000).toFixed(1)}s · agreement: ${result.agreement} ─\x1b[0m\n`)
+
+          } else if ((handled as string) === 'race') {
+            const models = pickDiverseModels(5)
+            console.log(`\n\x1b[33m  ╭── Race: ${models.length} models ──╮\x1b[0m`)
+            const result = await runRace({
+              prompt: mmPrompt,
+              models,
+              apiKey: resolved.apiKey,
+              baseURL: resolved.baseURL,
+              onModelStart: (m) => process.stdout.write(`\x1b[90m  ◎ ${m}...\x1b[0m`),
+              onModelDone: (m, ms, won) => console.log(won ? ` \x1b[32m★ WINNER ${(ms/1000).toFixed(1)}s\x1b[0m` : ` \x1b[90m${(ms/1000).toFixed(1)}s\x1b[0m`),
+            })
+            console.log()
+            console.log(`\x1b[32m  Winner: ${result.winner.model} (${(result.winner.durationMs/1000).toFixed(1)}s)\x1b[0m`)
+            console.log(`  ${result.winner.text}\n`)
+            if (result.cancelled.length > 0) {
+              console.log(`\x1b[90m  cancelled: ${result.cancelled.join(', ')}\x1b[0m`)
+            }
+            console.log(`\x1b[90m  ─ ${(result.totalDurationMs/1000).toFixed(1)}s total ─\x1b[0m\n`)
+
+          } else if ((handled as string) === 'pipeline') {
+            const stages: PipelineStage[] = [
+              { role: 'plan', model: 'claude-opus-4.6' },
+              { role: 'code', model: 'gpt-5.4' },
+              { role: 'review', model: 'gemini-3.1-pro' },
+            ]
+            console.log(`\n\x1b[35m  ╭── Pipeline: ${stages.length} stages ──╮\x1b[0m`)
+            const result = await runPipeline({
+              prompt: mmPrompt,
+              stages,
+              apiKey: resolved.apiKey,
+              baseURL: resolved.baseURL,
+              onStageStart: (s, i) => process.stdout.write(`\x1b[90m  ${i+1}. ${s.role} (${s.model})...\x1b[0m`),
+              onStageDone: (_s, _i, ms) => console.log(` \x1b[32m${(ms/1000).toFixed(1)}s\x1b[0m`),
+            })
+            console.log()
+            for (const { stage, response } of result.stages) {
+              console.log(`\x1b[90m  ── ${stage.role} · ${response.model} (${(response.durationMs/1000).toFixed(1)}s) ──\x1b[0m`)
+              if (response.error) {
+                console.log(`\x1b[31m  error: ${response.error}\x1b[0m\n`)
+              } else {
+                console.log(`  ${response.text.slice(0, 800)}${response.text.length > 800 ? '...' : ''}\n`)
+              }
+            }
+            console.log(`\x1b[90m  ─ ${result.stages.length} stages · ${(result.totalDurationMs/1000).toFixed(1)}s total ─\x1b[0m\n`)
+          }
+          continue
+        }
+
         // 'not_command' falls through to treat as normal message
       }
     }
@@ -542,6 +628,9 @@ function handleSlashCommand(
       console.log('  /sessions              List saved sessions')
       console.log('  /undo                  Revert last file write')
       console.log('  /hooks                 Show registered hooks')
+      console.log('  /council <prompt>      Ask N models, judge synthesizes (multi-model)')
+      console.log('  /race <prompt>         First model to answer wins (speed race)')
+      console.log('  /pipeline <prompt>     Plan→Code→Review chain across models')
       console.log('  /cwd                   Working directory')
       console.log('  /exit, /quit, /q       Exit')
       console.log('')
@@ -672,6 +761,31 @@ function handleSlashCommand(
     case '/hooks':
       hooks.printStatus()
       return 'handled'
+
+    case '/council': {
+      if (!arg) {
+        console.log('\x1b[33m  usage: /council <prompt>  (asks 3 diverse models + judge)\x1b[0m')
+        return 'handled'
+      }
+      // Mark as async — needs to be handled in the REPL loop
+      return 'council' as 'handled'
+    }
+
+    case '/race': {
+      if (!arg) {
+        console.log('\x1b[33m  usage: /race <prompt>  (first model to answer wins)\x1b[0m')
+        return 'handled'
+      }
+      return 'race' as 'handled'
+    }
+
+    case '/pipeline': {
+      if (!arg) {
+        console.log('\x1b[33m  usage: /pipeline <prompt>  (plan→code→review chain)\x1b[0m')
+        return 'handled'
+      }
+      return 'pipeline' as 'handled'
+    }
 
     case '/diff': {
       try {
