@@ -65,8 +65,9 @@ export function printRichBanner(opts: {
   cwd: string
   configFiles?: string[]
   toolCount?: number
+  mode?: 'yolo' | 'safe'
 }): void {
-  const { provider, model, cwd, configFiles, toolCount } = opts
+  const { provider, model, cwd, configFiles, toolCount, mode } = opts
   const spec = getModelSpec(model)
   const shortCwd = abbreviatePath(cwd)
 
@@ -77,7 +78,7 @@ export function printRichBanner(opts: {
     `  \x1b[90marmature agent runtime\x1b[0m`,
     '',  // spacer
     `  \x1b[36m▸\x1b[0m \x1b[90m${provider}/\x1b[0m\x1b[1;37m${model}\x1b[0m` + (spec ? `  \x1b[90m${spec}\x1b[0m` : ''),
-    `  \x1b[36m▸\x1b[0m \x1b[90m${shortCwd}\x1b[0m`,
+    `  \x1b[36m▸\x1b[0m \x1b[90m${shortCwd}\x1b[0m` + (mode === 'yolo' ? `  \x1b[33m[yolo]\x1b[0m` : mode === 'safe' ? `  \x1b[32m[safe]\x1b[0m` : ''),
   ]
 
   // Print art + info side by side
@@ -105,7 +106,7 @@ export function printRichBanner(opts: {
 /** Simple banner for non-interactive / one-shot mode */
 export function printBanner(): void {
   console.log(chalk.blue.bold(`\n  forge`) + chalk.gray(` v${VERSION}`) + chalk.gray(` — armature agent runtime`))
-  console.log(chalk.gray(`  provider-neutral · 25 tools · multi-model\n`))
+  console.log(chalk.gray(`  provider-neutral · 41 tools · multi-model\n`))
 }
 
 export function printProviderInfo(provider: string, model: string): void {

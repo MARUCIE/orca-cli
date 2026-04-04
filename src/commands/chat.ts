@@ -34,6 +34,7 @@ interface ChatOptions {
   systemPrompt?: string
   json?: boolean
   cwd?: string
+  safe?: boolean
 }
 
 export function createChatCommand(): Command {
@@ -47,6 +48,7 @@ export function createChatCommand(): Command {
     .option('-s, --system-prompt <prompt>', 'System prompt')
     .option('--json', 'Output as NDJSON for CI/pipelines')
     .option('--cwd <dir>', 'Working directory')
+    .option('--safe', 'Enable permission prompts for dangerous tools (default: yolo)')
     .action(async (promptParts: string[], opts: ChatOptions) => {
       const prompt = promptParts.join(' ').trim()
       const outputMode: OutputMode = opts.json ? 'json' : 'streaming'
@@ -75,6 +77,7 @@ export function createChatCommand(): Command {
               cwd,
               configFiles: configFiles.length > 0 ? configFiles : undefined,
               toolCount: TOOL_DEFINITIONS.length,
+              mode: opts.safe ? 'safe' : 'yolo',
             })
           }
         }
@@ -82,7 +85,7 @@ export function createChatCommand(): Command {
         if (prompt) {
           await executeOneShot(prompt, resolved, config, outputMode, cwd)
         } else {
-          await runREPL(resolved, config, outputMode, cwd)
+          await runREPL(resolved, config, outputMode, cwd, { safe: opts.safe })
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
@@ -140,6 +143,7 @@ async function runREPL(
   config: ForgeConfig,
   outputMode: OutputMode,
   cwd: string,
+  opts: { safe?: boolean } = {},
 ): Promise<void> {
   const { createInterface } = await import('node:readline')
   const { homedir: getHomedir } = await import('node:os')
@@ -384,6 +388,7 @@ async function runREPL(
             }
           },
           onFileWrite: (path, oldContent) => { lastWrite = { path, oldContent } },
+          safeMode: opts.safe || false,
         })
         stats.turns++
         stats.totalInputTokens += result.inputTokens
@@ -790,10 +795,11 @@ interface ProxyTurnOptions {
   abortSignal?: AbortSignal
   onFirstToken?: () => void
   onFileWrite?: (path: string, oldContent: string | null) => void
+  safeMode?: boolean
 }
 
 async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: number; outputTokens: number }> {
-  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onFileWrite } = options
+  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onFileWrite, safeMode } = options
 
   const startTime = Date.now()
   let inputTokens = 0
@@ -808,50 +814,86 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
     history,
     {
       onToolCall: async (name, args) => {
-        // Permission gate for dangerous tools (write_file, edit_file, run_command)
+        // Permission gate for dangerous tools
         if (DANGEROUS_TOOLS.has(name)) {
-          let preview: string
-          if (name === 'write_file') {
-            preview = `write ${String(args.content || '').length} bytes to ${String(args.path || '')}`
-          } else if (name === 'edit_file' || name === 'multi_edit') {
-            const target = String(args.path || '')
-            preview = `edit ${target}`
-          } else if (name === 'delete_file') {
-            preview = `delete ${String(args.path || '')}`
-          } else if (name === 'move_file') {
-            preview = `move ${String(args.source || '')} → ${String(args.destination || '')}`
-          } else if (name === 'git_commit') {
-            preview = `commit: ${String(args.message || '').slice(0, 60)}`
-          } else if (name === 'run_command' || name === 'run_background') {
-            preview = `run: ${String(args.command || '').slice(0, 80)}`
-          } else {
-            preview = `${name}: ${JSON.stringify(args).slice(0, 80)}`
-          }
-
-          // Show diff preview and capture old content for undo
-          if ((name === 'write_file' || name === 'edit_file') && args.path) {
+          // Track undo state for file writes
+          if ((name === 'write_file' || name === 'edit_file' || name === 'multi_edit') && args.path) {
             const { resolve: resolvePath } = await import('node:path')
             const fullPath = resolvePath(cwd, String(args.path))
             let oldContent: string | null = null
             if (existsSync(fullPath)) {
-              try {
-                oldContent = readFileSync(fullPath, 'utf-8')
-                if (name === 'write_file') {
-                  printDiffPreview(oldContent, String(args.content || ''))
-                } else if (name === 'edit_file') {
-                  const newContent = oldContent.replace(String(args.old_string || ''), String(args.new_string || ''))
-                  printDiffPreview(oldContent, newContent)
-                }
-              } catch { /* ignore read errors */ }
+              try { oldContent = readFileSync(fullPath, 'utf-8') } catch { /* ignore */ }
             }
             if (onFileWrite) onFileWrite(fullPath, oldContent)
           }
 
-          const allowed = await askPermission(name, preview)
-          if (!allowed) {
-            return { success: false, output: 'User denied permission.' }
+          // YOLO mode (default): auto-approve, no prompt
+          // Safe mode (--safe): show diff + ask permission
+          if (safeMode) {
+            let preview: string
+            if (name === 'write_file') {
+              preview = `write ${String(args.content || '').length} bytes to ${String(args.path || '')}`
+            } else if (name === 'edit_file' || name === 'multi_edit') {
+              preview = `edit ${String(args.path || '')}`
+            } else if (name === 'delete_file') {
+              preview = `delete ${String(args.path || '')}`
+            } else if (name === 'move_file') {
+              preview = `move ${String(args.source || '')} → ${String(args.destination || '')}`
+            } else if (name === 'git_commit') {
+              preview = `commit: ${String(args.message || '').slice(0, 60)}`
+            } else if (name === 'run_command' || name === 'run_background') {
+              preview = `run: ${String(args.command || '').slice(0, 80)}`
+            } else {
+              preview = `${name}: ${JSON.stringify(args).slice(0, 80)}`
+            }
+
+            // Diff preview for file writes in safe mode
+            if ((name === 'write_file' || name === 'edit_file') && args.path) {
+              const { resolve: resolvePath } = await import('node:path')
+              const fullPath = resolvePath(cwd, String(args.path))
+              if (existsSync(fullPath)) {
+                try {
+                  const old = readFileSync(fullPath, 'utf-8')
+                  if (name === 'write_file') printDiffPreview(old, String(args.content || ''))
+                  else printDiffPreview(old, old.replace(String(args.old_string || ''), String(args.new_string || '')))
+                } catch { /* ignore */ }
+              }
+            }
+
+            const allowed = await askPermission(name, preview)
+            if (!allowed) {
+              return { success: false, output: 'User denied permission.' }
+            }
           }
         }
+
+        // Sub-agent tools — spawn a new streamChat conversation
+        if (name === 'spawn_agent' || name === 'delegate_task') {
+          const subTask = String(args.task || args.context || '')
+          if (!subTask) return { success: false, output: 'task is required.' }
+
+          console.log(`\x1b[90m  spawning sub-agent...\x1b[0m`)
+          let subResult = ''
+          try {
+            for await (const subEvent of streamChat(
+              { apiKey: resolved.apiKey, baseURL: resolved.baseURL!, model: resolved.model, systemPrompt: config.systemPrompt },
+              subTask,
+              [], // fresh conversation
+              {
+                onToolCall: (subName, subArgs) => executeTool(subName, subArgs, cwd),
+              },
+              TOOL_DEFINITIONS as Array<Record<string, unknown>>,
+            )) {
+              if (subEvent.type === 'text' && subEvent.text) {
+                subResult += subEvent.text
+              }
+            }
+          } catch (err) {
+            return { success: false, output: `Sub-agent error: ${err instanceof Error ? err.message : String(err)}` }
+          }
+          return { success: true, output: subResult.slice(0, 10_000) || '(sub-agent produced no output)' }
+        }
+
         return executeTool(name, args, cwd)
       },
       abortSignal,

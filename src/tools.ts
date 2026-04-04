@@ -173,6 +173,31 @@ export const TOOL_DEFINITIONS = [
   // ── Process ─────────────────────────────────────────
   { type: 'function' as const, function: { name: 'run_background', description: 'Start a long-running command in the background. Returns a process ID.', parameters: { type: 'object', properties: { command: { type: 'string', description: 'Command to run' }, cwd: { type: 'string', description: 'Working directory' } }, required: ['command'] } } },
   { type: 'function' as const, function: { name: 'check_port', description: 'Check if a network port is in use and what process is using it.', parameters: { type: 'object', properties: { port: { type: 'number', description: 'Port number to check' } }, required: ['port'] } } },
+  // ── Agent & Delegation ─────────────────────────────
+  { type: 'function' as const, function: { name: 'spawn_agent', description: 'Spawn a sub-agent to handle a task in parallel. The sub-agent has its own conversation and tool access. Returns the result when done.', parameters: { type: 'object', properties: { task: { type: 'string', description: 'Task description for the sub-agent' }, type: { type: 'string', description: 'Agent type: general (default), explore (fast search), plan (design only)' } }, required: ['task'] } } },
+  { type: 'function' as const, function: { name: 'delegate_task', description: 'Delegate a focused task to a specialist sub-agent and wait for the result.', parameters: { type: 'object', properties: { task: { type: 'string', description: 'Task to delegate' }, context: { type: 'string', description: 'Additional context for the sub-agent' } }, required: ['task'] } } },
+  // ── Task Management ─────────────────────────────────
+  { type: 'function' as const, function: { name: 'task_create', description: 'Create a task to track progress on a multi-step goal.', parameters: { type: 'object', properties: { title: { type: 'string', description: 'Task title' }, description: { type: 'string', description: 'Task description' } }, required: ['title'] } } },
+  { type: 'function' as const, function: { name: 'task_update', description: 'Update task status.', parameters: { type: 'object', properties: { id: { type: 'string', description: 'Task ID' }, status: { type: 'string', description: 'Status: pending, in_progress, completed, failed' } }, required: ['id', 'status'] } } },
+  { type: 'function' as const, function: { name: 'task_list', description: 'List all tasks with their status.', parameters: { type: 'object', properties: {}, required: [] } } },
+  // ── User Interaction ────────────────────────────────
+  { type: 'function' as const, function: { name: 'ask_user', description: 'Ask the user a question and wait for their response. Use when you need clarification.', parameters: { type: 'object', properties: { question: { type: 'string', description: 'Question to ask' }, options: { type: 'array', items: { type: 'string' }, description: 'Optional: multiple-choice options' } }, required: ['question'] } } },
+  { type: 'function' as const, function: { name: 'notify_user', description: 'Send a notification/status update to the user without waiting for a response.', parameters: { type: 'object', properties: { message: { type: 'string', description: 'Message to display' }, level: { type: 'string', description: 'Level: info (default), success, warning, error' } }, required: ['message'] } } },
+  // ── Planning ────────────────────────────────────────
+  { type: 'function' as const, function: { name: 'create_plan', description: 'Create a structured execution plan before implementing.', parameters: { type: 'object', properties: { goal: { type: 'string', description: 'Goal to plan for' }, steps: { type: 'array', items: { type: 'string' }, description: 'Ordered list of steps' } }, required: ['goal', 'steps'] } } },
+  { type: 'function' as const, function: { name: 'verify_plan', description: 'Verify that a plan was executed correctly by checking expected outcomes.', parameters: { type: 'object', properties: { plan_id: { type: 'string', description: 'Plan ID to verify' }, checks: { type: 'array', items: { type: 'string' }, description: 'Verification checks to run' } }, required: ['checks'] } } },
+  // ── Web ──────────────────────────────────────────────
+  { type: 'function' as const, function: { name: 'web_search', description: 'Search the web and return results. Use when you need current information.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Search query' }, count: { type: 'number', description: 'Number of results (default: 5)' } }, required: ['query'] } } },
+  // ── MCP ──────────────────────────────────────────────
+  { type: 'function' as const, function: { name: 'mcp_list_servers', description: 'List connected MCP (Model Context Protocol) servers and their available tools.', parameters: { type: 'object', properties: {}, required: [] } } },
+  { type: 'function' as const, function: { name: 'mcp_list_resources', description: 'List resources available from MCP servers.', parameters: { type: 'object', properties: { server: { type: 'string', description: 'MCP server name (optional, lists all if omitted)' } }, required: [] } } },
+  { type: 'function' as const, function: { name: 'mcp_read_resource', description: 'Read a resource from an MCP server by URI.', parameters: { type: 'object', properties: { uri: { type: 'string', description: 'Resource URI (e.g., file:///path or custom://resource)' } }, required: ['uri'] } } },
+  // ── Scheduling ──────────────────────────────────────
+  { type: 'function' as const, function: { name: 'sleep', description: 'Wait for a specified duration before continuing.', parameters: { type: 'object', properties: { seconds: { type: 'number', description: 'Seconds to wait' }, reason: { type: 'string', description: 'Why waiting (e.g., "waiting for server to start")' } }, required: ['seconds'] } } },
+  // ── Notebook ────────────────────────────────────────
+  { type: 'function' as const, function: { name: 'notebook_edit', description: 'Edit a Jupyter notebook cell.', parameters: { type: 'object', properties: { path: { type: 'string', description: 'Notebook file path (.ipynb)' }, cell_index: { type: 'number', description: 'Cell index (0-based)' }, content: { type: 'string', description: 'New cell content' }, cell_type: { type: 'string', description: 'Cell type: code (default), markdown' } }, required: ['path', 'cell_index', 'content'] } } },
+  // ── Tool Discovery ──────────────────────────────────
+  { type: 'function' as const, function: { name: 'tool_search', description: 'Search available tools by keyword. Useful when you are not sure which tool to use.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Keyword to search for in tool names and descriptions' } }, required: ['query'] } } },
 ]
 
 // ── Tool Execution ──────────────────────────────────────────────
@@ -215,6 +240,31 @@ export function executeTool(name: string, args: Record<string, unknown>, cwd: st
       case 'patch_file': return execShellTool(`echo '${String(args.patch || '').replace(/'/g, "'\\''")}' | patch '${resolve(cwd, String(args.path || ''))}'`, cwd)
       case 'run_background': return execShellTool(`nohup ${String(args.command || '')} > /dev/null 2>&1 & echo "PID: $!"`, args.cwd ? resolve(cwd, String(args.cwd)) : cwd)
       case 'check_port': return execShellTool(`lsof -i :${Number(args.port) || 0} 2>/dev/null || echo "Port ${args.port} is free"`, cwd)
+      // Agent & delegation (handled at caller level for async — return stub here)
+      case 'spawn_agent': return { success: true, output: '[spawn_agent requires async handling — see chat.ts onToolCall]' }
+      case 'delegate_task': return { success: true, output: '[delegate_task requires async handling — see chat.ts onToolCall]' }
+      // Task management
+      case 'task_create': return executeTaskCreate(args, cwd)
+      case 'task_update': return executeTaskUpdate(args, cwd)
+      case 'task_list': return executeTaskList(cwd)
+      // User interaction (handled at caller level)
+      case 'ask_user': return { success: true, output: `[ask_user: ${String(args.question || '')}]` }
+      case 'notify_user': return executeNotifyUser(args)
+      // Planning
+      case 'create_plan': return executeCreatePlan(args, cwd)
+      case 'verify_plan': return executeVerifyPlan(args, cwd)
+      // Web
+      case 'web_search': return executeWebSearch(args)
+      // MCP
+      case 'mcp_list_servers': return executeMcpListServers(cwd)
+      case 'mcp_list_resources': return { success: true, output: 'MCP resources: connect MCP servers via .mcp.json to list resources.' }
+      case 'mcp_read_resource': return { success: true, output: `MCP read: ${args.uri} — connect MCP servers via .mcp.json to read resources.` }
+      // Scheduling
+      case 'sleep': return { success: true, output: `Waiting ${Number(args.seconds) || 1}s... ${String(args.reason || '')}` }
+      // Notebook
+      case 'notebook_edit': return executeNotebookEdit(args, cwd)
+      // Tool discovery
+      case 'tool_search': return executeToolSearch(args)
       default: return { success: false, output: `Unknown tool: ${name}` }
     }
   } catch (err) {
@@ -542,4 +592,167 @@ function executeMultiEdit(args: Record<string, unknown>, cwd: string): ToolResul
   } catch (err) {
     return { success: false, output: err instanceof Error ? err.message : String(err) }
   }
+}
+
+// ── Task Management ──────────────────────────────────────────────
+const taskStore: Array<{ id: string; title: string; description?: string; status: string; createdAt: string }> = []
+let taskCounter = 0
+
+function executeTaskCreate(args: Record<string, unknown>, _cwd: string): ToolResult {
+  const id = `task-${++taskCounter}`
+  const task = {
+    id,
+    title: String(args.title || ''),
+    description: args.description ? String(args.description) : undefined,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  }
+  taskStore.push(task)
+  return { success: true, output: `Created task ${id}: ${task.title}` }
+}
+
+function executeTaskUpdate(args: Record<string, unknown>, _cwd: string): ToolResult {
+  const id = String(args.id || '')
+  const status = String(args.status || 'pending')
+  const task = taskStore.find(t => t.id === id)
+  if (!task) return { success: false, output: `Task not found: ${id}` }
+  task.status = status
+  return { success: true, output: `Updated ${id}: ${task.title} → ${status}` }
+}
+
+function executeTaskList(_cwd: string): ToolResult {
+  if (taskStore.length === 0) return { success: true, output: 'No tasks.' }
+  const lines = taskStore.map(t => {
+    const icon = t.status === 'completed' ? '✓' : t.status === 'in_progress' ? '●' : t.status === 'failed' ? '✗' : '○'
+    return `${icon} ${t.id}: ${t.title} [${t.status}]`
+  })
+  return { success: true, output: lines.join('\n') }
+}
+
+// ── User Interaction ─────────────────────────────────────────────
+function executeNotifyUser(args: Record<string, unknown>): ToolResult {
+  const message = String(args.message || '')
+  const level = String(args.level || 'info')
+  const prefix = { info: 'INFO', success: 'OK', warning: 'WARN', error: 'ERROR' }[level] || 'NOTE'
+  console.log(`\x1b[90m  [${prefix}] ${message}\x1b[0m`)
+  return { success: true, output: `Notified user: ${message}` }
+}
+
+// ── Planning ─────────────────────────────────────────────────────
+function executeCreatePlan(args: Record<string, unknown>, cwd: string): ToolResult {
+  const goal = String(args.goal || '')
+  const steps = (args.steps as string[]) || []
+  const plan = {
+    id: `plan-${Date.now()}`,
+    goal,
+    steps: steps.map((s, i) => `${i + 1}. ${s}`),
+    createdAt: new Date().toISOString(),
+  }
+  // Save plan to .armature/plans/
+  try {
+    const planDir = join(cwd, '.armature', 'plans')
+    mkdirSync(planDir, { recursive: true })
+    writeFileSync(join(planDir, `${plan.id}.json`), JSON.stringify(plan, null, 2), 'utf-8')
+  } catch { /* ignore */ }
+  return { success: true, output: `Plan ${plan.id}:\nGoal: ${goal}\n${plan.steps.join('\n')}` }
+}
+
+function executeVerifyPlan(args: Record<string, unknown>, cwd: string): ToolResult {
+  const checks = (args.checks as string[]) || []
+  const results: string[] = []
+  for (const check of checks) {
+    try {
+      execSync(check, { cwd, encoding: 'utf-8', timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'] })
+      results.push(`✓ ${check}`)
+    } catch {
+      results.push(`✗ ${check}`)
+    }
+  }
+  const allPass = results.every(r => r.startsWith('✓'))
+  return { success: allPass, output: results.join('\n') }
+}
+
+// ── Web Search ───────────────────────────────────────────────────
+function executeWebSearch(args: Record<string, unknown>): ToolResult {
+  const query = String(args.query || '')
+  if (!query) return { success: false, output: 'query is required.' }
+  try {
+    const encoded = encodeURIComponent(query)
+    const cmd = `curl -sL 'https://html.duckduckgo.com/html/?q=${encoded}' 2>/dev/null | grep -oP 'href="https?://[^"]*"' | head -${Number(args.count) || 5} | sed 's/href="//;s/"$//'`
+    const output = execSync(cmd, { encoding: 'utf-8', timeout: 15_000, maxBuffer: 1024 * 1024 })
+    if (!output.trim()) return { success: true, output: `No results for "${query}". Try fetch_url with a specific URL.` }
+    return { success: true, output: `Search results for "${query}":\n${output}` }
+  } catch {
+    return { success: false, output: `Web search failed. Try fetch_url with a known URL instead.` }
+  }
+}
+
+// ── MCP Server Discovery ─────────────────────────────────────────
+function executeMcpListServers(cwd: string): ToolResult {
+  const configPaths = [
+    join(cwd, '.mcp.json'),
+    join(cwd, '.armature', 'mcp.json'),
+    join(process.env.HOME || '/tmp', '.armature', 'mcp.json'),
+  ]
+  const servers: string[] = []
+  for (const p of configPaths) {
+    if (existsSync(p)) {
+      try {
+        const config = JSON.parse(readFileSync(p, 'utf-8'))
+        const mcpServers = config.mcpServers || config.servers || {}
+        for (const [name, def] of Object.entries(mcpServers)) {
+          const d = def as Record<string, unknown>
+          servers.push(`${name}: ${d.command || d.url || 'unknown'} (${p})`)
+        }
+      } catch { /* ignore parse errors */ }
+    }
+  }
+  if (servers.length === 0) {
+    return { success: true, output: 'No MCP servers configured. Add servers to .mcp.json or .armature/mcp.json.' }
+  }
+  return { success: true, output: `MCP Servers:\n${servers.join('\n')}` }
+}
+
+// ── Notebook Edit ────────────────────────────────────────────────
+function executeNotebookEdit(args: Record<string, unknown>, cwd: string): ToolResult {
+  const filePath = resolve(cwd, String(args.path || ''))
+  const cellIndex = Number(args.cell_index) || 0
+  const content = String(args.content || '')
+  const cellType = String(args.cell_type || 'code')
+
+  if (!existsSync(filePath)) return { success: false, output: `Notebook not found: ${filePath}` }
+
+  try {
+    const nb = JSON.parse(readFileSync(filePath, 'utf-8'))
+    if (!nb.cells || !Array.isArray(nb.cells)) {
+      return { success: false, output: 'Invalid notebook format: missing cells array.' }
+    }
+    if (cellIndex >= nb.cells.length) {
+      // Add new cell
+      nb.cells.push({ cell_type: cellType, source: content.split('\n').map((l: string) => l + '\n'), metadata: {}, outputs: [] })
+    } else {
+      nb.cells[cellIndex].source = content.split('\n').map((l: string) => l + '\n')
+      nb.cells[cellIndex].cell_type = cellType
+    }
+    writeFileSync(filePath, JSON.stringify(nb, null, 1), 'utf-8')
+    return { success: true, output: `Updated cell ${cellIndex} in ${filePath}` }
+  } catch (err) {
+    return { success: false, output: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+// ── Tool Search ──────────────────────────────────────────────────
+function executeToolSearch(args: Record<string, unknown>): ToolResult {
+  const query = String(args.query || '').toLowerCase()
+  if (!query) return { success: false, output: 'query is required.' }
+
+  const matches = TOOL_DEFINITIONS.filter(t => {
+    const name = t.function.name.toLowerCase()
+    const desc = t.function.description.toLowerCase()
+    return name.includes(query) || desc.includes(query)
+  })
+
+  if (matches.length === 0) return { success: true, output: `No tools matching "${query}".` }
+  const lines = matches.map(t => `${t.function.name}: ${t.function.description.slice(0, 80)}`)
+  return { success: true, output: lines.join('\n') }
 }
