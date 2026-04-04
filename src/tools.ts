@@ -229,14 +229,16 @@ export function executeTool(name: string, args: Record<string, unknown>, cwd: st
       case 'file_info': return executeFileInfo(args, cwd)
       case 'find_definition': return executeFindDefinition(args, cwd)
       case 'find_references': {
+        const refName = shellEscape(String(args.name || ''))
+        const refPath = shellEscape(resolve(cwd, String(args.path || '.')))
         const refIncludes = ['ts','js','py','go','rs','java','c','cpp','h','rb'].map(e => `--include='*.${e}'`).join(' ')
-        return execShellTool(`grep -rn '\\b${String(args.name || '')}\\b' '${resolve(cwd, String(args.path || '.'))}' ${refIncludes} 2>/dev/null | head -30`, cwd)
+        return execShellTool(`grep -rn '\\b${refName}\\b' '${refPath}' ${refIncludes} 2>/dev/null | head -30`, cwd)
       }
-      case 'directory_tree': return execShellTool(`find '${resolve(cwd, String(args.path || '.'))}' -maxdepth ${Number(args.depth) || 3} -not -path '*/\\.*' -not -path '*/node_modules/*' 2>/dev/null | head -200 | sort`, cwd)
-      case 'count_lines': return execShellTool(`find '${resolve(cwd, String(args.path || '.'))}' -type f -not -path '*/\\.*' -not -path '*/node_modules/*' -not -path '*/dist/*' | xargs wc -l 2>/dev/null | sort -rn | head -30`, cwd)
+      case 'directory_tree': return execShellTool(`find '${shellEscape(resolve(cwd, String(args.path || '.')))}' -maxdepth ${Number(args.depth) || 3} -not -path '*/\\.*' -not -path '*/node_modules/*' 2>/dev/null | head -200 | sort`, cwd)
+      case 'count_lines': return execShellTool(`find '${shellEscape(resolve(cwd, String(args.path || '.')))}' -type f -not -path '*/\\.*' -not -path '*/node_modules/*' -not -path '*/dist/*' | xargs wc -l 2>/dev/null | sort -rn | head -30`, cwd)
       case 'git_status': return execShellTool('git status --short', cwd)
-      case 'git_diff': return execShellTool(`git diff ${args.staged ? '--staged' : ''} ${args.path ? `'${args.path}'` : ''} 2>/dev/null`, cwd)
-      case 'git_log': return execShellTool(`git log --oneline -${Number(args.count) || 10} ${args.path ? `-- '${args.path}'` : ''}`, cwd)
+      case 'git_diff': return execShellTool(`git diff ${args.staged ? '--staged' : ''} ${args.path ? `'${shellEscape(String(args.path))}'` : ''} 2>/dev/null`, cwd)
+      case 'git_log': return execShellTool(`git log --oneline -${Number(args.count) || 10} ${args.path ? `-- '${shellEscape(String(args.path))}'` : ''}`, cwd)
       case 'git_commit': return executeGitCommit(args, cwd)
       case 'fetch_url': return executeFetchUrl(args)
       case 'multi_edit': return executeMultiEdit(args, cwd)
@@ -275,6 +277,11 @@ export function executeTool(name: string, args: Record<string, unknown>, cwd: st
   }
 }
 
+/** Escape a string for safe use inside single-quoted shell arguments. */
+function shellEscape(s: string): string {
+  return s.replace(/'/g, "'\\''")
+}
+
 /** Shell helper for simple tools */
 function execShellTool(cmd: string, cwd: string): ToolResult {
   try {
@@ -294,7 +301,7 @@ function executeReadFile(args: Record<string, unknown>, cwd: string): ToolResult
   const content = readFileSync(filePath, 'utf-8')
   const lines = content.split('\n')
 
-  const startLine = typeof args.start_line === 'number' ? args.start_line - 1 : 0
+  const startLine = typeof args.start_line === 'number' ? Math.max(0, args.start_line - 1) : 0
   const endLine = typeof args.end_line === 'number' ? args.end_line : lines.length
 
   const selected = lines.slice(startLine, endLine)
@@ -370,9 +377,9 @@ function executeRunCommand(args: Record<string, unknown>, cwd: string): ToolResu
 function executeSearchFiles(args: Record<string, unknown>, cwd: string): ToolResult {
   const pattern = String(args.pattern || '')
   const searchPath = resolve(cwd, String(args.path || '.'))
-  const fileGlob = args.file_glob ? `--include='${args.file_glob}'` : ''
+  const fileGlob = args.file_glob ? `--include='${shellEscape(String(args.file_glob))}'` : ''
 
-  const cmd = `grep -rn ${fileGlob} '${pattern}' '${searchPath}' 2>/dev/null | head -50`
+  const cmd = `grep -rn ${fileGlob} '${shellEscape(pattern)}' '${shellEscape(searchPath)}' 2>/dev/null | head -50`
   try {
     const output = execSync(cmd, { encoding: 'utf-8', timeout: 10_000, maxBuffer: 512 * 1024 })
     return { success: true, output: output || 'No matches found.' }
@@ -460,9 +467,9 @@ function executeGlobFiles(args: Record<string, unknown>, cwd: string): ToolResul
     let cmd: string
     if (pattern.includes('/') || pattern.includes('**')) {
       const regex = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*').replace(/\?/g, '.')
-      cmd = `cd '${basePath}' && git ls-files --cached --others --exclude-standard 2>/dev/null | grep -E '${regex}' | head -100`
+      cmd = `cd '${shellEscape(basePath)}' && git ls-files --cached --others --exclude-standard 2>/dev/null | grep -E '${shellEscape(regex)}' | head -100`
     } else {
-      cmd = `cd '${basePath}' && find . -type f -name '${escaped}' 2>/dev/null | sed 's|^\\./||' | head -100`
+      cmd = `cd '${shellEscape(basePath)}' && find . -type f -name '${escaped}' 2>/dev/null | sed 's|^\\./||' | head -100`
     }
 
     const output = execSync(cmd, { encoding: 'utf-8', timeout: 10_000, maxBuffer: 512 * 1024 })
@@ -520,7 +527,7 @@ function executeFindDefinition(args: Record<string, unknown>, cwd: string): Tool
   const combined = patterns.join('|')
   const includes = ['ts','tsx','js','jsx','py','go','rs','java','c','cpp','h','rb','swift','kt'].map(e => `--include='*.${e}'`).join(' ')
   try {
-    const cmd = `grep -rn -E '${combined}' '${searchPath}' ${includes} 2>/dev/null | head -20`
+    const cmd = `grep -rn -E '${shellEscape(combined)}' '${shellEscape(searchPath)}' ${includes} 2>/dev/null | head -20`
     const output = execSync(cmd, { encoding: 'utf-8', timeout: 10_000, maxBuffer: 512 * 1024 })
     return { success: true, output: output || `No definition found for "${name}"` }
   } catch {
@@ -553,9 +560,10 @@ function executeFetchUrl(args: Record<string, unknown>): ToolResult {
 
   try {
     const format = String(args.format || 'text')
+    const safeUrl = shellEscape(url)
     const cmd = format === 'headers'
-      ? `curl -sI '${url}' 2>/dev/null | head -30`
-      : `curl -sL '${url}' 2>/dev/null | head -500`
+      ? `curl -sI '${safeUrl}' 2>/dev/null | head -30`
+      : `curl -sL '${safeUrl}' 2>/dev/null | head -500`
     const output = execSync(cmd, { encoding: 'utf-8', timeout: 15_000, maxBuffer: 2 * 1024 * 1024 })
     return { success: true, output: output.slice(0, 20_000) }
   } catch (err) {
@@ -643,11 +651,13 @@ function executeNotifyUser(args: Record<string, unknown>): ToolResult {
 }
 
 // ── Planning ─────────────────────────────────────────────────────
+let planCounter = 0
+
 function executeCreatePlan(args: Record<string, unknown>, cwd: string): ToolResult {
   const goal = String(args.goal || '')
   const steps = (args.steps as string[]) || []
   const plan = {
-    id: `plan-${Date.now()}`,
+    id: `plan-${++planCounter}`,
     goal,
     steps: steps.map((s, i) => `${i + 1}. ${s}`),
     createdAt: new Date().toISOString(),
@@ -724,6 +734,7 @@ function executeNotebookEdit(args: Record<string, unknown>, cwd: string): ToolRe
   const content = String(args.content || '')
   const cellType = String(args.cell_type || 'code')
 
+  if (cellIndex < 0) return { success: false, output: `Invalid cell_index: ${cellIndex}. Must be >= 0.` }
   if (!existsSync(filePath)) return { success: false, output: `Notebook not found: ${filePath}` }
 
   try {
