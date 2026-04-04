@@ -32,9 +32,23 @@ export function createProgram(): Command {
   program.addCommand(createPipelineCommand())
   program.addCommand(createInitCommand())
 
-  // Default action: if no subcommand, show help
-  program.action(() => {
-    program.help()
+  // Default: no subcommand → enter interactive REPL (like `claude` without args)
+  program.argument('[prompt...]', 'Prompt text (omit for interactive REPL)')
+  program.option('-m, --model <model>', 'Model name')
+  program.option('-p, --provider <provider>', 'Provider (poe, anthropic, openai, google)')
+  program.option('-k, --api-key <key>', 'API key')
+  program.option('--safe', 'Enable permission prompts')
+  program.option('--effort <level>', 'Thinking effort: low, medium, high, max')
+  program.action(async (prompt: string[], opts: Record<string, string | boolean | undefined>) => {
+    // Delegate to chat command: forge "prompt" → forge chat "prompt"
+    const args = ['node', 'forge', 'chat']
+    if (prompt.length > 0) args.push(prompt.join(' '))
+    if (opts.model) args.push('-m', String(opts.model))
+    if (opts.provider) args.push('-p', String(opts.provider))
+    if (opts.apiKey) args.push('-k', String(opts.apiKey))
+    if (opts.safe) args.push('--safe')
+    if (opts.effort) args.push('--effort', String(opts.effort))
+    await program.parseAsync(args)
   })
 
   return program
