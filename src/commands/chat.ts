@@ -11,7 +11,7 @@ import { Command } from 'commander'
 import { basename } from 'node:path'
 import type { ForgeConfig } from '../config.js'
 import { resolveConfig, resolveProvider } from '../config.js'
-import { existsSync, appendFileSync, mkdirSync as fsMkdirSync } from 'node:fs'
+import { existsSync, appendFileSync, mkdirSync as fsMkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import {
   printRichBanner, printBanner, printProviderInfo, printProjectContext, printError,
@@ -156,7 +156,8 @@ async function runREPL(
   // Tab completion for slash commands
   const SLASH_COMMANDS = [
     '/help', '/model', '/models', '/clear', '/compact', '/system',
-    '/history', '/tokens', '/stats', '/retry', '/cwd', '/exit', '/quit',
+    '/history', '/tokens', '/stats', '/retry', '/save', '/load',
+    '/sessions', '/undo', '/cwd', '/exit', '/quit',
   ]
   const completer = (line: string): [string[], string] => {
     if (line.startsWith('/')) {
@@ -222,16 +223,36 @@ async function runREPL(
   })
 
   console.log('\x1b[90m  Type your message. /help for commands. Ctrl+C to quit.\x1b[0m')
-  console.log('\x1b[90m  Up/Down arrows browse input history.\x1b[0m\n')
+  console.log('\x1b[90m  Up/Down arrows browse history. Start with ``` for multi-line.\x1b[0m\n')
 
   // Input history collector for persistence
   const inputHistory: string[] = []
 
+  // Undo stack: track last write_file for /undo
+  let lastWrite: { path: string; oldContent: string | null } | null = null
+
   while (true) {
-    const input = await promptUser()
+    let input = await promptUser()
 
     if (input === null) break
     if (!input) continue
+
+    // Multi-line input: ``` opens fence mode
+    if (input.startsWith('```')) {
+      const lines: string[] = [input]
+      const multiPrompt = (): Promise<string | null> => new Promise((resolve) => {
+        if (stdinEnded) { resolve(null); return }
+        rl.question('\x1b[90m  ...\x1b[0m ', (answer) => resolve(answer))
+        rl.once('close', () => resolve(null))
+      })
+      while (true) {
+        const line = await multiPrompt()
+        if (line === null) break
+        lines.push(line)
+        if (line.trim() === '```') break
+      }
+      input = lines.join('\n')
+    }
 
     // Slash command dispatch
     if (input.startsWith('/')) {
@@ -255,9 +276,13 @@ async function runREPL(
         const handled = handleSlashCommand(input, resolved, history, stats, cwd, {
           getModel: () => currentModel,
           setModel: (m: string) => { currentModel = m; resolved.model = m },
-        })
+        }, { lastWrite })
         if (handled === 'exit') {
           saveInputHistory(historyFile, inputHistory)
+          // Auto-save session on clean exit (if there was any conversation)
+          if (stats.turns > 0) {
+            autoSaveSession(currentModel, history, stats)
+          }
           printSessionSummary({
             turns: stats.turns,
             totalInputTokens: stats.totalInputTokens,
@@ -358,6 +383,7 @@ async function runREPL(
               process.stdout.write(`\x1b[90m  [${(ttft / 1000).toFixed(1)}s to first token]\x1b[0m\n`)
             }
           },
+          onFileWrite: (path, oldContent) => { lastWrite = { path, oldContent } },
         })
         stats.turns++
         stats.totalInputTokens += result.inputTokens
@@ -398,11 +424,31 @@ function saveInputHistory(historyFile: string, entries: string[]): void {
   } catch { /* ignore write errors */ }
 }
 
+function autoSaveSession(model: string, history: ChatMessage[], stats: SessionStats): void {
+  try {
+    const sessDir = join(process.env.HOME || '/tmp', '.armature', 'sessions')
+    fsMkdirSync(sessDir, { recursive: true })
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const sessFile = join(sessDir, `auto-${ts}.json`)
+    writeFileSync(sessFile, JSON.stringify({
+      model,
+      history,
+      stats: { turns: stats.turns, inputTokens: stats.totalInputTokens, outputTokens: stats.totalOutputTokens },
+      savedAt: new Date().toISOString(),
+    }, null, 2), 'utf-8')
+    console.log(`\x1b[90m  session auto-saved: auto-${ts}\x1b[0m`)
+  } catch { /* ignore */ }
+}
+
 // ── Slash Commands ──────────────────────────────────────────────
 
 interface ModelControl {
   getModel: () => string
   setModel: (m: string) => void
+}
+
+interface UndoState {
+  lastWrite: { path: string; oldContent: string | null } | null
 }
 
 const POE_MODELS = [
@@ -418,6 +464,7 @@ function handleSlashCommand(
   stats: SessionStats,
   cwd: string,
   mc: ModelControl,
+  undo?: UndoState,
 ): 'exit' | 'handled' | 'pick_model' | 'not_command' {
   const parts = input.split(/\s+/)
   const cmd = parts[0]!.toLowerCase()
@@ -445,8 +492,16 @@ function handleSlashCommand(
       console.log('  /tokens                Show token breakdown')
       console.log('  /stats                 Session statistics')
       console.log('  /retry, /r             Retry last message')
+      console.log('  /save [name]           Save session to disk')
+      console.log('  /load [name]           Load a saved session')
+      console.log('  /sessions              List saved sessions')
+      console.log('  /undo                  Revert last file write')
       console.log('  /cwd                   Working directory')
       console.log('  /exit, /quit, /q       Exit')
+      console.log('')
+      console.log('  Tips:')
+      console.log('  Start with ``` for multi-line input (close with ```)')
+      console.log('  Esc interrupts generation. Ctrl+L clears screen.')
       console.log('\x1b[0m')
       return 'handled'
 
@@ -566,6 +621,108 @@ function handleSlashCommand(
       console.log(`\x1b[90m  ${cwd}\x1b[0m`)
       return 'handled'
 
+    case '/save': {
+      const sessionName = arg || `session-${Date.now()}`
+      const sessDir = join(process.env.HOME || '/tmp', '.armature', 'sessions')
+      try {
+        fsMkdirSync(sessDir, { recursive: true })
+        const sessFile = join(sessDir, `${sessionName}.json`)
+        writeFileSync(sessFile, JSON.stringify({
+          model: mc.getModel(),
+          history,
+          stats: { turns: stats.turns, inputTokens: stats.totalInputTokens, outputTokens: stats.totalOutputTokens },
+          savedAt: new Date().toISOString(),
+        }, null, 2), 'utf-8')
+        console.log(`\x1b[90m  saved: ${sessFile}\x1b[0m`)
+      } catch (err) {
+        console.log(`\x1b[31m  save failed: ${err instanceof Error ? err.message : err}\x1b[0m`)
+      }
+      return 'handled'
+    }
+
+    case '/load': {
+      if (!arg) {
+        console.log('\x1b[33m  usage: /load <name>  (see /sessions for available)\x1b[0m')
+        return 'handled'
+      }
+      const sessDir = join(process.env.HOME || '/tmp', '.armature', 'sessions')
+      const sessFile = join(sessDir, arg.endsWith('.json') ? arg : `${arg}.json`)
+      try {
+        const data = JSON.parse(readFileSync(sessFile, 'utf-8'))
+        history.length = 0
+        if (Array.isArray(data.history)) {
+          for (const m of data.history) history.push(m)
+        }
+        if (data.model) {
+          mc.setModel(data.model)
+        }
+        stats.turns = data.stats?.turns || 0
+        stats.totalInputTokens = data.stats?.inputTokens || 0
+        stats.totalOutputTokens = data.stats?.outputTokens || 0
+        const msgCount = history.filter(m => m.role !== 'system').length
+        console.log(`\x1b[90m  loaded: ${msgCount} messages, model: ${mc.getModel()}\x1b[0m`)
+      } catch (err) {
+        console.log(`\x1b[31m  load failed: ${err instanceof Error ? err.message : err}\x1b[0m`)
+      }
+      return 'handled'
+    }
+
+    case '/sessions': {
+      const sessDir = join(process.env.HOME || '/tmp', '.armature', 'sessions')
+      try {
+        if (!existsSync(sessDir)) {
+          console.log('\x1b[90m  no saved sessions.\x1b[0m')
+          return 'handled'
+        }
+        const files = readdirSync(sessDir).filter(f => f.endsWith('.json')).sort().reverse()
+        if (files.length === 0) {
+          console.log('\x1b[90m  no saved sessions.\x1b[0m')
+          return 'handled'
+        }
+        console.log('\x1b[90m  Saved sessions:\x1b[0m')
+        for (const f of files.slice(0, 10)) {
+          const name = f.replace('.json', '')
+          try {
+            const data = JSON.parse(readFileSync(join(sessDir, f), 'utf-8'))
+            const turns = data.stats?.turns || 0
+            const savedAt = data.savedAt ? new Date(data.savedAt).toLocaleString() : '?'
+            console.log(`\x1b[90m    ${name}\x1b[0m  \x1b[90m${turns} turns · ${savedAt}\x1b[0m`)
+          } catch {
+            console.log(`\x1b[90m    ${name}\x1b[0m`)
+          }
+        }
+        if (files.length > 10) {
+          console.log(`\x1b[90m    ... and ${files.length - 10} more\x1b[0m`)
+        }
+      } catch {
+        console.log('\x1b[90m  no saved sessions.\x1b[0m')
+      }
+      return 'handled'
+    }
+
+    case '/undo': {
+      if (!undo?.lastWrite) {
+        console.log('\x1b[90m  nothing to undo.\x1b[0m')
+        return 'handled'
+      }
+      const { path: undoPath, oldContent } = undo.lastWrite
+      try {
+        if (oldContent === null) {
+          // File was newly created — delete it
+          unlinkSync(undoPath)
+          console.log(`\x1b[90m  undo: deleted ${undoPath} (was newly created)\x1b[0m`)
+        } else {
+          // File was overwritten — restore old content
+          writeFileSync(undoPath, oldContent, 'utf-8')
+          console.log(`\x1b[90m  undo: restored ${undoPath} (${oldContent.length} bytes)\x1b[0m`)
+        }
+        undo.lastWrite = null
+      } catch (err) {
+        console.log(`\x1b[31m  undo failed: ${err instanceof Error ? err.message : err}\x1b[0m`)
+      }
+      return 'handled'
+    }
+
     default:
       // Check if it's a model number (e.g., "/1" to "/11")
       if (/^\/\d+$/.test(cmd)) {
@@ -593,10 +750,11 @@ interface ProxyTurnOptions {
   cwd: string
   abortSignal?: AbortSignal
   onFirstToken?: () => void
+  onFileWrite?: (path: string, oldContent: string | null) => void
 }
 
 async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: number; outputTokens: number }> {
-  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken } = options
+  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onFileWrite } = options
 
   const startTime = Date.now()
   let inputTokens = 0
@@ -617,17 +775,19 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
             ? `write ${String(args.content || '').length} bytes to ${String(args.path || '')}`
             : `run: ${String(args.command || '').slice(0, 80)}`
 
-          // Show diff preview for file writes
+          // Show diff preview and capture old content for undo
           if (name === 'write_file' && args.path) {
-            const { existsSync, readFileSync } = await import('node:fs')
             const { resolve } = await import('node:path')
             const fullPath = resolve(cwd, String(args.path))
+            let oldContent: string | null = null
             if (existsSync(fullPath)) {
               try {
-                const oldContent = readFileSync(fullPath, 'utf-8')
+                oldContent = readFileSync(fullPath, 'utf-8')
                 printDiffPreview(oldContent, String(args.content || ''))
               } catch { /* ignore read errors */ }
             }
+            // Track for /undo
+            if (onFileWrite) onFileWrite(fullPath, oldContent)
           }
 
           const allowed = await askPermission(name, preview)
