@@ -68,7 +68,7 @@ export function createChatCommand(): Command {
         if (outputMode === 'streaming') {
           if (prompt) {
             // One-shot mode: compact banner
-            printBanner()
+            printBanner(TOOL_DEFINITIONS.length)
             printProviderInfo(resolved.provider, resolved.model)
           } else {
             // Interactive REPL: rich banner with ASCII art
@@ -577,6 +577,7 @@ function handleSlashCommand(
     case '/compact':
       // Keep system prompt + last 2 user/assistant pairs
       {
+        hooks.run('PreCompact', { event: 'PreCompact', cwd })
         const sysMsg = history.find(m => m.role === 'system')
         const convMsgs = history.filter(m => m.role !== 'system')
         const keep = convMsgs.slice(-4) // last 2 turns (user + assistant each)
@@ -585,6 +586,7 @@ function handleSlashCommand(
         if (sysMsg) history.push(sysMsg)
         history.push(...keep)
         console.log(`\x1b[90m  compacted: kept last 2 turns, dropped ${dropped} messages.\x1b[0m`)
+        hooks.run('PostCompact', { event: 'PostCompact', cwd })
       }
       return 'handled'
 
@@ -912,26 +914,31 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
           const subTask = String(args.task || args.context || '')
           if (!subTask) return { success: false, output: 'task is required.' }
 
+          await hooks.run('SubagentStart', { event: 'SubagentStart', cwd, model: resolved.model })
           console.log(`\x1b[90m  spawning sub-agent...\x1b[0m`)
-          let subResult = ''
-          try {
-            for await (const subEvent of streamChat(
-              { apiKey: resolved.apiKey, baseURL: resolved.baseURL!, model: resolved.model, systemPrompt: config.systemPrompt },
-              subTask,
-              [], // fresh conversation
-              {
-                onToolCall: (subName, subArgs) => executeTool(subName, subArgs, cwd),
-              },
-              TOOL_DEFINITIONS as Array<Record<string, unknown>>,
-            )) {
-              if (subEvent.type === 'text' && subEvent.text) {
-                subResult += subEvent.text
-              }
-            }
-          } catch (err) {
-            return { success: false, output: `Sub-agent error: ${err instanceof Error ? err.message : String(err)}` }
+
+        // ask_user — prompt user for input via readline
+        } else if (name === 'ask_user') {
+          const question = String(args.question || 'What would you like to do?')
+          const options = args.options as string[] | undefined
+          console.log(`\n\x1b[36m  ? ${question}\x1b[0m`)
+          if (options && options.length > 0) {
+            options.forEach((o, i) => console.log(`\x1b[90m    ${i + 1}. ${o}\x1b[0m`))
           }
-          return { success: true, output: subResult.slice(0, 10_000) || '(sub-agent produced no output)' }
+          const { createInterface } = await import('node:readline')
+          const askRl = createInterface({ input: process.stdin, output: process.stdout })
+          const answer = await new Promise<string>((res) => {
+            askRl.question('\x1b[90m  > \x1b[0m', (a) => { askRl.close(); res(a.trim()) })
+          })
+          return { success: true, output: answer || '(no response)' }
+
+        // sleep — actually wait
+        } else if (name === 'sleep') {
+          const seconds = Math.min(Number(args.seconds) || 1, 60)
+          const reason = String(args.reason || '')
+          if (reason) console.log(`\x1b[90m  waiting ${seconds}s: ${reason}\x1b[0m`)
+          await new Promise(r => setTimeout(r, seconds * 1000))
+          return { success: true, output: `Waited ${seconds}s.` }
         }
 
         const result = executeTool(name, args, cwd)

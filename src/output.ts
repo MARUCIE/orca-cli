@@ -104,9 +104,10 @@ export function printRichBanner(opts: {
 }
 
 /** Simple banner for non-interactive / one-shot mode */
-export function printBanner(): void {
+export function printBanner(toolCount?: number): void {
+  const tools = toolCount ? `${toolCount} tools` : 'multi-model'
   console.log(chalk.blue.bold(`\n  forge`) + chalk.gray(` v${VERSION}`) + chalk.gray(` — armature agent runtime`))
-  console.log(chalk.gray(`  provider-neutral · 41 tools · multi-model\n`))
+  console.log(chalk.gray(`  provider-neutral · ${tools}\n`))
 }
 
 export function printProviderInfo(provider: string, model: string): void {
@@ -316,44 +317,14 @@ export function ensureNewline(): void {
   }
 }
 
-export function resetOutputState(): void {
-  lastWasNewline = true
-}
-
 export function setLastNewline(value: boolean): void {
   lastWasNewline = value
-}
-
-// ── Live Progress (Claude Code style status line) ───────────────────
-
-let progressInterval: ReturnType<typeof setInterval> | null = null
-let progressStartTime = 0
-let progressTokens = 0
-
-export function startProgress(): void {
-  progressStartTime = Date.now()
-  progressTokens = 0
-}
-
-export function updateProgressTokens(count: number): void {
-  progressTokens += count
-}
-
-export function stopProgress(): void {
-  if (progressInterval) {
-    clearInterval(progressInterval)
-    progressInterval = null
-  }
 }
 
 // ── Tool Use Display (Claude Code style) ────────────────────────────
 
 const toolTimers = new Map<string, number>()
 let toolCallCount = 0
-
-export function resetToolCallCount(): void {
-  toolCallCount = 0
-}
 
 export function printToolUse(toolName: string, input?: string): void {
   ensureNewline()
