@@ -1,14 +1,17 @@
 # Forge CLI
 
-**Provider-neutral coding agent — Claude, GPT, Gemini through one CLI. 41 tools. 8 hooks. YOLO by default.**
+**Provider-neutral coding agent — 11 models · 41 tools · 8 hooks · multi-model collaboration.**
+
+The one CLI that can do what no single-vendor CLI can: ask Claude, GPT, and Gemini the same question simultaneously, race them, or chain them as specialists.
 
 ```
-        · ✦ ·
-      ▄██████▄         Forge  v0.1.0
-     ██████████        armature agent runtime
-     ▀████████▀
-       ██████          ▸ poe/Claude-Sonnet-4  200K ctx · 64K out
-      ████████         ▸ ~/Projects/my-app  [yolo]
+     · ✦ ·
+   ▄██████▄          Forge  v0.1.0
+  ██████████         armature agent runtime
+  ▀████████▀
+    ██████           ▸ poe/claude-sonnet-4.6  200K ctx · 64K out  [yolo]
+   ████████          ▸ ~/Projects/my-app
+                     41 tools · 8 hooks
 ```
 
 ## Install
@@ -21,262 +24,183 @@ export POE_API_KEY=your-poe-api-key
 ## Quick Start
 
 ```bash
-# Interactive REPL (multi-turn, multi-model, streaming markdown)
-forge chat
-
-# One-shot query
-forge chat "explain this codebase"
-
-# Task execution with full agent loop
-forge run "fix the failing tests"
-
-# Switch model mid-session
-forge chat -m GPT-4o
-
-# Safe mode (permission prompts for dangerous tools)
-forge chat --safe
+forge chat                                    # interactive REPL
+forge chat "explain this codebase"            # one-shot
+forge run "fix the failing tests"             # task execution
+forge council "SQL or NoSQL for this?" -n 5   # 5 models + judge
+forge race "write a CSV parser"               # first model wins
+forge pipeline "build REST API" --stages 5    # plan→code→review→fix→verify
 ```
+
+## Multi-Model Collaboration (Unique Feature)
+
+No single-vendor CLI can do this. Forge accesses 11 models from 9 vendors through one API key.
+
+### Council Mode — `/council` or `forge council`
+
+Ask N models the same question. A judge synthesizes the best answer.
+
+```bash
+forge council "is this code thread-safe?" -n 3
+forge council "review for security issues" -n 5 -j claude-opus-4.6
+```
+
+```
+╭── Council: 3 models ──╮
+● claude-opus-4.6... 4.2s
+● gpt-5.4... 2.1s
+● gemini-3.1-pro... 3.8s
+
+★ Verdict (claude-opus-4.6 as judge)
+  All three agree on the race condition in line 42...
+  Confidence: HIGH (3/3 agree)
+─ 3 models · 12.1s · agreement: high ─
+```
+
+### Race Mode — `/race` or `forge race`
+
+N models race. First good answer wins, rest cancelled.
+
+```bash
+forge race "write a quicksort in Python" -n 5
+```
+
+### Pipeline Mode — `/pipeline` or `forge pipeline`
+
+Chain models as specialists. Each stage feeds into the next.
+
+```bash
+forge pipeline "build auth middleware" --plan claude-opus-4.6 --code gpt-5.4 --review gemini-3.1-pro
+```
+
+| Stage | Default Model | Role |
+|-------|--------------|------|
+| Plan | claude-opus-4.6 | Architecture, data flow, API design |
+| Code | gpt-5.4 | Fast implementation |
+| Review | gemini-3.1-pro | Bug/security/perf review (2M context) |
+| Fix | gpt-5.4 | Address review findings |
+| Verify | claude-opus-4.6 | Confirm fix matches plan |
+
+## 11 Models via Poe
+
+One API key, 9 vendors:
+
+| Model | Vendor | Strength |
+|-------|--------|----------|
+| claude-opus-4.6 | Anthropic | Deep reasoning, careful analysis |
+| claude-sonnet-4.6 | Anthropic | Fast + capable (default) |
+| gpt-5.4 | OpenAI | Fast code generation |
+| gemini-3.1-pro | Google | 2M context, multimodal |
+| gemini-3.1-flash-lite | Google | Ultra-fast, cheap |
+| gemma-4-31b | Google/Meta | Open-source, local-friendly |
+| glm-5 | Zhipu | Chinese language excellence |
+| grok-4.20-multi-agent | xAI | Multi-agent native |
+| qwen3.6-plus | Alibaba | Math, reasoning |
+| kimi-k2.5 | Moonshot | Long-context reasoning |
+| minimax-m2.7 | MiniMax | Creative generation |
 
 ## 41 Agent Tools
 
-The model calls these tools autonomously to complete tasks.
+Tools the model calls autonomously. Grouped by capability:
 
-### File I/O (10)
+| Category | Tools | Count |
+|----------|-------|-------|
+| File I/O | read, write, edit, multi_edit, patch, delete, move, copy, mkdir, file_info | 10 |
+| Search | search, glob, find_definition, find_references, tree, count_lines, tool_search | 7+(1) |
+| Git | status, diff, log, commit | 4 |
+| Execution | run_command, run_background, check_port, sleep | 4 |
+| Agent/Swarm | spawn_agent, delegate_task | 2 |
+| Task Mgmt | task_create, task_update, task_list | 3 |
+| Planning | create_plan, verify_plan | 2 |
+| Interaction | ask_user, notify_user | 2 |
+| Web | fetch_url, web_search | 2 |
+| MCP | mcp_list_servers, mcp_list_resources, mcp_read_resource | 3 |
+| Notebook | notebook_edit | 1 |
 
-| Tool | Description |
-|------|-------------|
-| `read_file` | Read file contents (supports line ranges) |
-| `write_file` | Create or overwrite a file |
-| `edit_file` | Surgical string replacement (must match uniquely) |
-| `multi_edit` | Batch replacements in one call |
-| `patch_file` | Apply unified diff |
-| `delete_file` | Remove a file |
-| `move_file` | Move or rename |
-| `copy_file` | Copy a file |
-| `create_directory` | mkdir -p |
-| `file_info` | File metadata (size, modified, lines) |
-
-### Search & Navigation (8)
-
-| Tool | Description |
-|------|-------------|
-| `search_files` | Regex search across files (grep) |
-| `glob_files` | Find files by pattern (git ls-files + find) |
-| `list_directory` | List directory contents (recursive to 3 levels) |
-| `find_definition` | Find function/class/type definitions (12 patterns, 12 languages) |
-| `find_references` | Find all usages of a symbol |
-| `directory_tree` | Recursive tree view |
-| `count_lines` | Lines of code per file |
-| `tool_search` | Search available tools by keyword |
-
-### Git (4)
-
-| Tool | Description |
-|------|-------------|
-| `git_status` | Staged, modified, untracked files |
-| `git_diff` | Working tree or staged diff |
-| `git_log` | Recent commits (filterable by file) |
-| `git_commit` | Stage + commit (⚠ requires confirmation in --safe mode) |
-
-### Execution (4)
-
-| Tool | Description |
-|------|-------------|
-| `run_command` | Shell command (30s timeout, 1MB buffer) |
-| `run_background` | Long-running command with PID tracking |
-| `check_port` | Check if a port is in use |
-| `sleep` | Wait with reason annotation |
-
-### Agent / Swarm (2)
-
-| Tool | Description |
-|------|-------------|
-| `spawn_agent` | Spawn sub-agent with full tool access |
-| `delegate_task` | Delegate task to specialist sub-agent |
-
-### Task Management (3)
-
-| Tool | Description |
-|------|-------------|
-| `task_create` | Create task to track progress |
-| `task_update` | Update status (pending/in_progress/completed/failed) |
-| `task_list` | List all tasks with status |
-
-### Planning (2)
-
-| Tool | Description |
-|------|-------------|
-| `create_plan` | Create structured execution plan |
-| `verify_plan` | Verify plan completion with checks |
-
-### User Interaction (2)
-
-| Tool | Description |
-|------|-------------|
-| `ask_user` | Ask user a question (with optional multiple-choice) |
-| `notify_user` | Send notification (info/success/warning/error) |
-
-### Web (2)
-
-| Tool | Description |
-|------|-------------|
-| `fetch_url` | HTTP GET a URL (text/json/headers) |
-| `web_search` | Web search via DuckDuckGo |
-
-### MCP (3)
-
-| Tool | Description |
-|------|-------------|
-| `mcp_list_servers` | List connected MCP servers |
-| `mcp_list_resources` | List MCP server resources |
-| `mcp_read_resource` | Read resource by URI |
-
-### Notebook (1)
-
-| Tool | Description |
-|------|-------------|
-| `notebook_edit` | Edit Jupyter notebook cells |
+9 tools require confirmation in `--safe` mode: write, edit, multi_edit, patch, delete, move, run_command, run_background, git_commit.
 
 ## 8 Lifecycle Hooks
 
-Hooks are shell commands triggered at lifecycle events. Configure in `.armature/hooks.json`:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      { "matcher": "run_command", "command": "node scripts/validate-cmd.js" }
-    ],
-    "PostToolUse": [
-      { "matcher": ".*", "command": "bash scripts/log-tool.sh" }
-    ],
-    "SessionStart": [
-      { "command": "bash scripts/load-context.sh" }
-    ]
-  }
-}
-```
+Configure in `.armature/hooks.json`. Shell commands receive JSON stdin, return JSON stdout.
 
 | Hook | When | Can Block? |
 |------|------|------------|
-| `PreToolUse` | Before tool execution | Yes (non-zero exit = block) |
-| `PostToolUse` | After tool execution | No |
-| `SessionStart` | REPL startup | No |
-| `SessionEnd` | Clean exit | No |
-| `PreCompact` | Before /compact | No |
-| `PostCompact` | After /compact | No |
-| `UserPromptSubmit` | Before prompt sent to model | Yes |
-| `SubagentStart` | Sub-agent spawn | No |
+| PreToolUse | Before tool execution | Yes (exit 1 = block) |
+| PostToolUse | After tool execution | No |
+| SessionStart | REPL startup | No |
+| SessionEnd | Clean exit | No |
+| PreCompact | Before /compact | No |
+| PostCompact | After /compact | No |
+| UserPromptSubmit | Before prompt to model | Yes |
+| SubagentStart | Sub-agent spawn | No |
 
-Hooks receive JSON on stdin with event context. Return JSON to modify behavior:
-```json
-{ "continue": false, "stopReason": "Blocked: unsafe command" }
-```
-
-## 22 Slash Commands
+## 25 Slash Commands
 
 | Command | Description |
 |---------|-------------|
 | `/help` | Show all commands + tips |
-| `/model`, `/m` | Show current model |
-| `/model set <name>` | Switch model mid-session |
 | `/models` | Interactive model picker (1-11) |
+| `/model set <name>` | Switch model mid-session |
+| `/council <prompt>` | Multi-model council |
+| `/race <prompt>` | Multi-model race |
+| `/pipeline <prompt>` | Multi-model pipeline |
 | `/clear` | Clear conversation |
 | `/compact` | Keep last 2 turns |
 | `/system <prompt>` | Set system prompt |
-| `/history` | Show message counts |
-| `/tokens` | Token breakdown |
-| `/stats` | Session statistics |
-| `/retry`, `/r` | Retry last message |
 | `/diff` | Show git diff |
 | `/git <cmd>` | Run git command |
-| `/save [name]` | Save session to disk |
-| `/load [name]` | Load saved session |
+| `/save [name]` | Save session |
+| `/load [name]` | Load session |
 | `/sessions` | List saved sessions |
 | `/undo` | Revert last file write |
 | `/hooks` | Show registered hooks |
+| `/retry` | Retry last message |
+| `/history` `/tokens` `/stats` | Session metrics |
 | `/cwd` | Working directory |
-| `/exit`, `/quit` | Exit with summary |
+| `/exit` | Exit with summary |
 
 ## Permission Modes
 
-| Mode | Flag | Behavior |
-|------|------|----------|
-| **YOLO** (default) | (none) | Auto-approve all tools. Actions visible in output. |
-| **Safe** | `--safe` | Interactive y/n prompt for dangerous tools + diff preview |
-
-9 tools are classified as dangerous: `write_file`, `edit_file`, `multi_edit`, `patch_file`, `delete_file`, `move_file`, `run_command`, `run_background`, `git_commit`.
+| Mode | Flag | Default |
+|------|------|---------|
+| YOLO | (none) | **Yes** — auto-approve, actions visible |
+| Safe | `--safe` | No — interactive y/n + diff preview |
 
 ## Streaming Markdown
 
-Output is rendered with line-buffered streaming markdown:
+- Code blocks: box-drawing borders (╭╮╰╯│) + syntax highlighting (JS/TS, Python, Shell, JSON)
+- Inline: **bold**, *italic*, `code` (dark background)
+- Lists, blockquotes, headings, links, horizontal rules
 
-- **Headers**: cyan bold
-- **Bold/italic**: ANSI formatting
-- **Inline code**: dark background
-- **Code blocks**: box-drawing borders (╭╮╰╯│) with syntax highlighting (JS/TS, Python, Shell, JSON)
-- **Lists**: cyan bullet dots / numbered
-- **Blockquotes**: │ border with italic
-- **Links**: text + (url) format
+## Architecture
 
-## Context Management
-
-- Usage bar in turn summary: `ctx ████████░░░░ 45%` (green/yellow/red)
-- `/compact` keeps last 2 turns
-- Auto context size warning at 50K chars
-- Session auto-save on clean exit
-
-## Multi-Model via Poe
-
-One API key, 11 models:
-
-| Model | Provider |
-|-------|----------|
-| Claude-Sonnet-4 | Anthropic |
-| Claude-3.7-Sonnet | Anthropic |
-| Claude-3-Haiku | Anthropic |
-| GPT-4o | OpenAI |
-| GPT-4.1 | OpenAI |
-| GPT-4.1-mini | OpenAI |
-| o3 | OpenAI |
-| o4-mini | OpenAI |
-| Gemini-2.5-Pro | Google |
-| Gemini-2.5-Flash | Google |
-| Gemini-2.0-Flash | Google |
+```
+┌─────────────────────────────────────────────────────┐
+│  Forge CLI  v0.1.0                                  │
+│  5,111 LOC · 17 source files · 42 tests             │
+├─────────────────────────────────────────────────────┤
+│  Multi-Model Engine                                 │
+│  council · race · pipeline                          │
+│  11 models × 9 vendors via Poe proxy                │
+├─────────────────────────────────────────────────────┤
+│  Agent Runtime                                      │
+│  41 tools · 8 hooks · YOLO/safe · sub-agents        │
+│  StreamMarkdown · session persistence · MCP client   │
+├─────────────────────────────────────────────────────┤
+│  OpenAI-compat Provider                             │
+│  Unlimited agent loop · model-aware max_tokens      │
+│  Auto-continue on truncation · proxy support         │
+├─────────────────────────────────────────────────────┤
+│  @armature/sdk  (optional, native Anthropic path)   │
+│  51 tools · full MCP · agent infrastructure          │
+└─────────────────────────────────────────────────────┘
+```
 
 ## Configuration
 
 ```
 CLI flags  >  ENV vars  >  .armature.json  >  ~/.armature/config.json
 ```
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────┐
-│  Forge CLI  (this repo)                     │
-│  41 tools · 8 hooks · 22 commands           │
-│  StreamMarkdown · YOLO/Safe · Sub-agents    │
-├─────────────────────────────────────────────┤
-│  OpenAI-compat Provider (Poe/OpenRouter)    │
-│  Unlimited agent loop · Model-aware tokens  │
-├─────────────────────────────────────────────┤
-│  @armature/sdk  (optional, native path)     │
-│  51 tools · MCP · Full agent infrastructure │
-└─────────────────────────────────────────────┘
-```
-
-## Tool Status
-
-38 of 41 tools are fully functional. 3 tools need MCP infrastructure to connect:
-
-| Tool | Status | Why |
-|------|--------|-----|
-| `mcp_list_resources` | Stub | Needs active MCP server connections |
-| `mcp_read_resource` | Stub | Needs active MCP server connections |
-| `ask_user` | Stub | Needs async readline in generator context |
-
-`mcp_list_servers` works (reads `.mcp.json` config). Full MCP client planned for v0.2.
 
 ## License
 

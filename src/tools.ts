@@ -228,7 +228,10 @@ export function executeTool(name: string, args: Record<string, unknown>, cwd: st
       case 'create_directory': return execShellTool(`mkdir -p '${resolve(cwd, String(args.path || ''))}'`, cwd)
       case 'file_info': return executeFileInfo(args, cwd)
       case 'find_definition': return executeFindDefinition(args, cwd)
-      case 'find_references': return execShellTool(`grep -rn '\\b${String(args.name || '')}\\b' '${resolve(cwd, String(args.path || '.'))}' --include='*.{ts,js,py,go,rs,java,c,cpp,h,rb,swift,kt}' 2>/dev/null | head -30`, cwd)
+      case 'find_references': {
+        const refIncludes = ['ts','js','py','go','rs','java','c','cpp','h','rb'].map(e => `--include='*.${e}'`).join(' ')
+        return execShellTool(`grep -rn '\\b${String(args.name || '')}\\b' '${resolve(cwd, String(args.path || '.'))}' ${refIncludes} 2>/dev/null | head -30`, cwd)
+      }
       case 'directory_tree': return execShellTool(`find '${resolve(cwd, String(args.path || '.'))}' -maxdepth ${Number(args.depth) || 3} -not -path '*/\\.*' -not -path '*/node_modules/*' 2>/dev/null | head -200 | sort`, cwd)
       case 'count_lines': return execShellTool(`find '${resolve(cwd, String(args.path || '.'))}' -type f -not -path '*/\\.*' -not -path '*/node_modules/*' -not -path '*/dist/*' | xargs wc -l 2>/dev/null | sort -rn | head -30`, cwd)
       case 'git_status': return execShellTool('git status --short', cwd)
@@ -515,8 +518,9 @@ function executeFindDefinition(args: Record<string, unknown>, cwd: string): Tool
   ]
 
   const combined = patterns.join('|')
+  const includes = ['ts','tsx','js','jsx','py','go','rs','java','c','cpp','h','rb','swift','kt'].map(e => `--include='*.${e}'`).join(' ')
   try {
-    const cmd = `grep -rn -E '${combined}' '${searchPath}' --include='*.{ts,tsx,js,jsx,py,go,rs,java,c,cpp,h,rb,swift,kt,mjs,cjs}' 2>/dev/null | head -20`
+    const cmd = `grep -rn -E '${combined}' '${searchPath}' ${includes} 2>/dev/null | head -20`
     const output = execSync(cmd, { encoding: 'utf-8', timeout: 10_000, maxBuffer: 512 * 1024 })
     return { success: true, output: output || `No definition found for "${name}"` }
   } catch {
