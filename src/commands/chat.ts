@@ -260,22 +260,14 @@ async function runREPL(
     const contextChars = history.reduce((sum, m) => sum + m.content.length, 0)
     const totalTokens = stats.totalInputTokens + stats.totalOutputTokens
 
-    // Separator between output and input
-    printSeparator()
-
-    // Prompt line (❯) — user types here, ABOVE the status line
-    // Status line prints AFTER user submits (via post-prompt render)
-    // But we show it below the prompt as persistent HUD
-    //
-    // Layout:
+    // Layout (reliable, no cursor tricks):
     //   ─────────────────────
-    //   ❯ (user input here)
     //   ◇ FORGE │ model │ ██ │ project git:(branch)
     //   ▸▸ yolo │ ⚡⚡⚡high            tokens
+    //   ❯ (user input here)
 
-    // Pre-render status line below where the prompt will be
-    // Use ANSI save/restore to print status below, then return cursor to prompt line
-    const statusLines = buildStatusText({
+    printSeparator()
+    printStatusLine({
       model: currentModel,
       provider: resolved.provider,
       mode: opts.safe ? 'safe' : 'yolo',
@@ -286,46 +278,7 @@ async function runREPL(
       effort: currentEffort,
     })
 
-    // Print status below (it will appear under the prompt after user types)
-    // We print it first, then move cursor up for the prompt
-    for (const line of statusLines) {
-      console.log(line)
-    }
-    // Move cursor up past status lines so readline prompt appears above them
-    process.stdout.write(`\x1b[${statusLines.length}A`)
-
     return `\x1b[36m❯\x1b[0m `
-  }
-
-  /** Build status line text (without printing) */
-  function buildStatusText(info: import('../output.js').StatusLineInfo): string[] {
-    const estimatedTokens = Math.round(info.contextChars / 4)
-    const pct = Math.min(100, Math.round((estimatedTokens / 200_000) * 100))
-    const barLen = 6
-    const filled = Math.round((pct / 100) * barLen)
-    const empty = barLen - filled
-    let barColor = '\x1b[32m'
-    if (pct >= 60) barColor = '\x1b[31m'
-    else if (pct >= 40) barColor = '\x1b[33m'
-    const bar = `${barColor}${'█'.repeat(filled)}${'░'.repeat(empty)}\x1b[0m`
-
-    const gitPart = info.gitBranch ? ` \x1b[90mgit:(\x1b[32m${info.gitBranch}\x1b[90m)\x1b[0m` : ''
-    const project = info.cwd.split('/').filter(Boolean).pop() || '~'
-    const modelShort = info.model.length > 20 ? info.model.slice(0, 18) + '..' : info.model
-    const tokenStr = `\x1b[90m${info.totalTokens.toLocaleString()} tokens\x1b[0m`
-
-    const effortMap: Record<string, string> = {
-      low: '\x1b[90m⚡low\x1b[0m', medium: '\x1b[33m⚡⚡med\x1b[0m',
-      high: '\x1b[36m⚡⚡⚡high\x1b[0m', max: '\x1b[35m⚡⚡⚡⚡max\x1b[0m',
-    }
-    const effortTag = effortMap[info.effort || 'high'] || effortMap['high']!
-    const modeTag = info.mode === 'yolo' ? '\x1b[33m▸▸ yolo\x1b[0m' : '\x1b[32m▸▸ safe\x1b[0m'
-
-    const line1 = `\x1b[36m◇\x1b[0m \x1b[1;37mFORGE\x1b[0m \x1b[90m│\x1b[0m ${modelShort} \x1b[90m│\x1b[0m ${bar} ${pct}% \x1b[90m│\x1b[0m \x1b[36m${project}\x1b[0m${gitPart}`
-    const cols = process.stdout.columns || 80
-    const line2 = `${modeTag} \x1b[90m│\x1b[0m ${effortTag}${' '.repeat(Math.max(0, cols - 45 - String(info.totalTokens.toLocaleString()).length - 7))}${tokenStr}`
-
-    return [line1, line2]
   }
 
   const promptUser = (): Promise<string | null> => new Promise((resolve) => {
