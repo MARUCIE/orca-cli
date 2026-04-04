@@ -282,11 +282,30 @@ function shellEscape(s: string): string {
   return s.replace(/'/g, "'\\''")
 }
 
+/**
+ * Smartly truncate tool output: if output exceeds limit, add a summary
+ * header with line count and file mentions before truncating.
+ * Prevents context pollution from large grep/list results.
+ */
+function smartTruncate(output: string, limit = 8_000): string {
+  if (output.length <= limit) return output
+  const lines = output.split('\n')
+  const totalLines = lines.length
+  // Extract unique file paths mentioned in output (grep-style: "file:line: content")
+  const fileSet = new Set<string>()
+  for (const line of lines.slice(0, 100)) {
+    const match = line.match(/^([^:]+\.[a-zA-Z]+):\d+/)
+    if (match) fileSet.add(match[1]!)
+  }
+  const summary = `[${totalLines} lines total, ${fileSet.size > 0 ? `${fileSet.size} files: ${[...fileSet].slice(0, 5).join(', ')}${fileSet.size > 5 ? '...' : ''}` : 'truncated'}]\n`
+  return summary + output.slice(0, limit - summary.length) + `\n... (truncated, ${totalLines} total lines)`
+}
+
 /** Shell helper for simple tools */
 function execShellTool(cmd: string, cwd: string): ToolResult {
   try {
     const output = execSync(cmd, { cwd, encoding: 'utf-8', timeout: 30_000, maxBuffer: 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'] })
-    return { success: true, output: output.slice(0, 10_000) || '(empty output)' }
+    return { success: true, output: smartTruncate(output) || '(empty output)' }
   } catch (err) {
     const e = err as { stdout?: string; stderr?: string; message: string }
     return { success: false, output: ((e.stdout || '') + (e.stderr || '') || e.message).slice(0, 5_000) }
@@ -296,7 +315,7 @@ function execShellTool(cmd: string, cwd: string): ToolResult {
 function executeReadFile(args: Record<string, unknown>, cwd: string): ToolResult {
   const filePath = resolve(cwd, String(args.path || ''))
   if (!existsSync(filePath)) {
-    return { success: false, output: `File not found: ${filePath}` }
+    return { success: false, output: `File not found: ${filePath}. Use list_directory or glob_files to discover available files.` }
   }
   const content = readFileSync(filePath, 'utf-8')
   const lines = content.split('\n')
@@ -382,7 +401,7 @@ function executeSearchFiles(args: Record<string, unknown>, cwd: string): ToolRes
   const cmd = `grep -rn ${fileGlob} '${shellEscape(pattern)}' '${shellEscape(searchPath)}' 2>/dev/null | head -50`
   try {
     const output = execSync(cmd, { encoding: 'utf-8', timeout: 10_000, maxBuffer: 512 * 1024 })
-    return { success: true, output: output || 'No matches found.' }
+    return { success: true, output: smartTruncate(output) || 'No matches found.' }
   } catch {
     return { success: true, output: 'No matches found.' }
   }
@@ -437,10 +456,10 @@ function executeEditFile(args: Record<string, unknown>, cwd: string): ToolResult
     const content = readFileSync(filePath, 'utf-8')
     const idx = content.indexOf(oldString)
     if (idx === -1) {
-      return { success: false, output: `old_string not found in ${filePath}. Read the file first to get the exact text.` }
+      return { success: false, output: `old_string not found in ${filePath}. Use read_file to get the exact current text, then retry with the precise string. Whitespace and newlines must match exactly.` }
     }
     if (content.indexOf(oldString, idx + 1) !== -1) {
-      return { success: false, output: `old_string matches multiple locations in ${filePath}. Provide more surrounding context to make it unique.` }
+      return { success: false, output: `old_string matches multiple locations in ${filePath}. Include more surrounding lines (before and after) to make the match unique.` }
     }
 
     const newContent = content.slice(0, idx) + newString + content.slice(idx + oldString.length)
@@ -508,7 +527,7 @@ function executeFileInfo(args: Record<string, unknown>, cwd: string): ToolResult
 function executeFindDefinition(args: Record<string, unknown>, cwd: string): ToolResult {
   const name = String(args.name || '')
   const searchPath = resolve(cwd, String(args.path || '.'))
-  if (!name) return { success: false, output: 'name is required.' }
+  if (!name) return { success: false, output: 'name is required. Provide a function, class, or variable name to search for.' }
 
   // Language-aware definition patterns
   const patterns = [
@@ -537,7 +556,7 @@ function executeFindDefinition(args: Record<string, unknown>, cwd: string): Tool
 
 function executeGitCommit(args: Record<string, unknown>, cwd: string): ToolResult {
   const message = String(args.message || '')
-  if (!message) return { success: false, output: 'message is required.' }
+  if (!message) return { success: false, output: 'message is required. Provide a descriptive commit message.' }
 
   try {
     const files = args.files as string[] | undefined
@@ -579,7 +598,7 @@ function executeMultiEdit(args: Record<string, unknown>, cwd: string): ToolResul
     return { success: false, output: 'edits array is required.' }
   }
   if (!existsSync(filePath)) {
-    return { success: false, output: `File not found: ${filePath}` }
+    return { success: false, output: `File not found: ${filePath}. Use list_directory or glob_files to verify the path.` }
   }
 
   try {

@@ -5,6 +5,7 @@
  */
 
 import { TOOL_DEFINITIONS } from './tools.js'
+import { loadProjectContext, formatContextForPrompt } from './context.js'
 
 export function buildSystemPrompt(cwd: string): string {
   // Generate tool list from actual definitions
@@ -38,5 +39,14 @@ ${toolDocs}
 ## Working Directory
 
 Current directory: ${cwd}
+
+${(() => {
+  try {
+    const ctx = loadProjectContext(cwd)
+    return formatContextForPrompt(ctx)
+  } catch {
+    return ''
+  }
+})()}
 `
 }
