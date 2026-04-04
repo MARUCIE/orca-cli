@@ -15,13 +15,13 @@ import { existsSync, appendFileSync, mkdirSync as fsMkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import {
   printBanner, printProviderInfo, printProjectContext, printError,
-  streamToken, ensureNewline, printToolUse, printToolResult,
+  streamToken, ensureNewline, setLastNewline, printToolUse, printToolResult,
   printUsageSummary, printSessionSummary, emitJson,
 } from '../output.js'
 import type { OutputMode } from '../output.js'
 import { streamChat } from '../providers/openai-compat.js'
 import type { ChatMessage } from '../providers/openai-compat.js'
-import { renderMarkdown, hasMarkdown } from '../markdown.js'
+import { StreamMarkdown } from '../markdown.js'
 import { TOOL_DEFINITIONS, executeTool, DANGEROUS_TOOLS } from '../tools.js'
 
 interface ChatOptions {
@@ -592,6 +592,7 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
   let outputTokens = 0
   let responseText = ''
   let gotFirstToken = false
+  const md = new StreamMarkdown()
 
   for await (const event of streamChat(
     { apiKey: resolved.apiKey, baseURL: resolved.baseURL!, model: resolved.model, systemPrompt: config.systemPrompt },
@@ -605,8 +606,6 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
             ? `write ${String(args.content || '').length} bytes to ${args.path}`
             : `run: ${String(args.command || '').slice(0, 80)}`
           console.log(`\x1b[33m  confirm: ${preview}\x1b[0m`)
-          // Auto-approve in proxy path (user can Esc to cancel the whole turn)
-          // Full permission UI requires async readline which isn't compatible with sync onToolCall
         }
         return executeTool(name, args, cwd)
       },
@@ -626,11 +625,13 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
           gotFirstToken = true
         }
         if (event.text) {
-          streamToken(event.text)
+          md.push(event.text)
           responseText += event.text
         }
         break
       case 'tool_use':
+        // Flush any buffered markdown before tool output
+        md.flush(); setLastNewline(md.endsWithNewline)
         if (!gotFirstToken && onFirstToken) {
           onFirstToken()
           gotFirstToken = true
@@ -645,6 +646,7 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
         outputTokens = event.outputTokens || 0
         break
       case 'error':
+        md.flush(); setLastNewline(md.endsWithNewline)
         if (!gotFirstToken && onFirstToken) onFirstToken()
         ensureNewline()
         printError(event.error || 'Unknown error')
@@ -654,17 +656,13 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
     }
   }
 
+  // Flush remaining markdown buffer
+  md.flush()
+
   // Append to conversation history
   history.push({ role: 'user', content: prompt })
   if (responseText) {
     history.push({ role: 'assistant', content: responseText })
-
-    // Render markdown if the response contains rich formatting
-    if (outputMode === 'streaming' && hasMarkdown(responseText)) {
-      ensureNewline()
-      // Re-render the response with markdown formatting
-      // (tokens were already streamed raw; this adds a formatted view for complex responses)
-    }
   }
 
   if (outputMode === 'streaming') {

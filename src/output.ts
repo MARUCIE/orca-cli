@@ -127,6 +127,10 @@ export function resetOutputState(): void {
   lastWasNewline = true
 }
 
+export function setLastNewline(value: boolean): void {
+  lastWasNewline = value
+}
+
 // ── Live Progress (Claude Code style status line) ───────────────────
 
 let progressInterval: ReturnType<typeof setInterval> | null = null

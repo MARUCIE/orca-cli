@@ -17,10 +17,11 @@ import type { ForgeConfig } from '../config.js'
 import { resolveConfig, resolveProvider } from '../config.js'
 import {
   printBanner, printProviderInfo, printError,
-  streamToken, ensureNewline, printToolUse, printToolResult,
+  ensureNewline, setLastNewline, printToolUse, printToolResult,
   printUsageSummary, emitJson,
 } from '../output.js'
 import type { OutputMode } from '../output.js'
+import { StreamMarkdown } from '../markdown.js'
 
 interface RunOptions {
   model?: string
@@ -129,6 +130,7 @@ async function executeTask(options: ExecuteTaskOptions): Promise<void> {
   let outputTokens = 0
   let turns = 0
   let toolCalls = 0
+  const md = new StreamMarkdown()
 
   for await (const event of agent.query(task)) {
     if (outputMode === 'json') {
@@ -141,8 +143,9 @@ async function executeTask(options: ExecuteTaskOptions): Promise<void> {
 
     if (type === 'text' || type === 'content_block_delta') {
       const text = (ev.text as string) || (ev.delta as Record<string, unknown>)?.text as string || ''
-      if (text) streamToken(text)
+      if (text) md.push(text)
     } else if (type === 'tool_use' || type === 'tool_call') {
+      md.flush(); setLastNewline(md.endsWithNewline)
       toolCalls++
       const toolName = (ev.name as string) || (ev.tool as string) || 'tool'
       let input: string | undefined
@@ -159,6 +162,8 @@ async function executeTask(options: ExecuteTaskOptions): Promise<void> {
       turns = (result.turns as number) || 0
     }
   }
+
+  md.flush()
 
   if (outputMode === 'streaming') {
     ensureNewline()
