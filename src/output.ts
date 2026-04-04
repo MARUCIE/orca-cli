@@ -105,7 +105,7 @@ export function printRichBanner(opts: {
 /** Simple banner for non-interactive / one-shot mode */
 export function printBanner(): void {
   console.log(chalk.blue.bold(`\n  forge`) + chalk.gray(` v${VERSION}`) + chalk.gray(` — armature agent runtime`))
-  console.log(chalk.gray(`  provider-neutral · MCP-native\n`))
+  console.log(chalk.gray(`  provider-neutral · 25 tools · multi-model\n`))
 }
 
 export function printProviderInfo(provider: string, model: string): void {
@@ -399,17 +399,16 @@ export function printToolResult(toolName: string, success: boolean, output?: str
 }
 
 function formatToolName(name: string): string {
-  // Convert snake_case to PascalCase display
-  switch (name) {
-    case 'read_file': return 'Read'
-    case 'write_file': return 'Write'
-    case 'edit_file': return 'Edit'
-    case 'list_directory': return 'ListDir'
-    case 'run_command': return 'Bash'
-    case 'search_files': return 'Search'
-    case 'glob_files': return 'Glob'
-    default: return name
+  const MAP: Record<string, string> = {
+    read_file: 'Read', write_file: 'Write', edit_file: 'Edit', multi_edit: 'MultiEdit',
+    list_directory: 'ListDir', run_command: 'Bash', search_files: 'Search', glob_files: 'Glob',
+    delete_file: 'Delete', move_file: 'Move', copy_file: 'Copy', create_directory: 'Mkdir',
+    file_info: 'FileInfo', find_definition: 'FindDef', find_references: 'FindRef',
+    directory_tree: 'Tree', count_lines: 'CountLines', patch_file: 'Patch',
+    git_status: 'GitStatus', git_diff: 'GitDiff', git_log: 'GitLog', git_commit: 'GitCommit',
+    fetch_url: 'Fetch', run_background: 'BgRun', check_port: 'CheckPort',
   }
+  return MAP[name] || name
 }
 
 function formatToolArgs(toolName: string, args: Record<string, unknown>): string {

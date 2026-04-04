@@ -813,11 +813,19 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
           let preview: string
           if (name === 'write_file') {
             preview = `write ${String(args.content || '').length} bytes to ${String(args.path || '')}`
-          } else if (name === 'edit_file') {
-            const oldStr = String(args.old_string || '').slice(0, 40)
-            preview = `edit ${String(args.path || '')}: "${oldStr}${String(args.old_string || '').length > 40 ? '...' : ''}"`
-          } else {
+          } else if (name === 'edit_file' || name === 'multi_edit') {
+            const target = String(args.path || '')
+            preview = `edit ${target}`
+          } else if (name === 'delete_file') {
+            preview = `delete ${String(args.path || '')}`
+          } else if (name === 'move_file') {
+            preview = `move ${String(args.source || '')} → ${String(args.destination || '')}`
+          } else if (name === 'git_commit') {
+            preview = `commit: ${String(args.message || '').slice(0, 60)}`
+          } else if (name === 'run_command' || name === 'run_background') {
             preview = `run: ${String(args.command || '').slice(0, 80)}`
+          } else {
+            preview = `${name}: ${JSON.stringify(args).slice(0, 80)}`
           }
 
           // Show diff preview and capture old content for undo
