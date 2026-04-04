@@ -1,0 +1,321 @@
+/**
+ * MCP (Model Context Protocol) stdio client.
+ *
+ * Spawns child processes for MCP servers defined in .mcp.json / .armature.json,
+ * communicates via JSON-RPC 2.0 over stdin/stdout.
+ *
+ * Capabilities:
+ *   - Server lifecycle (spawn, initialize, shutdown)
+ *   - resources/list + resources/read
+ *   - tools/list (discover MCP server tools)
+ *   - tools/call (invoke MCP server tools)
+ */
+
+import { spawn, type ChildProcess } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { createInterface, type Interface as ReadlineInterface } from 'node:readline'
+
+// ── Types ────────────────────────────────────────────────────────
+
+interface MCPServerConfig {
+  command: string
+  args?: string[]
+  env?: Record<string, string>
+  cwd?: string
+}
+
+interface JSONRPCRequest {
+  jsonrpc: '2.0'
+  id: number
+  method: string
+  params?: Record<string, unknown>
+}
+
+interface JSONRPCResponse {
+  jsonrpc: '2.0'
+  id: number
+  result?: unknown
+  error?: { code: number; message: string; data?: unknown }
+}
+
+export interface MCPResource {
+  uri: string
+  name: string
+  description?: string
+  mimeType?: string
+}
+
+export interface MCPTool {
+  name: string
+  description?: string
+  inputSchema?: Record<string, unknown>
+}
+
+interface MCPConnection {
+  name: string
+  process: ChildProcess
+  readline: ReadlineInterface
+  requestId: number
+  pending: Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>
+  initialized: boolean
+}
+
+// ── MCP Client ───────────────────────────────────────────────────
+
+export class MCPClient {
+  private connections = new Map<string, MCPConnection>()
+  private configs = new Map<string, MCPServerConfig>()
+
+  /** Load server configs from project/global config files */
+  loadConfigs(cwd: string): void {
+    const configPaths = [
+      join(cwd, '.mcp.json'),
+      join(cwd, '.armature.json'),
+      join(cwd, '.armature', 'mcp.json'),
+      join(process.env.HOME || '/tmp', '.armature', 'mcp.json'),
+    ]
+
+    for (const configPath of configPaths) {
+      if (!existsSync(configPath)) continue
+      try {
+        const raw = JSON.parse(readFileSync(configPath, 'utf-8'))
+        const servers = raw.mcpServers || raw.servers || raw
+        if (typeof servers === 'object' && !Array.isArray(servers)) {
+          for (const [name, config] of Object.entries(servers)) {
+            if (typeof config === 'object' && config !== null) {
+              this.configs.set(name, config as MCPServerConfig)
+            }
+          }
+        }
+      } catch { /* ignore parse errors */ }
+    }
+  }
+
+  /** Connect to a specific MCP server */
+  async connect(name: string): Promise<boolean> {
+    const config = this.configs.get(name)
+    if (!config) return false
+    if (this.connections.has(name)) return true
+
+    try {
+      const args = config.args || []
+      const env = { ...process.env, ...(config.env || {}) }
+      const proc = spawn(config.command, args, {
+        cwd: config.cwd,
+        env,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+
+      if (!proc.stdout || !proc.stdin) {
+        proc.kill()
+        return false
+      }
+
+      const rl = createInterface({ input: proc.stdout })
+      const conn: MCPConnection = {
+        name,
+        process: proc,
+        readline: rl,
+        requestId: 0,
+        pending: new Map(),
+        initialized: false,
+      }
+
+      // Handle incoming JSON-RPC responses
+      rl.on('line', (line) => {
+        try {
+          const msg = JSON.parse(line) as JSONRPCResponse
+          if (msg.id !== undefined) {
+            const pending = conn.pending.get(msg.id)
+            if (pending) {
+              conn.pending.delete(msg.id)
+              if (msg.error) {
+                pending.reject(new Error(msg.error.message))
+              } else {
+                pending.resolve(msg.result)
+              }
+            }
+          }
+        } catch { /* ignore non-JSON lines */ }
+      })
+
+      proc.on('exit', () => {
+        this.connections.delete(name)
+        for (const [, p] of conn.pending) {
+          p.reject(new Error('MCP server exited'))
+        }
+        conn.pending.clear()
+      })
+
+      this.connections.set(name, conn)
+
+      // Initialize handshake
+      const initResult = await this.request(name, 'initialize', {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'forge-cli', version: '0.1.0' },
+      })
+
+      if (initResult) {
+        conn.initialized = true
+        // Send initialized notification
+        this.notify(name, 'notifications/initialized', {})
+        return true
+      }
+      return false
+    } catch {
+      return false
+    }
+  }
+
+  /** Connect to all configured servers */
+  async connectAll(): Promise<string[]> {
+    const connected: string[] = []
+    for (const name of this.configs.keys()) {
+      const ok = await this.connect(name)
+      if (ok) connected.push(name)
+    }
+    return connected
+  }
+
+  /** Disconnect from a server */
+  disconnect(name: string): void {
+    const conn = this.connections.get(name)
+    if (!conn) return
+    try {
+      conn.process.kill()
+    } catch { /* ignore */ }
+    this.connections.delete(name)
+  }
+
+  /** Disconnect from all servers */
+  disconnectAll(): void {
+    for (const name of [...this.connections.keys()]) {
+      this.disconnect(name)
+    }
+  }
+
+  /** List connected servers */
+  listServers(): Array<{ name: string; initialized: boolean; pid: number }> {
+    const result: Array<{ name: string; initialized: boolean; pid: number }> = []
+    for (const [name, conn] of this.connections) {
+      result.push({ name, initialized: conn.initialized, pid: conn.process.pid || 0 })
+    }
+    // Also list configured but not connected
+    for (const name of this.configs.keys()) {
+      if (!this.connections.has(name)) {
+        result.push({ name, initialized: false, pid: 0 })
+      }
+    }
+    return result
+  }
+
+  /** List resources from all connected servers */
+  async listResources(serverName?: string): Promise<MCPResource[]> {
+    const resources: MCPResource[] = []
+    const targets = serverName
+      ? [serverName]
+      : [...this.connections.keys()]
+
+    for (const name of targets) {
+      if (!this.connections.has(name)) continue
+      try {
+        const result = await this.request(name, 'resources/list', {}) as { resources?: MCPResource[] }
+        if (result?.resources) {
+          for (const r of result.resources) {
+            resources.push({ ...r, name: `${name}/${r.name}` })
+          }
+        }
+      } catch { /* server may not support resources */ }
+    }
+    return resources
+  }
+
+  /** Read a specific resource by URI */
+  async readResource(uri: string): Promise<string> {
+    // Try all connected servers
+    for (const name of this.connections.keys()) {
+      try {
+        const result = await this.request(name, 'resources/read', { uri }) as {
+          contents?: Array<{ uri: string; text?: string; blob?: string }>
+        }
+        if (result?.contents && result.contents.length > 0) {
+          return result.contents[0]!.text || result.contents[0]!.blob || ''
+        }
+      } catch { continue }
+    }
+    throw new Error(`Resource not found: ${uri}`)
+  }
+
+  /** List tools from all connected servers */
+  async listTools(serverName?: string): Promise<Array<MCPTool & { server: string }>> {
+    const tools: Array<MCPTool & { server: string }> = []
+    const targets = serverName
+      ? [serverName]
+      : [...this.connections.keys()]
+
+    for (const name of targets) {
+      if (!this.connections.has(name)) continue
+      try {
+        const result = await this.request(name, 'tools/list', {}) as { tools?: MCPTool[] }
+        if (result?.tools) {
+          for (const t of result.tools) {
+            tools.push({ ...t, server: name })
+          }
+        }
+      } catch { /* server may not support tools */ }
+    }
+    return tools
+  }
+
+  /** Call a tool on a specific server */
+  async callTool(serverName: string, toolName: string, args: Record<string, unknown>): Promise<unknown> {
+    return this.request(serverName, 'tools/call', { name: toolName, arguments: args })
+  }
+
+  /** Get connected server count */
+  get connectedCount(): number {
+    return this.connections.size
+  }
+
+  get configuredCount(): number {
+    return this.configs.size
+  }
+
+  // ── Internal ─────────────────────────────────────────────────
+
+  private request(serverName: string, method: string, params: Record<string, unknown>): Promise<unknown> {
+    const conn = this.connections.get(serverName)
+    if (!conn || !conn.process.stdin) {
+      return Promise.reject(new Error(`Not connected to ${serverName}`))
+    }
+
+    const id = ++conn.requestId
+    const req: JSONRPCRequest = { jsonrpc: '2.0', id, method, params }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        conn.pending.delete(id)
+        reject(new Error(`MCP request timeout: ${method}`))
+      }, 10_000)
+
+      conn.pending.set(id, {
+        resolve: (v) => { clearTimeout(timeout); resolve(v) },
+        reject: (e) => { clearTimeout(timeout); reject(e) },
+      })
+
+      conn.process.stdin!.write(JSON.stringify(req) + '\n')
+    })
+  }
+
+  private notify(serverName: string, method: string, params: Record<string, unknown>): void {
+    const conn = this.connections.get(serverName)
+    if (!conn || !conn.process.stdin) return
+    const msg = { jsonrpc: '2.0', method, params }
+    conn.process.stdin.write(JSON.stringify(msg) + '\n')
+  }
+}
+
+/** Singleton MCP client */
+export const mcpClient = new MCPClient()

@@ -26,6 +26,7 @@ import { StreamMarkdown } from '../markdown.js'
 import { buildSystemPrompt } from '../system-prompt.js'
 import { hooks } from '../hooks.js'
 import type { HookInput } from '../hooks.js'
+import { mcpClient } from '../mcp-client.js'
 import { TOOL_DEFINITIONS, executeTool, DANGEROUS_TOOLS } from '../tools.js'
 
 interface ChatOptions {
@@ -228,11 +229,20 @@ async function runREPL(
     rl.once('close', () => resolve(null))
   })
 
-  // Load and run hooks
+  // Load hooks and MCP servers
   hooks.load(cwd)
   if (hooks.totalHooks > 0) {
     hooks.printStatus()
   }
+
+  mcpClient.loadConfigs(cwd)
+  if (mcpClient.configuredCount > 0) {
+    const connected = await mcpClient.connectAll()
+    if (connected.length > 0) {
+      console.log(`\x1b[90m  MCP: ${connected.length} server(s) connected (${connected.join(', ')})\x1b[0m`)
+    }
+  }
+
   await hooks.run('SessionStart', { event: 'SessionStart', cwd, model: currentModel })
 
   console.log('\x1b[90m  Type your message. /help for commands. Ctrl+C to quit.\x1b[0m')
@@ -292,6 +302,7 @@ async function runREPL(
         }, { lastWrite })
         if (handled === 'exit') {
           saveInputHistory(historyFile, inputHistory)
+          mcpClient.disconnectAll()
           await hooks.run('SessionEnd', { event: 'SessionEnd', cwd, model: currentModel })
           // Auto-save session on clean exit (if there was any conversation)
           if (stats.turns > 0) {
@@ -931,6 +942,27 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
             askRl.question('\x1b[90m  > \x1b[0m', (a) => { askRl.close(); res(a.trim()) })
           })
           return { success: true, output: answer || '(no response)' }
+
+        // MCP tools — async server communication
+        } else if (name === 'mcp_list_resources') {
+          try {
+            const resources = await mcpClient.listResources(args.server ? String(args.server) : undefined)
+            if (resources.length === 0) return { success: true, output: 'No resources available from connected MCP servers.' }
+            const lines = resources.map(r => `${r.uri} — ${r.name}${r.description ? ': ' + r.description : ''}`)
+            return { success: true, output: lines.join('\n') }
+          } catch (err) {
+            return { success: false, output: `MCP error: ${err instanceof Error ? err.message : String(err)}` }
+          }
+
+        } else if (name === 'mcp_read_resource') {
+          const uri = String(args.uri || '')
+          if (!uri) return { success: false, output: 'uri is required.' }
+          try {
+            const content = await mcpClient.readResource(uri)
+            return { success: true, output: content.slice(0, 20_000) }
+          } catch (err) {
+            return { success: false, output: `MCP error: ${err instanceof Error ? err.message : String(err)}` }
+          }
 
         // sleep — actually wait
         } else if (name === 'sleep') {

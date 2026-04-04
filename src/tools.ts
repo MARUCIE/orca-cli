@@ -255,10 +255,10 @@ export function executeTool(name: string, args: Record<string, unknown>, cwd: st
       case 'verify_plan': return executeVerifyPlan(args, cwd)
       // Web
       case 'web_search': return executeWebSearch(args)
-      // MCP
+      // MCP (async — handled in chat.ts onToolCall for live connections)
       case 'mcp_list_servers': return executeMcpListServers(cwd)
-      case 'mcp_list_resources': return { success: true, output: 'MCP resources: connect MCP servers via .mcp.json to list resources.' }
-      case 'mcp_read_resource': return { success: true, output: `MCP read: ${args.uri} — connect MCP servers via .mcp.json to read resources.` }
+      case 'mcp_list_resources': return { success: true, output: '[mcp_list_resources: async — handled in chat.ts]' }
+      case 'mcp_read_resource': return { success: true, output: '[mcp_read_resource: async — handled in chat.ts]' }
       // Scheduling
       case 'sleep': return { success: true, output: `Waiting ${Number(args.seconds) || 1}s... ${String(args.reason || '')}` }
       // Notebook
