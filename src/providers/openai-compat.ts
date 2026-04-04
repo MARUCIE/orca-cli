@@ -56,21 +56,20 @@ function resolveProxy(): string | undefined {
  * When the model isn't recognized, fall back to 16384 (safe for all major providers).
  */
 const MODEL_MAX_OUTPUT: Array<[string, number]> = [
-  // Anthropic (via Poe)
+  // Anthropic
+  ['claude-opus-4',     32000],
   ['claude-sonnet-4',   64000],
-  ['claude-3.7-sonnet', 64000],
-  ['claude-3-haiku',    8192],
-  ['claude-opus',       32000],
   // OpenAI
-  ['o3',                100000],
-  ['o4-mini',           100000],
-  ['gpt-4.1',           32768],
-  ['gpt-4.1-mini',      32768],
-  ['gpt-4o',            16384],
+  ['gpt-5',             64000],
   // Google
-  ['gemini-2.5-pro',    65536],
-  ['gemini-2.5-flash',  65536],
-  ['gemini-2.0-flash',  8192],
+  ['gemini-3',          65536],
+  // Open-source / China
+  ['gemma-4',           8192],
+  ['glm-5',             8192],
+  ['grok-4',            32000],
+  ['qwen3',             32000],
+  ['kimi-k2',           32000],
+  ['minimax-m2',        16384],
 ]
 
 function getModelMaxOutput(model: string): number {

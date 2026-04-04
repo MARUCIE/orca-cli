@@ -487,9 +487,17 @@ interface UndoState {
 }
 
 const POE_MODELS = [
-  'Claude-Sonnet-4', 'Claude-3.7-Sonnet', 'Claude-3-Haiku',
-  'GPT-4o', 'GPT-4.1', 'GPT-4.1-mini', 'o3', 'o4-mini',
-  'Gemini-2.5-Pro', 'Gemini-2.5-Flash', 'Gemini-2.0-Flash',
+  'claude-opus-4.6',
+  'claude-sonnet-4.6',
+  'gpt-5.4',
+  'gemini-3.1-pro',
+  'gemini-3.1-flash-lite',
+  'gemma-4-31b',
+  'glm-5',
+  'grok-4.20-multi-agent',
+  'qwen3.6-plus',
+  'kimi-k2.5',
+  'minimax-m2.7',
 ]
 
 function handleSlashCommand(

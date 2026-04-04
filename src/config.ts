@@ -233,11 +233,11 @@ function getProviderApiKey(provider: string): string | undefined {
 
 function getDefaultModel(provider: string): string {
   switch (provider) {
-    case 'poe': return 'Claude-Sonnet-4'
+    case 'poe': return 'claude-sonnet-4.6'
     case 'anthropic': return 'claude-sonnet-4-20250514'
-    case 'openai': return 'gpt-4.1'
-    case 'google': return 'gemini-2.5-pro'
-    default: return 'claude-sonnet-4-20250514'
+    case 'openai': return 'gpt-5.4'
+    case 'google': return 'gemini-3.1-pro'
+    default: return 'claude-sonnet-4.6'
   }
 }
 

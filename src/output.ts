@@ -15,29 +15,31 @@ export type OutputMode = 'streaming' | 'json'
 const VERSION = '0.1.0'
 
 // Anvil with sparks — the forge where tools are made
+// Each line is padded to exactly 20 visible chars for alignment
+const ART_WIDTH = 20 // visible character width of art column
 const ANVIL_ART = [
-  '\x1b[33m        · ✦ ·\x1b[0m',
-  '\x1b[36m      ▄██████▄\x1b[0m',
-  '\x1b[36m     ██████████\x1b[0m',
-  '\x1b[36m     ▀████████▀\x1b[0m',
-  '\x1b[36m       ██████\x1b[0m',
-  '\x1b[36m      ████████\x1b[0m',
+  '\x1b[33m     · ✦ ·\x1b[0m',          //  10 vis chars
+  '\x1b[36m   ▄██████▄\x1b[0m',          //  11 vis chars
+  '\x1b[36m  ██████████\x1b[0m',          //  12 vis chars
+  '\x1b[36m  ▀████████▀\x1b[0m',          //  12 vis chars
+  '\x1b[36m    ██████\x1b[0m',            //  10 vis chars
+  '\x1b[36m   ████████\x1b[0m',           //  11 vis chars
 ]
+// Visible widths of each art line (excluding ANSI codes)
+const ART_VIS_WIDTHS = [10, 11, 12, 12, 10, 11]
 
 // Model context window sizes (for display)
 const MODEL_CONTEXT: Record<string, string> = {
-  'claude-sonnet-4':   '200K ctx · 64K out',
-  'claude-3.7-sonnet': '200K ctx · 64K out',
-  'claude-3-haiku':    '200K ctx · 8K out',
-  'claude-opus':       '200K ctx · 32K out',
-  'gpt-4o':            '128K ctx · 16K out',
-  'gpt-4.1':           '1M ctx · 32K out',
-  'gpt-4.1-mini':      '1M ctx · 32K out',
-  'o3':                '200K ctx · 100K out',
-  'o4-mini':           '200K ctx · 100K out',
-  'gemini-2.5-pro':    '1M ctx · 65K out',
-  'gemini-2.5-flash':  '1M ctx · 65K out',
-  'gemini-2.0-flash':  '1M ctx · 8K out',
+  'claude-opus-4':      '200K ctx · 32K out',
+  'claude-sonnet-4':    '200K ctx · 64K out',
+  'gpt-5':              '1M ctx · 64K out',
+  'gemini-3':           '2M ctx · 65K out',
+  'gemma-4':            '128K ctx · 8K out',
+  'glm-5':              '128K ctx · 8K out',
+  'grok-4':             '256K ctx · 32K out',
+  'qwen3':              '128K ctx · 32K out',
+  'kimi-k2':            '128K ctx · 32K out',
+  'minimax-m2':         '256K ctx · 16K out',
 }
 
 function getModelSpec(model: string): string {
@@ -72,33 +74,41 @@ export function printRichBanner(opts: {
   const shortCwd = abbreviatePath(cwd)
 
   // Build right-side info lines (aligned with art)
+  const modeTag = mode === 'yolo' ? `  \x1b[33m[yolo]\x1b[0m` : mode === 'safe' ? `  \x1b[32m[safe]\x1b[0m` : ''
   const info: string[] = [
-    '',  // line 0: sparks (no text)
-    `  \x1b[1;37mForge\x1b[0m  \x1b[90mv${VERSION}\x1b[0m`,
-    `  \x1b[90marmature agent runtime\x1b[0m`,
+    '',  // sparks line — no text
+    `\x1b[1;37mForge\x1b[0m  \x1b[90mv${VERSION}\x1b[0m`,
+    `\x1b[90marmature agent runtime\x1b[0m`,
     '',  // spacer
-    `  \x1b[36m▸\x1b[0m \x1b[90m${provider}/\x1b[0m\x1b[1;37m${model}\x1b[0m` + (spec ? `  \x1b[90m${spec}\x1b[0m` : ''),
-    `  \x1b[36m▸\x1b[0m \x1b[90m${shortCwd}\x1b[0m` + (mode === 'yolo' ? `  \x1b[33m[yolo]\x1b[0m` : mode === 'safe' ? `  \x1b[32m[safe]\x1b[0m` : ''),
+    `\x1b[36m▸\x1b[0m \x1b[90m${provider}/\x1b[0m\x1b[1;37m${model}\x1b[0m` + (spec ? `  \x1b[90m${spec}\x1b[0m` : '') + modeTag,
+    `\x1b[36m▸\x1b[0m \x1b[90m${shortCwd}\x1b[0m`,
   ]
 
-  // Print art + info side by side
+  // Print art + info side by side with consistent padding
+  const pad = ' '.repeat(ART_WIDTH)
   console.log()
   for (let i = 0; i < ANVIL_ART.length; i++) {
-    console.log(`${ANVIL_ART[i]}${info[i] || ''}`)
+    const artLine = ANVIL_ART[i]!
+    const visWidth = ART_VIS_WIDTHS[i] || 0
+    const gap = ' '.repeat(Math.max(0, ART_WIDTH - visWidth))
+    const infoLine = info[i] || ''
+    if (infoLine) {
+      console.log(`${artLine}${gap}${infoLine}`)
+    } else {
+      console.log(artLine)
+    }
   }
 
-  // Extra info below the art
+  // Extra info below the art (aligned with info column)
   const extras: string[] = []
   if (configFiles && configFiles.length > 0) {
-    extras.push(`\x1b[90m  config: ${configFiles.join(', ')}\x1b[0m`)
+    extras.push(`\x1b[90mconfig: ${configFiles.join(', ')}\x1b[0m`)
   }
   if (toolCount) {
-    extras.push(`\x1b[90m  ${toolCount} tools loaded\x1b[0m`)
+    extras.push(`\x1b[90m${toolCount} tools · 8 hooks\x1b[0m`)
   }
-  if (extras.length > 0) {
-    for (const line of extras) {
-      console.log(`                      ${line}`)
-    }
+  for (const line of extras) {
+    console.log(`${pad}${line}`)
   }
   console.log()
 }
