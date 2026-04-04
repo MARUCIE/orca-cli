@@ -501,12 +501,6 @@ async function runREPL(
       }
     }
 
-    // Context size warning
-    const contextChars = history.reduce((sum, m) => sum + m.content.length, 0)
-    if (contextChars > 50_000) {
-      console.log('\x1b[33m  warn: context is large (' + Math.round(contextChars / 1000) + 'K chars). Consider /compact to reduce.\x1b[0m')
-    }
-
     // Abort controller for Esc/Ctrl+C during generation
     const abortController = new AbortController()
 
@@ -591,6 +585,42 @@ async function runREPL(
       }
     }
     console.log()
+
+    // ── Auto-compact: context management ──────────────────────
+    // Thresholds (chars, ~4 chars/token, ~200K token window):
+    //   40% = 320K chars → suggest
+    //   60% = 480K chars → auto-compact (keep last 4 turns)
+    //   80% = 640K chars → aggressive compact (keep last 2 turns)
+    const ctxChars = history.reduce((sum, m) => sum + m.content.length, 0)
+    const ctxPct = Math.round((ctxChars / 4 / 200_000) * 100)
+
+    if (ctxPct >= 80) {
+      // Aggressive: keep only system + last 2 messages
+      hooks.run('PreCompact', { event: 'PreCompact', cwd })
+      const sysMsg = history.find(m => m.role === 'system')
+      const convMsgs = history.filter(m => m.role !== 'system')
+      const keep = convMsgs.slice(-2)
+      const dropped = convMsgs.length - keep.length
+      history.length = 0
+      if (sysMsg) history.push(sysMsg)
+      history.push(...keep)
+      hooks.run('PostCompact', { event: 'PostCompact', cwd })
+      console.log(`\x1b[31m  auto-compact (${ctxPct}%): dropped ${dropped} messages, kept last 1 turn.\x1b[0m`)
+    } else if (ctxPct >= 60) {
+      // Standard: keep system + last 4 messages
+      hooks.run('PreCompact', { event: 'PreCompact', cwd })
+      const sysMsg = history.find(m => m.role === 'system')
+      const convMsgs = history.filter(m => m.role !== 'system')
+      const keep = convMsgs.slice(-4)
+      const dropped = convMsgs.length - keep.length
+      history.length = 0
+      if (sysMsg) history.push(sysMsg)
+      history.push(...keep)
+      hooks.run('PostCompact', { event: 'PostCompact', cwd })
+      console.log(`\x1b[33m  auto-compact (${ctxPct}%): dropped ${dropped} messages, kept last 2 turns.\x1b[0m`)
+    } else if (ctxPct >= 40) {
+      console.log(`\x1b[33m  context: ${ctxPct}% — consider /compact to free space.\x1b[0m`)
+    }
   }
 
   // Save history on any exit path
