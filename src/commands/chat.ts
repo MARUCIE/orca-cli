@@ -23,6 +23,7 @@ import type { OutputMode } from '../output.js'
 import { streamChat } from '../providers/openai-compat.js'
 import type { ChatMessage } from '../providers/openai-compat.js'
 import { StreamMarkdown } from '../markdown.js'
+import { buildSystemPrompt } from '../system-prompt.js'
 import { TOOL_DEFINITIONS, executeTool, DANGEROUS_TOOLS } from '../tools.js'
 
 interface ChatOptions {
@@ -156,8 +157,8 @@ async function runREPL(
   // Tab completion for slash commands
   const SLASH_COMMANDS = [
     '/help', '/model', '/models', '/clear', '/compact', '/system',
-    '/history', '/tokens', '/stats', '/retry', '/save', '/load',
-    '/sessions', '/undo', '/cwd', '/exit', '/quit',
+    '/history', '/tokens', '/stats', '/retry', '/diff', '/git',
+    '/save', '/load', '/sessions', '/undo', '/cwd', '/exit', '/quit',
   ]
   const completer = (line: string): [string[], string] => {
     if (line.startsWith('/')) {
@@ -189,9 +190,8 @@ async function runREPL(
 
   // Multi-turn conversation history
   const history: ChatMessage[] = []
-  if (config.systemPrompt) {
-    history.push({ role: 'system', content: config.systemPrompt })
-  }
+  const sysPrompt = config.systemPrompt || buildSystemPrompt(cwd)
+  history.push({ role: 'system', content: sysPrompt })
 
   // Session statistics
   const stats: SessionStats = {
@@ -492,6 +492,8 @@ function handleSlashCommand(
       console.log('  /tokens                Show token breakdown')
       console.log('  /stats                 Session statistics')
       console.log('  /retry, /r             Retry last message')
+      console.log('  /diff                  Show git diff')
+      console.log('  /git <cmd>             Run git command')
       console.log('  /save [name]           Save session to disk')
       console.log('  /load [name]           Load a saved session')
       console.log('  /sessions              List saved sessions')
@@ -620,6 +622,43 @@ function handleSlashCommand(
     case '/cwd':
       console.log(`\x1b[90m  ${cwd}\x1b[0m`)
       return 'handled'
+
+    case '/diff': {
+      try {
+        const { execSync } = require('node:child_process') as typeof import('node:child_process')
+        const diff = execSync('git diff --stat && echo "---" && git diff --no-color', {
+          cwd, encoding: 'utf-8', timeout: 10_000, maxBuffer: 1024 * 1024,
+        })
+        if (diff.trim()) {
+          console.log(`\x1b[90m${diff.slice(0, 3000)}\x1b[0m`)
+          if (diff.length > 3000) console.log('\x1b[90m  ... (truncated)\x1b[0m')
+        } else {
+          console.log('\x1b[90m  no changes.\x1b[0m')
+        }
+      } catch (err) {
+        console.log(`\x1b[31m  git diff failed: ${err instanceof Error ? err.message : err}\x1b[0m`)
+      }
+      return 'handled'
+    }
+
+    case '/git': {
+      if (!arg) {
+        console.log('\x1b[33m  usage: /git <command>  (e.g., /git status, /git log --oneline -5)\x1b[0m')
+        return 'handled'
+      }
+      try {
+        const { execSync } = require('node:child_process') as typeof import('node:child_process')
+        const output = execSync(`git ${arg}`, {
+          cwd, encoding: 'utf-8', timeout: 10_000, maxBuffer: 1024 * 1024,
+        })
+        console.log(`\x1b[90m${output.slice(0, 3000)}\x1b[0m`)
+        if (output.length > 3000) console.log('\x1b[90m  ... (truncated)\x1b[0m')
+      } catch (err) {
+        const execErr = err as { stdout?: string; stderr?: string; message: string }
+        console.log(`\x1b[31m  ${(execErr.stderr || execErr.stdout || execErr.message).slice(0, 500)}\x1b[0m`)
+      }
+      return 'handled'
+    }
 
     case '/save': {
       const sessionName = arg || `session-${Date.now()}`
@@ -769,24 +808,34 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
     history,
     {
       onToolCall: async (name, args) => {
-        // Permission gate for dangerous tools (write_file, run_command)
+        // Permission gate for dangerous tools (write_file, edit_file, run_command)
         if (DANGEROUS_TOOLS.has(name)) {
-          const preview = name === 'write_file'
-            ? `write ${String(args.content || '').length} bytes to ${String(args.path || '')}`
-            : `run: ${String(args.command || '').slice(0, 80)}`
+          let preview: string
+          if (name === 'write_file') {
+            preview = `write ${String(args.content || '').length} bytes to ${String(args.path || '')}`
+          } else if (name === 'edit_file') {
+            const oldStr = String(args.old_string || '').slice(0, 40)
+            preview = `edit ${String(args.path || '')}: "${oldStr}${String(args.old_string || '').length > 40 ? '...' : ''}"`
+          } else {
+            preview = `run: ${String(args.command || '').slice(0, 80)}`
+          }
 
           // Show diff preview and capture old content for undo
-          if (name === 'write_file' && args.path) {
-            const { resolve } = await import('node:path')
-            const fullPath = resolve(cwd, String(args.path))
+          if ((name === 'write_file' || name === 'edit_file') && args.path) {
+            const { resolve: resolvePath } = await import('node:path')
+            const fullPath = resolvePath(cwd, String(args.path))
             let oldContent: string | null = null
             if (existsSync(fullPath)) {
               try {
                 oldContent = readFileSync(fullPath, 'utf-8')
-                printDiffPreview(oldContent, String(args.content || ''))
+                if (name === 'write_file') {
+                  printDiffPreview(oldContent, String(args.content || ''))
+                } else if (name === 'edit_file') {
+                  const newContent = oldContent.replace(String(args.old_string || ''), String(args.new_string || ''))
+                  printDiffPreview(oldContent, newContent)
+                }
               } catch { /* ignore read errors */ }
             }
-            // Track for /undo
             if (onFileWrite) onFileWrite(fullPath, oldContent)
           }
 

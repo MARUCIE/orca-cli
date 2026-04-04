@@ -403,9 +403,11 @@ function formatToolName(name: string): string {
   switch (name) {
     case 'read_file': return 'Read'
     case 'write_file': return 'Write'
+    case 'edit_file': return 'Edit'
     case 'list_directory': return 'ListDir'
     case 'run_command': return 'Bash'
     case 'search_files': return 'Search'
+    case 'glob_files': return 'Glob'
     default: return name
   }
 }
@@ -434,6 +436,16 @@ function formatToolArgs(toolName: string, args: Record<string, unknown>): string
       const glob = args.file_glob ? ` ${args.file_glob}` : ''
       return `"${pattern}" in ${path}${glob}`
     }
+    case 'edit_file': {
+      const path = String(args.path || '')
+      const oldStr = String(args.old_string || '').slice(0, 30)
+      return `${path}, "${oldStr}${String(args.old_string || '').length > 30 ? '...' : ''}"`
+    }
+    case 'glob_files': {
+      const pattern = String(args.pattern || '')
+      const path = args.path ? ` in ${args.path}` : ''
+      return `${pattern}${path}`
+    }
     default:
       return ''
   }
@@ -460,7 +472,12 @@ function getResultPreview(toolName: string, output: string): string {
         : 'no matches'
     }
     case 'write_file':
+    case 'edit_file':
       return output
+    case 'glob_files': {
+      const files = output.split('\n').filter(Boolean)
+      return `${files.length} files`
+    }
     default:
       return ''
   }

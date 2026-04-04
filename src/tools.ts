@@ -126,6 +126,29 @@ export const TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'edit_file',
+      description: 'Edit a file by replacing an exact string with a new string. More precise than write_file — use this for targeted changes.',
+      parameters: { type: 'object', properties: {
+        path: { type: 'string', description: 'File path to edit' },
+        old_string: { type: 'string', description: 'Exact string to find and replace (must match uniquely)' },
+        new_string: { type: 'string', description: 'Replacement string' },
+      }, required: ['path', 'old_string', 'new_string'] },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'glob_files',
+      description: 'Find files matching a glob pattern. Use this to discover project structure and find files by name.',
+      parameters: { type: 'object', properties: {
+        pattern: { type: 'string', description: 'Glob pattern (e.g., "**/*.ts", "src/**/*.py", "*.json")' },
+        path: { type: 'string', description: 'Base directory to search from (default: working directory)' },
+      }, required: ['pattern'] },
+    },
+  },
 ]
 
 // ── Tool Execution ──────────────────────────────────────────────
@@ -135,24 +158,19 @@ export interface ToolResult {
   output: string
 }
 
-// Tools that modify the filesystem or execute arbitrary commands
-export const DANGEROUS_TOOLS = new Set(['write_file', 'run_command'])
+export const DANGEROUS_TOOLS = new Set(['write_file', 'edit_file', 'run_command'])
 
 export function executeTool(name: string, args: Record<string, unknown>, cwd: string): ToolResult {
   try {
     switch (name) {
-      case 'read_file':
-        return executeReadFile(args, cwd)
-      case 'list_directory':
-        return executeListDirectory(args, cwd)
-      case 'run_command':
-        return executeRunCommand(args, cwd)
-      case 'search_files':
-        return executeSearchFiles(args, cwd)
-      case 'write_file':
-        return executeWriteFile(args, cwd)
-      default:
-        return { success: false, output: `Unknown tool: ${name}` }
+      case 'read_file': return executeReadFile(args, cwd)
+      case 'list_directory': return executeListDirectory(args, cwd)
+      case 'run_command': return executeRunCommand(args, cwd)
+      case 'search_files': return executeSearchFiles(args, cwd)
+      case 'write_file': return executeWriteFile(args, cwd)
+      case 'edit_file': return executeEditFile(args, cwd)
+      case 'glob_files': return executeGlobFiles(args, cwd)
+      default: return { success: false, output: `Unknown tool: ${name}` }
     }
   } catch (err) {
     return { success: false, output: err instanceof Error ? err.message : String(err) }
@@ -284,5 +302,66 @@ function executeWriteFile(args: Record<string, unknown>, cwd: string): ToolResul
     return { success: true, output: `Created ${filePath} (${content.length} bytes, ${content.split('\n').length} lines)` }
   } catch (err) {
     return { success: false, output: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function executeEditFile(args: Record<string, unknown>, cwd: string): ToolResult {
+  const filePath = resolve(cwd, String(args.path || ''))
+  const oldString = String(args.old_string || '')
+  const newString = String(args.new_string || '')
+
+  if (!oldString) {
+    return { success: false, output: 'old_string is required and must not be empty.' }
+  }
+  if (!existsSync(filePath)) {
+    return { success: false, output: `File not found: ${filePath}` }
+  }
+
+  try {
+    const content = readFileSync(filePath, 'utf-8')
+    const idx = content.indexOf(oldString)
+    if (idx === -1) {
+      return { success: false, output: `old_string not found in ${filePath}. Read the file first to get the exact text.` }
+    }
+    if (content.indexOf(oldString, idx + 1) !== -1) {
+      return { success: false, output: `old_string matches multiple locations in ${filePath}. Provide more surrounding context to make it unique.` }
+    }
+
+    const newContent = content.slice(0, idx) + newString + content.slice(idx + oldString.length)
+    writeFileSync(filePath, newContent, 'utf-8')
+
+    const oldLines = oldString.split('\n').length
+    const newLines = newString.split('\n').length
+    const delta = newLines - oldLines
+    const sign = delta >= 0 ? `+${delta}` : `${delta}`
+    return { success: true, output: `Edited ${filePath} (replaced ${oldLines} lines with ${newLines} lines, ${sign})` }
+  } catch (err) {
+    return { success: false, output: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function executeGlobFiles(args: Record<string, unknown>, cwd: string): ToolResult {
+  const pattern = String(args.pattern || '')
+  const basePath = args.path ? resolve(cwd, String(args.path)) : cwd
+
+  if (!pattern) return { success: false, output: 'pattern is required.' }
+
+  try {
+    const escaped = pattern.replace(/'/g, "'\\''")
+    let cmd: string
+    if (pattern.includes('/') || pattern.includes('**')) {
+      const regex = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*').replace(/\?/g, '.')
+      cmd = `cd '${basePath}' && git ls-files --cached --others --exclude-standard 2>/dev/null | grep -E '${regex}' | head -100`
+    } else {
+      cmd = `cd '${basePath}' && find . -type f -name '${escaped}' 2>/dev/null | sed 's|^\\./||' | head -100`
+    }
+
+    const output = execSync(cmd, { encoding: 'utf-8', timeout: 10_000, maxBuffer: 512 * 1024 })
+    const files = output.trim().split('\n').filter(Boolean)
+    return files.length === 0
+      ? { success: true, output: 'No files matched.' }
+      : { success: true, output: files.join('\n') }
+  } catch {
+    return { success: true, output: 'No files matched.' }
   }
 }

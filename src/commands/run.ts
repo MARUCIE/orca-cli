@@ -22,6 +22,7 @@ import {
 } from '../output.js'
 import type { OutputMode } from '../output.js'
 import { StreamMarkdown } from '../markdown.js'
+import { buildSystemPrompt } from '../system-prompt.js'
 
 interface RunOptions {
   model?: string
@@ -120,7 +121,7 @@ async function executeTask(options: ExecuteTaskOptions): Promise<void> {
     model,
     maxTurns: config.maxTurns,
     maxBudgetUsd: config.maxBudgetUsd,
-    systemPrompt: config.systemPrompt || buildTaskSystemPrompt(),
+    systemPrompt: config.systemPrompt || buildSystemPrompt(cwd),
     permissionMode: permissionMode as 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan',
     cwd,
   })
@@ -187,11 +188,3 @@ function buildFlags(opts: RunOptions): Partial<ForgeConfig> {
   return flags
 }
 
-function buildTaskSystemPrompt(): string {
-  return [
-    'You are Forge, a provider-neutral coding agent powered by the Armature SDK.',
-    'You have access to file system tools, shell execution, and search capabilities.',
-    'Execute the given task efficiently. Prefer minimal, reviewable changes.',
-    'Always verify your work before reporting completion.',
-  ].join(' ')
-}
