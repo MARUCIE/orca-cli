@@ -73,15 +73,15 @@ export function printRichBanner(opts: {
   const spec = getModelSpec(model)
   const shortCwd = abbreviatePath(cwd)
 
-  // Build right-side info lines (aligned with art)
-  const modeTag = mode === 'yolo' ? `  \x1b[33m[yolo]\x1b[0m` : mode === 'safe' ? `  \x1b[32m[safe]\x1b[0m` : ''
+  // Build right-side info lines (only name + version + project context)
+  // Model/mode/effort shown in status line — no duplication
   const info: string[] = [
     '',  // sparks line — no text
     `\x1b[1;37mForge\x1b[0m  \x1b[90mv${VERSION}\x1b[0m`,
     `\x1b[90marmature agent runtime\x1b[0m`,
     '',  // spacer
-    `\x1b[36m▸\x1b[0m \x1b[90m${provider}/\x1b[0m\x1b[1;37m${model}\x1b[0m` + (spec ? `  \x1b[90m${spec}\x1b[0m` : '') + modeTag,
     `\x1b[36m▸\x1b[0m \x1b[90m${shortCwd}\x1b[0m`,
+    '',
   ]
 
   // Print art + info side by side with consistent padding
