@@ -27,6 +27,7 @@ import { buildSystemPrompt } from '../system-prompt.js'
 import { hooks } from '../hooks.js'
 import type { HookInput } from '../hooks.js'
 import { mcpClient } from '../mcp-client.js'
+import { runCommandPicker } from '../command-picker.js'
 import { runCouncil, runRace, runPipeline, pickDiverseModels } from '../multi-model.js'
 import type { PipelineStage } from '../multi-model.js'
 import { TOOL_DEFINITIONS, executeTool, DANGEROUS_TOOLS } from '../tools.js'
@@ -186,12 +187,35 @@ async function runREPL(
     completer,
   })
 
-  // Ctrl+L to clear screen
+  // Ctrl+L to clear screen + live slash hint
+  let lastHintLen = 0
   rl.on('SIGCONT', () => { /* resume after bg */ })
+  rl.on('line', () => { lastHintLen = 0 }) // clear hint state on submit
   process.stdin.on('keypress', (_ch: string, key: { name?: string; ctrl?: boolean }) => {
     if (key && key.ctrl && key.name === 'l') {
-      process.stdout.write('\x1b[2J\x1b[H') // clear screen + move cursor to top
+      process.stdout.write('\x1b[2J\x1b[H')
       rl.prompt()
+      return
+    }
+
+    // Live slash command hint — show matching commands as user types
+    const line = (rl as unknown as { line: string }).line
+    if (line && line.startsWith('/') && line.length > 1 && line.length < 15) {
+      const matches = SLASH_COMMANDS.filter(c => c.startsWith(line))
+      // Clear previous hint
+      if (lastHintLen > 0) {
+        process.stdout.write(`\x1b[s\x1b[1B\x1b[2K\x1b[u`) // save, down, clear, restore
+      }
+      if (matches.length > 0 && matches.length <= 8) {
+        const hint = matches.map(m => m === matches[0] ? `\x1b[36m${m}\x1b[0m` : `\x1b[90m${m}\x1b[0m`).join('  ')
+        process.stdout.write(`\x1b[s\n\x1b[2K  ${hint}\x1b[u`) // save, newline, clear, write, restore
+        lastHintLen = 1
+      } else {
+        lastHintLen = 0
+      }
+    } else if (lastHintLen > 0) {
+      process.stdout.write(`\x1b[s\x1b[1B\x1b[2K\x1b[u`)
+      lastHintLen = 0
     }
   })
 
@@ -282,6 +306,17 @@ async function runREPL(
 
     // Slash command dispatch
     if (input.startsWith('/')) {
+      // Interactive command picker: just `/` alone opens the picker
+      if (input === '/') {
+        const picked = await runCommandPicker()
+        if (picked) {
+          input = picked
+          // Fall through to process the picked command
+        } else {
+          continue // cancelled
+        }
+      }
+
       // Handle /retry specially
       if (input === '/retry' || input === '/r') {
         if (!lastPrompt) {
