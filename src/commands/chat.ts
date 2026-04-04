@@ -1143,5 +1143,6 @@ function buildFlags(opts: ChatOptions): Partial<ForgeConfig> {
   if (opts.apiKey) flags.apiKey = opts.apiKey
   if (opts.maxTurns) flags.maxTurns = parseInt(opts.maxTurns, 10)
   if (opts.systemPrompt) flags.systemPrompt = opts.systemPrompt
+  if (opts.safe) flags.permissionMode = 'default'
   return flags
 }

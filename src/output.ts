@@ -470,7 +470,9 @@ export interface UsageSummary {
   turns: number
   durationMs: number
   model?: string
-  contextChars?: number  // for context usage bar
+  contextChars?: number
+  budgetUsd?: number       // max budget for warning
+  sessionCostUsd?: number  // cumulative session cost
 }
 
 export function printUsageSummary(usage: UsageSummary): void {
@@ -498,7 +500,18 @@ export function printUsageSummary(usage: UsageSummary): void {
     ctxBar = renderContextBar(usage.contextChars)
   }
 
-  console.log(chalk.gray(`\n  ─ ${parts.join(' · ')}${ctxBar} ─\n`))
+  console.log(chalk.gray(`\n  ─ ${parts.join(' · ')}${ctxBar} ─`))
+
+  // Budget warning
+  if (usage.budgetUsd && usage.sessionCostUsd) {
+    const pct = Math.round((usage.sessionCostUsd / usage.budgetUsd) * 100)
+    if (pct >= 90) {
+      console.log(chalk.red(`  ⚠ budget: $${usage.sessionCostUsd.toFixed(4)} / $${usage.budgetUsd.toFixed(2)} (${pct}%) — approaching limit`))
+    } else if (pct >= 70) {
+      console.log(chalk.yellow(`  budget: $${usage.sessionCostUsd.toFixed(4)} / $${usage.budgetUsd.toFixed(2)} (${pct}%)`))
+    }
+  }
+  console.log()
 }
 
 /**
