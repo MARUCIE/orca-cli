@@ -118,15 +118,16 @@ export class StreamMarkdown {
       return
     }
 
-    // ── Regular line — format and emit ──────────────────────────
-    this.emit(this.formatLine(line) + '\n')
+    // ── Regular line — format and emit (with 2-space indent for readability)
+    const formatted = this.formatLine(line)
+    this.emit((formatted ? '  ' + formatted : '') + '\n')
   }
 
   // ── Line-level formatting ──────────────────────────────────────
 
   private formatLine(line: string): string {
-    // Empty line → blank
-    if (!line.trim()) return ''
+    // Empty line → paragraph break (preserve spacing between blocks)
+    if (!line.trim()) return ''  // single blank line for paragraph separation
 
     // Heading: # … ######
     const hMatch = line.match(/^(#{1,6})\s+(.*)/)

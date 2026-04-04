@@ -260,7 +260,7 @@ async function runREPL(
     const contextChars = history.reduce((sum, m) => sum + m.content.length, 0)
     const totalTokens = stats.totalInputTokens + stats.totalOutputTokens
 
-    // Separator
+    // Top separator (above status line)
     printSeparator()
 
     // Status line
@@ -275,8 +275,7 @@ async function runREPL(
       effort: currentEffort,
     })
 
-    // Return the actual prompt string
-    const turnNum = stats.turns + 1
+    // Prompt line with ❯
     return `\x1b[36m❯\x1b[0m `
   }
 

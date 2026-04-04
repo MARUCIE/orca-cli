@@ -315,10 +315,12 @@ function truncateLine(s: string, max: number): string {
 
 /**
  * Print a separator line between output and prompt (like Claude Code).
+ * Uses a lighter style to frame the input area.
  */
 export function printSeparator(): void {
   const cols = process.stdout.columns || 80
-  console.log(chalk.gray('─'.repeat(Math.min(cols - 2, 80))))
+  const width = Math.min(cols - 2, 80)
+  console.log(`\x1b[90m${'─'.repeat(width)}\x1b[0m`)
 }
 
 export type ThinkingEffort = 'low' | 'medium' | 'high' | 'max'
