@@ -6,8 +6,8 @@
 
 ## Executive Summary
 
-Current state: 5,111 LOC, 41 tools, 8 hooks, 11 models, 129 tests (3 rounds).
-Target state: 210+ tests (9 rounds), covering all 10 SOTA dimensions.
+Current state: 5,111 LOC, 41 tools, 8 hooks, 11 models, 262 tests (12 rounds).
+All 10 SOTA dimensions covered + 3 hardening rounds (determinism, adversarial, protocol).
 
 Key insight from research: **Model raw score vs agent delivery has a 20+ point gap**
 (Claude Opus 80.9% SWE-bench vs Claude Code 58.0%). The gap = harness engineering.
@@ -211,13 +211,16 @@ From production audit research, each mode has dedicated test coverage:
 | 3 | integration.test.ts | 18 | DONE |
 | 3b | edge-cases.test.ts | 24 | DONE |
 | 3c | config/output/program | 22 | DONE |
-| 4 | agent-loop.test.ts | 15 | PENDING |
-| 5 | hooks.test.ts | 15 | PENDING |
-| 6 | complex-scenarios.test.ts | 20 | PENDING |
-| 7 | large-codebase.test.ts | 12 | PENDING |
-| 8 | e2e-workflow.test.ts | 12 | PENDING |
-| 9 | multi-model.test.ts | 11 | PENDING |
-| **Total** | | **214** | |
+| 4 | agent-loop.test.ts | 15 | DONE |
+| 5 | hooks.test.ts | 15 | DONE |
+| 6 | complex-scenarios.test.ts | 20 | DONE |
+| 7 | large-codebase.test.ts | 12 | DONE |
+| 8 | e2e-workflow.test.ts | 12 | DONE |
+| 9 | multi-model.test.ts | 11 | DONE |
+| 10 | determinism.test.ts | 15 | DONE |
+| 11 | adversarial.test.ts | 18 | DONE |
+| 12 | protocol.test.ts | 15 | DONE |
+| **Total** | | **262** | |
 
 ---
 
