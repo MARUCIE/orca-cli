@@ -249,7 +249,7 @@ async function runREPL(
   await hooks.run('SessionStart', { event: 'SessionStart', cwd, model: currentModel })
 
   console.log('\x1b[90m  Type your message. /help for commands. Ctrl+C to quit.\x1b[0m')
-  console.log('\x1b[90m  Up/Down arrows browse history. Start with ``` for multi-line.\x1b[0m\n')
+  console.log('\x1b[90m  /council /race /pipeline — multi-model collaboration\x1b[0m\n')
 
   // Input history collector for persistence
   const inputHistory: string[] = []
