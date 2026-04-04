@@ -51,6 +51,36 @@ function resolveProxy(): string | undefined {
   )
 }
 
+/**
+ * Model max output tokens — keyed by lowercase prefix match.
+ * When the model isn't recognized, fall back to 16384 (safe for all major providers).
+ */
+const MODEL_MAX_OUTPUT: Array<[string, number]> = [
+  // Anthropic (via Poe)
+  ['claude-sonnet-4',   64000],
+  ['claude-3.7-sonnet', 64000],
+  ['claude-3-haiku',    8192],
+  ['claude-opus',       32000],
+  // OpenAI
+  ['o3',                100000],
+  ['o4-mini',           100000],
+  ['gpt-4.1',           32768],
+  ['gpt-4.1-mini',      32768],
+  ['gpt-4o',            16384],
+  // Google
+  ['gemini-2.5-pro',    65536],
+  ['gemini-2.5-flash',  65536],
+  ['gemini-2.0-flash',  8192],
+]
+
+function getModelMaxOutput(model: string): number {
+  const lower = model.toLowerCase()
+  for (const [prefix, max] of MODEL_MAX_OUTPUT) {
+    if (lower.includes(prefix)) return max
+  }
+  return 16384 // safe fallback
+}
+
 let proxyWarningShown = false
 
 async function createOpenAIClient(apiKey: string, baseURL: string) {
@@ -103,10 +133,9 @@ export async function* streamChat(
 
   let totalInputTokens = 0
   let totalOutputTokens = 0
-  const maxRounds = 20 // allow complex multi-step tasks
 
   try {
-    for (let round = 0; round <= maxRounds; round++) {
+    for (let round = 0; /* no limit — loop until task completes, error, or abort */ ; round++) {
       // Check abort signal between rounds
       if (toolCallbacks?.abortSignal?.aborted) {
         yield { type: 'text', text: '\n\n[interrupted]' }
@@ -118,7 +147,7 @@ export async function* streamChat(
         model: options.model,
         messages,
         stream: true,
-        max_tokens: options.maxTokens || 16384,
+        max_tokens: options.maxTokens || getModelMaxOutput(options.model),
       }
 
       // Include tools if available (function calling)
@@ -266,7 +295,7 @@ export async function chatOnce(
   const response = await client.chat.completions.create({
     model: options.model,
     messages,
-    max_tokens: options.maxTokens || 4096,
+    max_tokens: options.maxTokens || getModelMaxOutput(options.model),
   })
 
   const choice = response.choices?.[0]
