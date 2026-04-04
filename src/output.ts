@@ -12,25 +12,116 @@ export type OutputMode = 'streaming' | 'json'
 
 // ── Banner ──────────────────────────────────────────────────────────
 
+const VERSION = '0.1.0'
+
+// Anvil with sparks — the forge where tools are made
+const ANVIL_ART = [
+  '\x1b[33m        · ✦ ·\x1b[0m',
+  '\x1b[36m      ▄██████▄\x1b[0m',
+  '\x1b[36m     ██████████\x1b[0m',
+  '\x1b[36m     ▀████████▀\x1b[0m',
+  '\x1b[36m       ██████\x1b[0m',
+  '\x1b[36m      ████████\x1b[0m',
+]
+
+// Model context window sizes (for display)
+const MODEL_CONTEXT: Record<string, string> = {
+  'claude-sonnet-4':   '200K ctx · 64K out',
+  'claude-3.7-sonnet': '200K ctx · 64K out',
+  'claude-3-haiku':    '200K ctx · 8K out',
+  'claude-opus':       '200K ctx · 32K out',
+  'gpt-4o':            '128K ctx · 16K out',
+  'gpt-4.1':           '1M ctx · 32K out',
+  'gpt-4.1-mini':      '1M ctx · 32K out',
+  'o3':                '200K ctx · 100K out',
+  'o4-mini':           '200K ctx · 100K out',
+  'gemini-2.5-pro':    '1M ctx · 65K out',
+  'gemini-2.5-flash':  '1M ctx · 65K out',
+  'gemini-2.0-flash':  '1M ctx · 8K out',
+}
+
+function getModelSpec(model: string): string {
+  const lower = model.toLowerCase()
+  for (const [key, spec] of Object.entries(MODEL_CONTEXT)) {
+    if (lower.includes(key)) return spec
+  }
+  return ''
+}
+
+function abbreviatePath(p: string): string {
+  const home = process.env.HOME || process.env.USERPROFILE || ''
+  if (home && p.startsWith(home)) {
+    return '~' + p.slice(home.length)
+  }
+  return p
+}
+
+/**
+ * Rich startup banner with ASCII art anvil, model info, and project context.
+ */
+export function printRichBanner(opts: {
+  provider: string
+  model: string
+  cwd: string
+  configFiles?: string[]
+  toolCount?: number
+}): void {
+  const { provider, model, cwd, configFiles, toolCount } = opts
+  const spec = getModelSpec(model)
+  const shortCwd = abbreviatePath(cwd)
+
+  // Build right-side info lines (aligned with art)
+  const info: string[] = [
+    '',  // line 0: sparks (no text)
+    `  \x1b[1;37mForge\x1b[0m  \x1b[90mv${VERSION}\x1b[0m`,
+    `  \x1b[90marmature agent runtime\x1b[0m`,
+    '',  // spacer
+    `  \x1b[36m▸\x1b[0m \x1b[90m${provider}/\x1b[0m\x1b[1;37m${model}\x1b[0m` + (spec ? `  \x1b[90m${spec}\x1b[0m` : ''),
+    `  \x1b[36m▸\x1b[0m \x1b[90m${shortCwd}\x1b[0m`,
+  ]
+
+  // Print art + info side by side
+  console.log()
+  for (let i = 0; i < ANVIL_ART.length; i++) {
+    console.log(`${ANVIL_ART[i]}${info[i] || ''}`)
+  }
+
+  // Extra info below the art
+  const extras: string[] = []
+  if (configFiles && configFiles.length > 0) {
+    extras.push(`\x1b[90m  config: ${configFiles.join(', ')}\x1b[0m`)
+  }
+  if (toolCount) {
+    extras.push(`\x1b[90m  ${toolCount} tools loaded\x1b[0m`)
+  }
+  if (extras.length > 0) {
+    for (const line of extras) {
+      console.log(`                      ${line}`)
+    }
+  }
+  console.log()
+}
+
+/** Simple banner for non-interactive / one-shot mode */
 export function printBanner(): void {
-  const version = '0.1.0'
-  console.log(chalk.blue.bold(`\n  forge`) + chalk.gray(` v${version}`) + chalk.gray(` — armature agent runtime`))
-  console.log(chalk.gray(`  provider-neutral · 50 tools · MCP-native\n`))
+  console.log(chalk.blue.bold(`\n  forge`) + chalk.gray(` v${VERSION}`) + chalk.gray(` — armature agent runtime`))
+  console.log(chalk.gray(`  provider-neutral · MCP-native\n`))
 }
 
 export function printProviderInfo(provider: string, model: string): void {
+  const spec = getModelSpec(model)
   console.log(
     chalk.gray('  ') +
     chalk.cyan('▸') +
-    chalk.gray(` ${provider}`) +
-    chalk.gray('/') +
+    chalk.gray(` ${provider}/`) +
     chalk.white.bold(model) +
+    (spec ? chalk.gray(`  ${spec}`) : '') +
     '\n'
   )
 }
 
 export function printProjectContext(cwd: string, configFiles: string[]): void {
-  console.log(chalk.gray(`  cwd: ${cwd}`))
+  console.log(chalk.gray(`  cwd: ${abbreviatePath(cwd)}`))
   if (configFiles.length > 0) {
     console.log(chalk.gray(`  config: ${configFiles.join(', ')}`))
   }
@@ -105,6 +196,107 @@ function classifyError(message: string): ClassifiedError {
   }
 
   return { message }
+}
+
+// ── Permission Prompt ──────────────────────────────────────────────────
+
+/**
+ * Ask the user for permission to execute a dangerous tool.
+ * Returns true if approved, false if denied.
+ * Uses raw stdin keypress (y/n) — works during agent loop.
+ */
+export function askPermission(toolName: string, preview: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const displayName = toolName === 'write_file' ? 'Write' : toolName === 'run_command' ? 'Bash' : toolName
+    console.log()
+    console.log(chalk.yellow(`  ⚠ ${displayName}: `) + chalk.white(preview))
+    process.stdout.write(chalk.gray('  allow? ') + chalk.cyan('y') + chalk.gray('/') + chalk.cyan('n') + chalk.gray(' › '))
+
+    const isTTY = process.stdin.isTTY
+    if (!isTTY) {
+      // Non-interactive: auto-approve
+      console.log(chalk.green('y') + chalk.gray(' (auto, non-interactive)'))
+      resolve(true)
+      return
+    }
+
+    const wasRaw = process.stdin.isRaw
+    process.stdin.setRawMode(true)
+    process.stdin.resume()
+
+    const handler = (data: Buffer) => {
+      const key = String.fromCharCode(data[0]!).toLowerCase()
+      process.stdin.removeListener('data', handler)
+      if (!wasRaw) process.stdin.setRawMode(false)
+
+      if (key === 'y' || key === '\r') {
+        console.log(chalk.green('yes'))
+        resolve(true)
+      } else {
+        console.log(chalk.red('no'))
+        resolve(false)
+      }
+    }
+
+    process.stdin.on('data', handler)
+  })
+}
+
+// ── Diff Display ──────────────────────────────────────────────────────
+
+export function printDiffPreview(oldContent: string, newContent: string, maxLines = 12): void {
+  const oldLines = oldContent.split('\n')
+  const newLines = newContent.split('\n')
+
+  // Simple line-by-line diff
+  const diffLines: Array<{ type: '+' | '-' | ' '; text: string }> = []
+  const maxLen = Math.max(oldLines.length, newLines.length)
+
+  for (let i = 0; i < maxLen; i++) {
+    const oldLine = i < oldLines.length ? oldLines[i]! : undefined
+    const newLine = i < newLines.length ? newLines[i]! : undefined
+
+    if (oldLine === newLine) {
+      diffLines.push({ type: ' ', text: oldLine! })
+    } else {
+      if (oldLine !== undefined) diffLines.push({ type: '-', text: oldLine })
+      if (newLine !== undefined) diffLines.push({ type: '+', text: newLine })
+    }
+  }
+
+  // Show only changed lines with context
+  const changedIndices = diffLines.map((d, i) => d.type !== ' ' ? i : -1).filter(i => i >= 0)
+  if (changedIndices.length === 0) return
+
+  let shown = 0
+  const printed = new Set<number>()
+
+  for (const idx of changedIndices) {
+    if (shown >= maxLines) {
+      console.log(chalk.gray(`  │ ... ${changedIndices.length - shown} more changes`))
+      break
+    }
+
+    // Show 1 line of context before
+    const ctxStart = Math.max(0, idx - 1)
+    for (let i = ctxStart; i <= idx; i++) {
+      if (printed.has(i)) continue
+      printed.add(i)
+      const d = diffLines[i]!
+      if (d.type === '+') {
+        console.log(chalk.green(`  │ + ${truncateLine(d.text, 70)}`))
+      } else if (d.type === '-') {
+        console.log(chalk.red(`  │ - ${truncateLine(d.text, 70)}`))
+      } else {
+        console.log(chalk.gray(`  │   ${truncateLine(d.text, 70)}`))
+      }
+      if (d.type !== ' ') shown++
+    }
+  }
+}
+
+function truncateLine(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 3) + '...' : s
 }
 
 // ── Streaming Text ──────────────────────────────────────────────────
@@ -290,6 +482,7 @@ export interface UsageSummary {
   turns: number
   durationMs: number
   model?: string
+  contextChars?: number  // for context usage bar
 }
 
 export function printUsageSummary(usage: UsageSummary): void {
@@ -310,7 +503,36 @@ export function printUsageSummary(usage: UsageSummary): void {
   if (cost > 0) {
     parts.push(`$${cost.toFixed(4)}`)
   }
-  console.log(chalk.gray(`\n  ─ ${parts.join(' · ')} ─\n`))
+
+  // Context usage bar (if context chars provided)
+  let ctxBar = ''
+  if (usage.contextChars && usage.contextChars > 0) {
+    ctxBar = renderContextBar(usage.contextChars)
+  }
+
+  console.log(chalk.gray(`\n  ─ ${parts.join(' · ')}${ctxBar} ─\n`))
+}
+
+/**
+ * Render a visual context usage bar.
+ * Assumes ~4 chars per token, ~200K context window.
+ */
+function renderContextBar(chars: number): string {
+  const estimatedTokens = Math.round(chars / 4)
+  const maxTokens = 200_000
+  const pct = Math.min(100, Math.round((estimatedTokens / maxTokens) * 100))
+
+  const barLen = 12
+  const filled = Math.round((pct / 100) * barLen)
+  const empty = barLen - filled
+
+  let color: string
+  if (pct < 40) color = '\x1b[32m'       // green
+  else if (pct < 60) color = '\x1b[33m'  // yellow
+  else color = '\x1b[31m'                // red
+
+  const bar = `${color}${'█'.repeat(filled)}${'░'.repeat(empty)}\x1b[0m`
+  return ` · ctx ${bar} ${pct}%`
 }
 
 // ── Session Summary (on exit) ───────────────────────────────────────

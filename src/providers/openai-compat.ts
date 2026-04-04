@@ -27,7 +27,7 @@ export interface StreamEvent {
 }
 
 export interface ToolCallbacks {
-  onToolCall?: (name: string, args: Record<string, unknown>) => { success: boolean; output: string }
+  onToolCall?: (name: string, args: Record<string, unknown>) => Promise<{ success: boolean; output: string }> | { success: boolean; output: string }
   abortSignal?: AbortSignal
 }
 
@@ -229,7 +229,7 @@ export async function* streamChat(
 
           yield { type: 'tool_use', toolName: tc.name, toolInput: tc.arguments }
 
-          const result = toolCallbacks.onToolCall(tc.name, args)
+          const result = await toolCallbacks.onToolCall(tc.name, args)
           yield { type: 'tool_result', toolName: tc.name, toolSuccess: result.success, toolOutput: result.output }
 
           messages.push({

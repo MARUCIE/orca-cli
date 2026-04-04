@@ -259,10 +259,29 @@ function executeWriteFile(args: Record<string, unknown>, cwd: string): ToolResul
   const content = String(args.content || '')
 
   try {
+    // Read existing content for diff (if file exists)
+    let oldContent: string | null = null
+    if (existsSync(filePath)) {
+      try { oldContent = readFileSync(filePath, 'utf-8') } catch { /* ignore */ }
+    }
+
     const dir = resolve(filePath, '..')
     mkdirSync(dir, { recursive: true })
     writeFileSync(filePath, content, 'utf-8')
-    return { success: true, output: `Written ${content.length} bytes to ${filePath}` }
+
+    // Generate diff summary
+    if (oldContent !== null) {
+      const oldLines = oldContent.split('\n')
+      const newLines = content.split('\n')
+      const added = newLines.length - oldLines.length
+      const sign = added >= 0 ? `+${added}` : `${added}`
+      return {
+        success: true,
+        output: `Updated ${filePath} (${content.length} bytes, ${newLines.length} lines, ${sign} lines)`,
+      }
+    }
+
+    return { success: true, output: `Created ${filePath} (${content.length} bytes, ${content.split('\n').length} lines)` }
   } catch (err) {
     return { success: false, output: err instanceof Error ? err.message : String(err) }
   }

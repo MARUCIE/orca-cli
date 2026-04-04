@@ -14,9 +14,10 @@ import { resolveConfig, resolveProvider } from '../config.js'
 import { existsSync, appendFileSync, mkdirSync as fsMkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import {
-  printBanner, printProviderInfo, printProjectContext, printError,
+  printRichBanner, printBanner, printProviderInfo, printProjectContext, printError,
   streamToken, ensureNewline, setLastNewline, printToolUse, printToolResult,
   printUsageSummary, printSessionSummary, emitJson,
+  askPermission, printDiffPreview,
 } from '../output.js'
 import type { OutputMode } from '../output.js'
 import { streamChat } from '../providers/openai-compat.js'
@@ -57,20 +58,30 @@ export function createChatCommand(): Command {
 
         const resolved = resolveProvider(config)
 
+        const cwd = opts.cwd || process.cwd()
+
         if (outputMode === 'streaming') {
-          const cwd = opts.cwd || process.cwd()
-          printBanner()
-          printProviderInfo(resolved.provider, resolved.model)
-          const configFiles = detectConfigFiles(cwd)
-          if (configFiles.length > 0) {
-            printProjectContext(cwd, configFiles)
+          if (prompt) {
+            // One-shot mode: compact banner
+            printBanner()
+            printProviderInfo(resolved.provider, resolved.model)
+          } else {
+            // Interactive REPL: rich banner with ASCII art
+            const configFiles = detectConfigFiles(cwd)
+            printRichBanner({
+              provider: resolved.provider,
+              model: resolved.model,
+              cwd,
+              configFiles: configFiles.length > 0 ? configFiles : undefined,
+              toolCount: TOOL_DEFINITIONS.length,
+            })
           }
         }
 
         if (prompt) {
-          await executeOneShot(prompt, resolved, config, outputMode, opts.cwd || process.cwd())
+          await executeOneShot(prompt, resolved, config, outputMode, cwd)
         } else {
-          await runREPL(resolved, config, outputMode, opts.cwd || process.cwd())
+          await runREPL(resolved, config, outputMode, cwd)
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
@@ -599,13 +610,30 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
     prompt,
     history,
     {
-      onToolCall: (name, args) => {
+      onToolCall: async (name, args) => {
         // Permission gate for dangerous tools (write_file, run_command)
         if (DANGEROUS_TOOLS.has(name)) {
           const preview = name === 'write_file'
-            ? `write ${String(args.content || '').length} bytes to ${args.path}`
+            ? `write ${String(args.content || '').length} bytes to ${String(args.path || '')}`
             : `run: ${String(args.command || '').slice(0, 80)}`
-          console.log(`\x1b[33m  confirm: ${preview}\x1b[0m`)
+
+          // Show diff preview for file writes
+          if (name === 'write_file' && args.path) {
+            const { existsSync, readFileSync } = await import('node:fs')
+            const { resolve } = await import('node:path')
+            const fullPath = resolve(cwd, String(args.path))
+            if (existsSync(fullPath)) {
+              try {
+                const oldContent = readFileSync(fullPath, 'utf-8')
+                printDiffPreview(oldContent, String(args.content || ''))
+              } catch { /* ignore read errors */ }
+            }
+          }
+
+          const allowed = await askPermission(name, preview)
+          if (!allowed) {
+            return { success: false, output: 'User denied permission.' }
+          }
         }
         return executeTool(name, args, cwd)
       },
@@ -667,6 +695,7 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
 
   if (outputMode === 'streaming') {
     ensureNewline()
+    const contextChars = history.reduce((sum, m) => sum + m.content.length, 0)
     printUsageSummary({
       inputTokens,
       outputTokens,
@@ -674,6 +703,7 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
       turns: 1,
       durationMs: Date.now() - startTime,
       model: resolved.model,
+      contextChars,
     })
   }
 
