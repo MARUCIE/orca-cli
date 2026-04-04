@@ -29,6 +29,7 @@ const COMMANDS: CommandDef[] = [
   { name: '/load', description: 'Load saved session' },
   { name: '/sessions', description: 'List saved sessions' },
   { name: '/undo', description: 'Revert last file write' },
+  { name: '/effort', description: 'Set thinking: low/medium/high/max' },
   { name: '/retry', description: 'Retry last message' },
   { name: '/hooks', description: 'Show registered hooks' },
   { name: '/history', description: 'Show message counts' },

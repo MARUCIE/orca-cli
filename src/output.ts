@@ -321,6 +321,8 @@ export function printSeparator(): void {
   console.log(chalk.gray('─'.repeat(Math.min(cols - 2, 80))))
 }
 
+export type ThinkingEffort = 'low' | 'medium' | 'high' | 'max'
+
 export interface StatusLineInfo {
   model: string
   provider: string
@@ -329,6 +331,7 @@ export interface StatusLineInfo {
   totalTokens: number
   cwd: string
   gitBranch?: string
+  effort?: ThinkingEffort
 }
 
 /**
@@ -361,18 +364,28 @@ export function printStatusLine(info: StatusLineInfo): void {
     ? '\x1b[33m▸▸ yolo\x1b[0m'
     : '\x1b[32m▸▸ safe\x1b[0m'
 
+  // Thinking effort indicator
+  const effortDisplay: Record<ThinkingEffort, string> = {
+    low:    '\x1b[90m⚡low\x1b[0m',
+    medium: '\x1b[33m⚡⚡med\x1b[0m',
+    high:   '\x1b[36m⚡⚡⚡high\x1b[0m',
+    max:    '\x1b[35m⚡⚡⚡⚡max\x1b[0m',
+  }
+  const effort = info.effort || 'high'
+  const effortTag = effortDisplay[effort]
+
   // Model short
   const modelShort = info.model.length > 20 ? info.model.slice(0, 18) + '..' : info.model
 
   // Tokens right-aligned
   const tokenStr = `${info.totalTokens.toLocaleString()} tokens`
 
-  // Left side
+  // Left side: ◇ FORGE │ model │ ██░░ 15% │ project git:(branch)
   const left = `\x1b[36m◇\x1b[0m \x1b[1;37mFORGE\x1b[0m \x1b[90m│\x1b[0m ${modelShort} \x1b[90m│\x1b[0m ${bar} ${pct}% \x1b[90m│\x1b[0m \x1b[36m${project}\x1b[0m${gitPart}`
 
   // Print status line
   console.log(`${left}`)
-  console.log(`${modeTag} \x1b[90m(--safe to change)\x1b[0m${' '.repeat(Math.max(0, cols - 40 - tokenStr.length))}\x1b[90m${tokenStr}\x1b[0m`)
+  console.log(`${modeTag} \x1b[90m│\x1b[0m ${effortTag}${' '.repeat(Math.max(0, cols - 45 - tokenStr.length))}\x1b[90m${tokenStr}\x1b[0m`)
 }
 
 // ── Streaming Text ──────────────────────────────────────────────────

@@ -42,6 +42,7 @@ interface ChatOptions {
   json?: boolean
   cwd?: string
   safe?: boolean
+  effort?: string
 }
 
 export function createChatCommand(): Command {
@@ -56,6 +57,7 @@ export function createChatCommand(): Command {
     .option('--json', 'Output as NDJSON for CI/pipelines')
     .option('--cwd <dir>', 'Working directory')
     .option('--safe', 'Enable permission prompts for dangerous tools (default: yolo)')
+    .option('--effort <level>', 'Thinking effort: low, medium, high (default), max')
     .action(async (promptParts: string[], opts: ChatOptions) => {
       const prompt = promptParts.join(' ').trim()
       const outputMode: OutputMode = opts.json ? 'json' : 'streaming'
@@ -92,7 +94,7 @@ export function createChatCommand(): Command {
         if (prompt) {
           await executeOneShot(prompt, resolved, config, outputMode, cwd)
         } else {
-          await runREPL(resolved, config, outputMode, cwd, { safe: opts.safe })
+          await runREPL(resolved, config, outputMode, cwd, { safe: opts.safe, effort: opts.effort })
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
@@ -150,7 +152,7 @@ async function runREPL(
   config: ForgeConfig,
   outputMode: OutputMode,
   cwd: string,
-  opts: { safe?: boolean } = {},
+  opts: { safe?: boolean; effort?: string } = {},
 ): Promise<void> {
   const { createInterface } = await import('node:readline')
   const { homedir: getHomedir } = await import('node:os')
@@ -169,7 +171,7 @@ async function runREPL(
   const SLASH_COMMANDS = [
     '/help', '/model', '/models', '/clear', '/compact', '/system',
     '/history', '/tokens', '/stats', '/retry', '/diff', '/git',
-    '/save', '/load', '/sessions', '/undo', '/council', '/race', '/pipeline',
+    '/save', '/load', '/sessions', '/undo', '/effort', '/council', '/race', '/pipeline',
     '/cwd', '/exit', '/quit',
   ]
   const completer = (line: string): [string[], string] => {
@@ -242,6 +244,8 @@ async function runREPL(
   // Mutable model (supports /model set)
   let currentModel = resolved.model
   let lastPrompt = '' // for /retry
+  let currentEffort: import('../output.js').ThinkingEffort =
+    (opts.effort as import('../output.js').ThinkingEffort) || 'high'
 
   const shortModel = (m: string) => m.length > 24 ? m.slice(0, 22) + '..' : m
 
@@ -268,6 +272,7 @@ async function runREPL(
       totalTokens,
       cwd,
       gitBranch,
+      effort: currentEffort,
     })
 
     // Return the actual prompt string
@@ -341,6 +346,25 @@ async function runREPL(
         } else {
           continue // cancelled
         }
+      }
+
+      // Handle /effort: change thinking intensity
+      if (input.startsWith('/effort')) {
+        const level = input.replace('/effort', '').trim().toLowerCase()
+        const valid = ['low', 'medium', 'med', 'high', 'max'] as const
+        if (!level) {
+          console.log(`\x1b[90m  effort: ${currentEffort}. Options: low, medium, high, max\x1b[0m`)
+          continue
+        }
+        const mapped = level === 'med' ? 'medium' : level
+        if (['low', 'medium', 'high', 'max'].includes(mapped)) {
+          const old = currentEffort
+          currentEffort = mapped as import('../output.js').ThinkingEffort
+          console.log(`\x1b[90m  effort: ${old} → \x1b[36m${currentEffort}\x1b[0m`)
+        } else {
+          console.log(`\x1b[33m  invalid effort. Options: low, medium, high, max\x1b[0m`)
+        }
+        continue
       }
 
       // Handle /retry specially
@@ -718,6 +742,7 @@ function handleSlashCommand(
       console.log('  /load [name]           Load a saved session')
       console.log('  /sessions              List saved sessions')
       console.log('  /undo                  Revert last file write')
+      console.log('  /effort <level>        Set thinking: low/medium/high/max')
       console.log('  /hooks                 Show registered hooks')
       console.log('  /council <prompt>      Ask N models, judge synthesizes (multi-model)')
       console.log('  /race <prompt>         First model to answer wins (speed race)')
