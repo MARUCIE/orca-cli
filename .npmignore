@@ -1,0 +1,10 @@
+src/
+tests/
+.github/
+.armature.json
+.armature/
+tsconfig.json
+vitest.config.*
+*.test.ts
+.gitignore
+doc/

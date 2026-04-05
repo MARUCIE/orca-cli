@@ -18,7 +18,9 @@
     "build": "tsc -p tsconfig.json",
     "test": "node --experimental-vm-modules node_modules/.bin/vitest run",
     "lint": "tsc --noEmit",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "bench": "node dist/bin/forge.js bench",
+    "prepublishOnly": "npm run build && npm test && npm run bench"
   },
   "dependencies": {
     "chalk": "^5.3.0",
@@ -38,9 +40,23 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "keywords": [
+    "cli",
+    "agent",
+    "coding-agent",
+    "forge",
+    "multi-model",
+    "poe",
+    "openai",
+    "claude",
+    "gemini",
+    "gpt",
+    "benchmark"
+  ],
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "repository": {
     "type": "git",
