@@ -305,6 +305,304 @@ export function pageCount(total: number, size: number): number {
       }
     },
   },
+
+  // ── S6: Hardcoded Secret Removal (Easy, Bug Fix) ──
+  {
+    id: 's6-secret-removal',
+    name: 'Remove hardcoded secrets from config',
+    category: 'bug-fix',
+    difficulty: 'easy',
+    setup: (dir) => {
+      mkdirSync(join(dir, 'src'), { recursive: true })
+      writeFileSync(join(dir, 'src', 'config.ts'), `
+export const config = {
+  port: 3000,
+  host: 'localhost',
+  dbPassword: 'super-secret-password-123',
+  apiKey: 'sk-hardcoded-api-key-456',
+}
+`)
+    },
+    steps: [
+      { tool: 'read_file', args: { path: 'src/config.ts' } },
+      { tool: 'edit_file', args: {
+        path: 'src/config.ts',
+        old_string: "dbPassword: 'super-secret-password-123'",
+        new_string: "dbPassword: process.env.DB_PASSWORD || ''",
+      }},
+      { tool: 'edit_file', args: {
+        path: 'src/config.ts',
+        old_string: "apiKey: 'sk-hardcoded-api-key-456'",
+        new_string: "apiKey: process.env.API_KEY || ''",
+      }},
+    ],
+    verify: (dir) => {
+      const content = readFileSync(join(dir, 'src', 'config.ts'), 'utf-8')
+      const noHardcoded = !content.includes('super-secret') && !content.includes('sk-hardcoded')
+      const usesEnv = content.includes('process.env.DB_PASSWORD') && content.includes('process.env.API_KEY')
+      return {
+        passed: noHardcoded && usesEnv,
+        details: `no hardcoded: ${noHardcoded}, uses env: ${usesEnv}`,
+      }
+    },
+  },
+
+  // ── S7: Add Error Handling (Medium, Feature Dev) ──
+  {
+    id: 's7-error-handling',
+    name: 'Add try-catch error handling to async functions',
+    category: 'feature-dev',
+    difficulty: 'medium',
+    setup: (dir) => {
+      mkdirSync(join(dir, 'src'), { recursive: true })
+      writeFileSync(join(dir, 'src', 'api.ts'), `
+export async function fetchData(url: string) {
+  const response = await fetch(url)
+  const data = await response.json()
+  return data
+}
+`)
+    },
+    steps: [
+      { tool: 'read_file', args: { path: 'src/api.ts' } },
+      { tool: 'edit_file', args: {
+        path: 'src/api.ts',
+        old_string: `export async function fetchData(url: string) {
+  const response = await fetch(url)
+  const data = await response.json()
+  return data
+}`,
+        new_string: `export async function fetchData(url: string) {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) throw new Error(\`HTTP \${response.status}\`)
+    const data = await response.json()
+    return data
+  } catch (err) {
+    throw new Error(\`Failed to fetch \${url}: \${err instanceof Error ? err.message : String(err)}\`)
+  }
+}`,
+      }},
+    ],
+    verify: (dir) => {
+      const content = readFileSync(join(dir, 'src', 'api.ts'), 'utf-8')
+      const hasTryCatch = content.includes('try {') && content.includes('catch')
+      const hasStatusCheck = content.includes('response.ok')
+      const hasErrorWrap = content.includes('Failed to fetch')
+      return {
+        passed: hasTryCatch && hasStatusCheck && hasErrorWrap,
+        details: `try-catch: ${hasTryCatch}, status check: ${hasStatusCheck}, error wrap: ${hasErrorWrap}`,
+      }
+    },
+  },
+
+  // ── S8: Multi-file Rename (Hard, Refactor) ──
+  {
+    id: 's8-multi-file-rename',
+    name: 'Rename function across multiple files',
+    category: 'refactor',
+    difficulty: 'hard',
+    setup: (dir) => {
+      mkdirSync(join(dir, 'src'), { recursive: true })
+      mkdirSync(join(dir, 'tests'), { recursive: true })
+      writeFileSync(join(dir, 'src', 'math.ts'), `
+export function calculateTotal(items: number[]): number {
+  return items.reduce((sum, n) => sum + n, 0)
+}
+`)
+      writeFileSync(join(dir, 'src', 'cart.ts'), `
+import { calculateTotal } from './math'
+
+export function getCartTotal(items: { price: number }[]) {
+  return calculateTotal(items.map(i => i.price))
+}
+`)
+      writeFileSync(join(dir, 'tests', 'math.test.ts'), `
+import { calculateTotal } from '../src/math'
+
+describe('calculateTotal', () => {
+  it('sums numbers', () => {
+    expect(calculateTotal([1, 2, 3])).toBe(6)
+  })
+})
+`)
+    },
+    steps: [
+      { tool: 'search_files', args: { pattern: 'calculateTotal', path: '.' } },
+      { tool: 'edit_file', args: {
+        path: 'src/math.ts',
+        old_string: 'export function calculateTotal(items: number[]): number {',
+        new_string: 'export function sumItems(items: number[]): number {',
+      }},
+      { tool: 'edit_file', args: {
+        path: 'src/cart.ts',
+        old_string: "import { calculateTotal } from './math'",
+        new_string: "import { sumItems } from './math'",
+      }},
+      { tool: 'edit_file', args: {
+        path: 'src/cart.ts',
+        old_string: 'return calculateTotal(items.map(i => i.price))',
+        new_string: 'return sumItems(items.map(i => i.price))',
+      }},
+      { tool: 'edit_file', args: {
+        path: 'tests/math.test.ts',
+        old_string: "import { calculateTotal } from '../src/math'",
+        new_string: "import { sumItems } from '../src/math'",
+      }},
+      { tool: 'edit_file', args: {
+        path: 'tests/math.test.ts',
+        old_string: "describe('calculateTotal', () => {\n  it('sums numbers', () => {\n    expect(calculateTotal([1, 2, 3])).toBe(6)",
+        new_string: "describe('sumItems', () => {\n  it('sums numbers', () => {\n    expect(sumItems([1, 2, 3])).toBe(6)",
+      }},
+    ],
+    verify: (dir) => {
+      const math = readFileSync(join(dir, 'src', 'math.ts'), 'utf-8')
+      const cart = readFileSync(join(dir, 'src', 'cart.ts'), 'utf-8')
+      const test = readFileSync(join(dir, 'tests', 'math.test.ts'), 'utf-8')
+      const allRenamed = !math.includes('calculateTotal') && !cart.includes('calculateTotal') && !test.includes('calculateTotal')
+      const allHaveNew = math.includes('sumItems') && cart.includes('sumItems') && test.includes('sumItems')
+      return {
+        passed: allRenamed && allHaveNew,
+        details: `old removed: ${allRenamed}, new present: ${allHaveNew}`,
+      }
+    },
+  },
+
+  // ── S9: Create New Module (Medium, Feature Dev) ──
+  {
+    id: 's9-new-module',
+    name: 'Create a complete new module with tests',
+    category: 'feature-dev',
+    difficulty: 'medium',
+    setup: (dir) => {
+      mkdirSync(join(dir, 'src'), { recursive: true })
+      mkdirSync(join(dir, 'tests'), { recursive: true })
+      writeFileSync(join(dir, 'src', 'index.ts'), "export { add } from './math'\n")
+      writeFileSync(join(dir, 'src', 'math.ts'), `
+export function add(a: number, b: number): number {
+  return a + b
+}
+`)
+    },
+    steps: [
+      { tool: 'read_file', args: { path: 'src/index.ts' } },
+      { tool: 'write_file', args: {
+        path: 'src/validator.ts',
+        content: `export function isEmail(value: string): boolean {
+  return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value)
+}
+
+export function isPositive(n: number): boolean {
+  return n > 0
+}
+
+export function isNonEmpty(s: string): boolean {
+  return s.trim().length > 0
+}
+`,
+      }},
+      { tool: 'write_file', args: {
+        path: 'tests/validator.test.ts',
+        content: `import { isEmail, isPositive, isNonEmpty } from '../src/validator'
+
+describe('validator', () => {
+  it('validates email', () => {
+    expect(isEmail('test@example.com')).toBe(true)
+    expect(isEmail('not-email')).toBe(false)
+  })
+  it('validates positive', () => {
+    expect(isPositive(1)).toBe(true)
+    expect(isPositive(-1)).toBe(false)
+  })
+  it('validates non-empty', () => {
+    expect(isNonEmpty('hello')).toBe(true)
+    expect(isNonEmpty('  ')).toBe(false)
+  })
+})
+`,
+      }},
+      { tool: 'edit_file', args: {
+        path: 'src/index.ts',
+        old_string: "export { add } from './math'",
+        new_string: "export { add } from './math'\nexport { isEmail, isPositive, isNonEmpty } from './validator'",
+      }},
+    ],
+    verify: (dir) => {
+      const hasModule = existsSync(join(dir, 'src', 'validator.ts'))
+      const hasTest = existsSync(join(dir, 'tests', 'validator.test.ts'))
+      const index = readFileSync(join(dir, 'src', 'index.ts'), 'utf-8')
+      const exportsValidator = index.includes("from './validator'")
+      const module = hasModule ? readFileSync(join(dir, 'src', 'validator.ts'), 'utf-8') : ''
+      const hasThreeFunctions = module.includes('isEmail') && module.includes('isPositive') && module.includes('isNonEmpty')
+      return {
+        passed: hasModule && hasTest && exportsValidator && hasThreeFunctions,
+        details: `module: ${hasModule}, test: ${hasTest}, exported: ${exportsValidator}, 3 functions: ${hasThreeFunctions}`,
+      }
+    },
+  },
+
+  // ── S10: Multi-step Plan + Verify (Hard, Multi-step) ──
+  {
+    id: 's10-plan-verify',
+    name: 'Create plan, execute steps, verify with checks',
+    category: 'multi-step',
+    difficulty: 'hard',
+    setup: (dir) => {
+      mkdirSync(join(dir, 'src'), { recursive: true })
+      writeFileSync(join(dir, 'src', 'app.ts'), 'export const version = "1.0.0"\n')
+    },
+    steps: [
+      { tool: 'create_plan', args: {
+        goal: 'Add logging utility and integrate it',
+        steps: ['Create logger module', 'Create config module', 'Update app to use both'],
+      }},
+      { tool: 'write_file', args: {
+        path: 'src/logger.ts',
+        content: `export function log(level: string, message: string): void {
+  const timestamp = new Date().toISOString()
+  console.log(\`[\${timestamp}] [\${level.toUpperCase()}] \${message}\`)
+}
+
+export function info(message: string): void { log('info', message) }
+export function error(message: string): void { log('error', message) }
+export function warn(message: string): void { log('warn', message) }
+`,
+      }},
+      { tool: 'write_file', args: {
+        path: 'src/config.ts',
+        content: `export const config = {
+  logLevel: process.env.LOG_LEVEL || 'info',
+  appName: 'forge-app',
+  version: '1.0.0',
+}
+`,
+      }},
+      { tool: 'edit_file', args: {
+        path: 'src/app.ts',
+        old_string: 'export const version = "1.0.0"',
+        new_string: "import { info } from './logger'\nimport { config } from './config'\n\nexport const version = config.version\ninfo(`App ${config.appName} v${version} starting`)",
+      }},
+      { tool: 'verify_plan', args: {
+        checks: [
+          'test -f src/logger.ts',
+          'test -f src/config.ts',
+          'grep -q "import.*logger" src/app.ts',
+          'grep -q "import.*config" src/app.ts',
+        ],
+      }},
+    ],
+    verify: (dir) => {
+      const hasLogger = existsSync(join(dir, 'src', 'logger.ts'))
+      const hasConfig = existsSync(join(dir, 'src', 'config.ts'))
+      const app = readFileSync(join(dir, 'src', 'app.ts'), 'utf-8')
+      const importsLogger = app.includes("from './logger'")
+      const importsConfig = app.includes("from './config'")
+      return {
+        passed: hasLogger && hasConfig && importsLogger && importsConfig,
+        details: `logger: ${hasLogger}, config: ${hasConfig}, app imports: ${importsLogger && importsConfig}`,
+      }
+    },
+  },
 ]
 
 // ── Suite Runner ─────────────────────────────────────────────────

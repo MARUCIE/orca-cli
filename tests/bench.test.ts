@@ -20,8 +20,8 @@ afterAll(() => {
 // ── Scenario Registry ───────────────────────────────────────────
 
 describe('Benchmark: scenario registry', () => {
-  it('16.1 has exactly 5 built-in scenarios', () => {
-    expect(SCENARIOS).toHaveLength(5)
+  it('16.1 has exactly 10 built-in scenarios', () => {
+    expect(SCENARIOS).toHaveLength(10)
   })
 
   it('16.2 all scenarios have required fields', () => {
@@ -77,6 +77,31 @@ describe('Benchmark: individual scenarios pass', () => {
     const result = runScenario(SCENARIOS[4]!, baseDir)
     expect(result.passed).toBe(true)
   })
+
+  it('16.11 S6: Secret removal passes', () => {
+    const result = runScenario(SCENARIOS[5]!, baseDir)
+    expect(result.passed).toBe(true)
+  })
+
+  it('16.12 S7: Error handling passes', () => {
+    const result = runScenario(SCENARIOS[6]!, baseDir)
+    expect(result.passed).toBe(true)
+  })
+
+  it('16.13 S8: Multi-file rename passes', () => {
+    const result = runScenario(SCENARIOS[7]!, baseDir)
+    expect(result.passed).toBe(true)
+  })
+
+  it('16.14 S9: New module creation passes', () => {
+    const result = runScenario(SCENARIOS[8]!, baseDir)
+    expect(result.passed).toBe(true)
+  })
+
+  it('16.15 S10: Plan + verify passes', () => {
+    const result = runScenario(SCENARIOS[9]!, baseDir)
+    expect(result.passed).toBe(true)
+  })
 })
 
 // ── Suite Runner ────────────────────────────────────────────────
@@ -88,7 +113,7 @@ describe('Benchmark: suite runner', () => {
 
     const { results, score, totalMs } = runSuite(SCENARIOS, suiteDir)
 
-    expect(results).toHaveLength(5)
+    expect(results).toHaveLength(10)
     expect(score).toBe(100)
     expect(totalMs).toBeGreaterThan(0)
 

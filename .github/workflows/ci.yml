@@ -1,0 +1,69 @@
+name: CI — Tests + Benchmark
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test Suite (321 tests)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript build
+        run: npm run build
+
+      - name: Run test suite
+        run: npm test
+
+  bench:
+    name: Benchmark (SOTA Gate)
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run forge bench
+        run: node dist/bin/forge.js bench --json
+
+      - name: Verify SOTA score
+        run: |
+          SCORE=$(node dist/bin/forge.js bench --json 2>/dev/null | node -e "
+            let data = '';
+            process.stdin.on('data', d => data += d);
+            process.stdin.on('end', () => {
+              const result = JSON.parse(data);
+              console.log(result.score);
+              process.exit(result.score === 100 ? 0 : 1);
+            });
+          ")
+          echo "Benchmark score: ${SCORE}%"
