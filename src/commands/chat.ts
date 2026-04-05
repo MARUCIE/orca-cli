@@ -592,6 +592,7 @@ async function runREPL(
           },
           onFileWrite: (path, oldContent) => { lastWrite = { path, oldContent } },
           safeMode: opts.safe || false,
+          retryTracker,
         })
         stats.turns++
         stats.totalInputTokens += result.inputTokens
@@ -1064,10 +1065,11 @@ interface ProxyTurnOptions {
   onFirstToken?: () => void
   onFileWrite?: (path: string, oldContent: string | null) => void
   safeMode?: boolean
+  retryTracker?: RetryTracker
 }
 
 async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: number; outputTokens: number }> {
-  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onFileWrite, safeMode } = options
+  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onFileWrite, safeMode, retryTracker } = options
 
   const startTime = Date.now()
   let inputTokens = 0
@@ -1207,12 +1209,14 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
         const result = executeTool(name, args, cwd)
 
         // ── Retry intelligence: track success/failure ──
-        if (result.success) {
-          retryTracker.recordSuccess(name, args)
-        } else {
-          const hint = retryTracker.recordFailure(name, args, result.output)
-          if (hint.shouldWarn) {
-            result.output += `\n\n${hint.hint}`
+        if (retryTracker) {
+          if (result.success) {
+            retryTracker.recordSuccess(name, args)
+          } else {
+            const hint = retryTracker.recordFailure(name, args, result.output)
+            if (hint.shouldWarn) {
+              result.output += `\n\n${hint.hint}`
+            }
           }
         }
 
