@@ -2,5 +2,5 @@
   "provider": "poe",
   "model": "claude-sonnet-4.6",
   "baseURL": "https://api.poe.com/v1",
-  "apiKey": "${POE_API_KEY}"
+  "apiKey": "your-poe-api-key-here"
 }
