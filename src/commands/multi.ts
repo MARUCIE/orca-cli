@@ -3,43 +3,22 @@
  *
  * Multi-model collaboration commands — the feature no single-vendor CLI can have.
  *
+ * Routing strategy:
+ *   - Aggregator available (Poe/OpenRouter): single endpoint → cross-vendor diversity
+ *   - No aggregator: each model routes to its direct provider (Anthropic/OpenAI/Google)
+ *
  * Usage:
  *   forge council "should we use SQL or NoSQL?"           # 3 models + judge
- *   forge council "review this code" -n 5                 # 5 models + judge
  *   forge race "write a CSV parser"                       # first model wins
- *   forge race "explain monads" -n 3                      # 3 models race
  *   forge pipeline "build a REST API"                     # plan→code→review
- *   forge pipeline "refactor to TypeScript" --stages 5    # 5-stage pipeline
  */
 
 import { Command } from 'commander'
-import { resolveConfig, resolveProvider, type ForgeConfig } from '../config.js'
-import { printBanner, printError } from '../output.js'
+import { resolveConfig, resolveModelEndpoint, findAggregator, type ForgeConfig } from '../config.js'
+import { printError } from '../output.js'
 import { runCouncil, runRace, runPipeline, pickDiverseModels } from '../multi-model.js'
 import { StreamMarkdown } from '../markdown.js'
 import type { PipelineStage } from '../multi-model.js'
-
-/**
- * Resolve the provider for multi-model commands.
- * Uses config.multiModel.provider if set, otherwise the default provider.
- * Multi-model requires a baseURL (OpenAI-compatible endpoint).
- */
-function resolveMultiProvider(config: ForgeConfig) {
-  const multiProviderId = config.multiModel?.provider
-  if (multiProviderId) {
-    const overridden = { ...config, defaultProvider: multiProviderId }
-    return resolveProvider(overridden)
-  }
-  return resolveProvider(config)
-}
-
-/**
- * Get the model list for multi-model from the provider config.
- * If the provider declares models[], use them for diversity selection.
- */
-function getProviderModels(config: ForgeConfig, providerId: string): string[] | undefined {
-  return config.providers[providerId]?.models
-}
 
 // ── Council Command ──────────────────────────────────────────────
 
@@ -49,29 +28,43 @@ export function createCouncilCommand(): Command {
     .argument('<prompt...>', 'Question or task')
     .option('-n, --models <n>', 'Number of models to consult', '3')
     .option('-j, --judge <model>', 'Judge model for synthesis')
-    .option('-p, --provider <provider>', 'Provider (poe)')
+    .option('-p, --provider <provider>', 'Aggregator provider (poe, openrouter)')
     .option('-k, --api-key <key>', 'API key')
     .action(async (promptParts: string[], opts: { models?: string; judge?: string; provider?: string; apiKey?: string }) => {
       const prompt = promptParts.join(' ').trim()
 
       try {
         const config = resolveConfig({ cwd: process.cwd(), flags: buildMultiFlags(opts) })
-        const resolved = resolveMultiProvider(config)
+        const aggregatorId = opts.provider || findAggregator(config)
 
-        if (!resolved.baseURL) {
-          printError(`Provider "${resolved.provider}" has no baseURL. Multi-model needs an OpenAI-compatible endpoint.\nConfigure providers.${resolved.provider}.baseURL in ~/.armature/config.json`)
+        // Pick models: aggregator → cross-vendor diversity, no aggregator → single-provider fallback
+        const count = Math.min(parseInt(opts.models || '3', 10), 11)
+        const models = pickDiverseModels(count, aggregatorId ? undefined : getSingleProviderModels(config))
+        const judgeModel = opts.judge || models[0]!
+
+        // Build resolver closure that routes each model
+        const resolveEndpoint = (model: string) => resolveModelEndpoint(model, config, aggregatorId)
+
+        // Verify at least one model is routable
+        const testEndpoint = resolveEndpoint(models[0]!)
+        if (!testEndpoint) {
+          printError(
+            `Cannot route model "${models[0]}". Configure an aggregator (Poe/OpenRouter) or direct provider API keys.\n` +
+            `  forge council -p poe "..."      (aggregator)\n` +
+            `  Set ANTHROPIC_API_KEY + OPENAI_API_KEY for direct routing`
+          )
           process.exit(1)
         }
 
-        const count = Math.min(parseInt(opts.models || '3', 10), 11)
-        const providerModels = getProviderModels(config, resolved.provider)
-        const models = pickDiverseModels(count, providerModels)
-        const judgeModel = opts.judge || models[0]!
+        const routeLabel = aggregatorId
+          ? `via ${aggregatorId} (aggregator)`
+          : 'direct routing'
 
         console.log()
         console.log(`\x1b[36m  ╭─────────────────────────────────────────────────╮\x1b[0m`)
         console.log(`\x1b[36m  │  Council Mode · ${models.length} models · judge: ${judgeModel.slice(0, 20).padEnd(20)}│\x1b[0m`)
         console.log(`\x1b[36m  ╰─────────────────────────────────────────────────╯\x1b[0m`)
+        console.log(`\x1b[90m  ${routeLabel}\x1b[0m`)
         console.log()
         console.log(`\x1b[90m  prompt: ${prompt.slice(0, 70)}${prompt.length > 70 ? '...' : ''}\x1b[0m`)
         console.log()
@@ -80,15 +73,13 @@ export function createCouncilCommand(): Command {
           prompt,
           models,
           judgeModel,
-          apiKey: resolved.apiKey,
-          baseURL: resolved.baseURL,
+          resolveEndpoint,
           onModelStart: (m) => process.stdout.write(`  \x1b[90m● ${m}...\x1b[0m`),
           onModelDone: (_m, ms) => console.log(` \x1b[32m${(ms / 1000).toFixed(1)}s\x1b[0m`),
         })
 
         const md = new StreamMarkdown()
 
-        // Show individual responses
         console.log()
         for (const r of result.responses) {
           if (r.error) {
@@ -100,12 +91,10 @@ export function createCouncilCommand(): Command {
           }
         }
 
-        // Show verdict
         console.log(`\x1b[36m  ★ Verdict\x1b[0m \x1b[90m(${result.verdict.model} as judge, ${(result.verdict.durationMs / 1000).toFixed(1)}s)\x1b[0m\n`)
         md.push(result.verdict.text + '\n')
         md.flush()
 
-        // Summary bar
         const totalCost = [...result.responses, result.verdict].reduce((s, r) => s + r.inputTokens + r.outputTokens, 0)
         console.log()
         console.log(`\x1b[90m  ─ ${result.responses.length} models · ${(result.totalDurationMs / 1000).toFixed(1)}s · agreement: ${result.agreement} · ~${Math.round(totalCost / 1000)}K tokens ─\x1b[0m\n`)
@@ -124,35 +113,38 @@ export function createRaceCommand(): Command {
     .description('Race multiple models — first good answer wins')
     .argument('<prompt...>', 'Question or task')
     .option('-n, --models <n>', 'Number of models to race', '5')
-    .option('-p, --provider <provider>', 'Provider (poe)')
+    .option('-p, --provider <provider>', 'Aggregator provider')
     .option('-k, --api-key <key>', 'API key')
     .action(async (promptParts: string[], opts: { models?: string; provider?: string; apiKey?: string }) => {
       const prompt = promptParts.join(' ').trim()
 
       try {
         const config = resolveConfig({ cwd: process.cwd(), flags: buildMultiFlags(opts) })
-        const resolved = resolveMultiProvider(config)
+        const aggregatorId = opts.provider || findAggregator(config)
 
-        if (!resolved.baseURL) {
-          printError(`Provider "${resolved.provider}" has no baseURL. Multi-model needs an OpenAI-compatible endpoint.\nConfigure providers.${resolved.provider}.baseURL in ~/.armature/config.json`)
+        const count = Math.min(parseInt(opts.models || '5', 10), 11)
+        const models = pickDiverseModels(count, aggregatorId ? undefined : getSingleProviderModels(config))
+        const resolveEndpoint = (model: string) => resolveModelEndpoint(model, config, aggregatorId)
+
+        const testEndpoint = resolveEndpoint(models[0]!)
+        if (!testEndpoint) {
+          printError('Cannot route models. Set up an aggregator or direct provider keys.')
           process.exit(1)
         }
 
-        const count = Math.min(parseInt(opts.models || '5', 10), 11)
-        const providerModels = getProviderModels(config, resolved.provider)
-        const models = pickDiverseModels(count, providerModels)
+        const routeLabel = aggregatorId ? `via ${aggregatorId}` : 'direct routing'
 
         console.log()
         console.log(`\x1b[33m  ╭─────────────────────────────────────────╮\x1b[0m`)
         console.log(`\x1b[33m  │  Race Mode · ${String(models.length).padStart(2)} models · first wins   │\x1b[0m`)
         console.log(`\x1b[33m  ╰─────────────────────────────────────────╯\x1b[0m`)
+        console.log(`\x1b[90m  ${routeLabel}\x1b[0m`)
         console.log()
 
         const result = await runRace({
           prompt,
           models,
-          apiKey: resolved.apiKey,
-          baseURL: resolved.baseURL,
+          resolveEndpoint,
           onModelStart: (m) => process.stdout.write(`  \x1b[90m◎ ${m}...\x1b[0m`),
           onModelDone: (_m, ms, won) =>
             console.log(won ? ` \x1b[32m★ WINNER ${(ms / 1000).toFixed(1)}s\x1b[0m` : ` \x1b[90m${(ms / 1000).toFixed(1)}s\x1b[0m`),
@@ -186,7 +178,7 @@ export function createPipelineCommand(): Command {
     .option('--code <model>', 'Coder model', 'gpt-5.4')
     .option('--review <model>', 'Reviewer model', 'gemini-3.1-pro')
     .option('--stages <n>', 'Number of stages (3 or 5)', '3')
-    .option('-p, --provider <provider>', 'Provider (poe)')
+    .option('-p, --provider <provider>', 'Aggregator provider')
     .option('-k, --api-key <key>', 'API key')
     .action(async (promptParts: string[], opts: {
       plan?: string; code?: string; review?: string; stages?: string
@@ -196,12 +188,8 @@ export function createPipelineCommand(): Command {
 
       try {
         const config = resolveConfig({ cwd: process.cwd(), flags: buildMultiFlags(opts) })
-        const resolved = resolveMultiProvider(config)
-
-        if (!resolved.baseURL) {
-          printError(`Provider "${resolved.provider}" has no baseURL. Multi-model needs an OpenAI-compatible endpoint.\nConfigure providers.${resolved.provider}.baseURL in ~/.armature/config.json`)
-          process.exit(1)
-        }
+        const aggregatorId = opts.provider || findAggregator(config)
+        const resolveEndpoint = (model: string) => resolveModelEndpoint(model, config, aggregatorId)
 
         const stages: PipelineStage[] = [
           { role: 'plan', model: opts.plan || 'claude-opus-4.6' },
@@ -215,18 +203,20 @@ export function createPipelineCommand(): Command {
           )
         }
 
+        const routeLabel = aggregatorId ? `via ${aggregatorId}` : 'direct routing'
+
         console.log()
         console.log(`\x1b[35m  ╭─────────────────────────────────────────────╮\x1b[0m`)
         console.log(`\x1b[35m  │  Pipeline Mode · ${stages.length} stages                    │\x1b[0m`)
         console.log(`\x1b[35m  │  ${stages.map(s => s.role).join(' → ').padEnd(43)}│\x1b[0m`)
         console.log(`\x1b[35m  ╰─────────────────────────────────────────────╯\x1b[0m`)
+        console.log(`\x1b[90m  ${routeLabel}\x1b[0m`)
         console.log()
 
         const result = await runPipeline({
           prompt,
           stages,
-          apiKey: resolved.apiKey,
-          baseURL: resolved.baseURL,
+          resolveEndpoint,
           onStageStart: (s, i) => process.stdout.write(`  \x1b[90m${i + 1}. ${s.role} (${s.model})...\x1b[0m`),
           onStageDone: (_s, _i, ms) => console.log(` \x1b[32m${(ms / 1000).toFixed(1)}s\x1b[0m`),
         })
@@ -258,4 +248,15 @@ function buildMultiFlags(opts: { provider?: string; apiKey?: string }): Partial<
   if (opts.provider) flags.provider = opts.provider as ForgeConfig['provider']
   if (opts.apiKey) flags.apiKey = opts.apiKey
   return flags
+}
+
+/** Get model list from the default provider (fallback when no aggregator) */
+function getSingleProviderModels(config: ForgeConfig): string[] | undefined {
+  const defaultId = config.defaultProvider === 'auto' ? undefined : config.defaultProvider
+  if (defaultId) return config.providers[defaultId]?.models
+  // Scan for first provider with models
+  for (const [, pc] of Object.entries(config.providers)) {
+    if (pc.models && pc.models.length > 0 && !pc.disabled) return pc.models
+  }
+  return undefined
 }

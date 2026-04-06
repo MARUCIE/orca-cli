@@ -30,6 +30,8 @@ const ProviderConfigSchema = z.object({
   models: z.array(z.string()).optional(),
   defaultModel: z.string().optional(),
   disabled: z.boolean().default(false),
+  /** True for aggregators (Poe, OpenRouter, Zenmux) that route to multiple vendors via one endpoint */
+  aggregator: z.boolean().default(false),
 })
 
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>
@@ -479,6 +481,122 @@ export function listProviders(config: ForgeConfig): ProviderInfo[] {
   }
 
   return result
+}
+
+// ── Model Endpoint Resolution (for multi-model) ────────────────────
+
+export interface ModelEndpoint {
+  model: string
+  apiKey: string
+  baseURL: string
+  provider: string
+}
+
+/**
+ * Model name prefix → provider mapping for auto-detection.
+ */
+const MODEL_PREFIX_TO_PROVIDER: Array<[string, string]> = [
+  ['claude', 'anthropic'],
+  ['anthropic', 'anthropic'],
+  ['gpt', 'openai'],
+  ['o1', 'openai'],
+  ['o3', 'openai'],
+  ['o4', 'openai'],
+  ['gemini', 'google'],
+  ['gemma', 'google'],
+  ['deepseek', 'deepseek'],
+  ['grok', 'xai'],
+  ['qwen', 'local'],
+  ['llama', 'local'],
+  ['kimi', 'local'],
+  ['glm', 'local'],
+  ['minimax', 'local'],
+]
+
+function detectProviderForModel(model: string): string | undefined {
+  const lower = model.toLowerCase()
+  for (const [prefix, provider] of MODEL_PREFIX_TO_PROVIDER) {
+    if (lower.startsWith(prefix)) return provider
+  }
+  return undefined
+}
+
+/**
+ * Resolve the endpoint (apiKey + baseURL) for a specific model.
+ *
+ * Strategy:
+ *   1. If an aggregator provider is specified and available, use it (single endpoint for all models)
+ *   2. Otherwise, detect which direct provider owns this model and use that provider's endpoint
+ *   3. Fall back to the default provider
+ *
+ * This enables council/race/pipeline to send each model to the right endpoint.
+ */
+export function resolveModelEndpoint(
+  model: string,
+  config: ForgeConfig,
+  aggregatorId?: string,
+): ModelEndpoint | null {
+  // Path 1: Aggregator available — use it for everything
+  if (aggregatorId) {
+    const agg = config.providers[aggregatorId]
+    if (agg && !agg.disabled) {
+      const wk = WELL_KNOWN_PROVIDERS[aggregatorId]
+      const apiKey = resolveEnvTemplate(agg.apiKey) || (wk ? process.env[wk.envKey] : undefined)
+      const baseURL = resolveEnvTemplate(agg.baseURL) || wk?.baseURL
+      if (apiKey && baseURL) {
+        return { model, apiKey, baseURL, provider: aggregatorId }
+      }
+    }
+  }
+
+  // Path 2: Direct provider routing — find who owns this model
+  const detectedProvider = detectProviderForModel(model)
+  if (detectedProvider) {
+    const pc = config.providers[detectedProvider]
+    const wk = WELL_KNOWN_PROVIDERS[detectedProvider]
+    const apiKey = resolveEnvTemplate(pc?.apiKey) || (wk ? process.env[wk.envKey] : undefined)
+    const baseURL = resolveEnvTemplate(pc?.baseURL) || wk?.baseURL
+    if (apiKey && baseURL) {
+      return { model, apiKey, baseURL, provider: detectedProvider }
+    }
+  }
+
+  // Path 3: Fall back to default provider
+  try {
+    const resolved = resolveProvider(config)
+    if (resolved.baseURL) {
+      return { model, apiKey: resolved.apiKey, baseURL: resolved.baseURL, provider: resolved.provider }
+    }
+  } catch { /* no default available */ }
+
+  return null
+}
+
+/**
+ * Find the best aggregator provider from config, or undefined if none available.
+ * Checks multiModel.provider first, then scans for any enabled aggregator with a key.
+ */
+export function findAggregator(config: ForgeConfig): string | undefined {
+  // Explicit multiModel.provider
+  const explicit = config.multiModel?.provider
+  if (explicit) {
+    const pc = config.providers[explicit]
+    if (pc && !pc.disabled) {
+      const wk = WELL_KNOWN_PROVIDERS[explicit]
+      const hasKey = !!(resolveEnvTemplate(pc.apiKey) || (wk ? process.env[wk.envKey] : undefined))
+      if (hasKey) return explicit
+    }
+  }
+
+  // Scan for any aggregator with a key
+  for (const [id, pc] of Object.entries(config.providers)) {
+    if (!pc.aggregator || pc.disabled) continue
+    const wk = WELL_KNOWN_PROVIDERS[id]
+    const hasKey = !!(resolveEnvTemplate(pc.apiKey) || (wk ? process.env[wk.envKey] : undefined))
+    if (hasKey) return id
+  }
+
+  return undefined
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────

@@ -5,9 +5,15 @@
  *   1. Council — N models answer, judge synthesizes
  *   2. Race — N models race, first good answer wins
  *   3. Pipeline — chain models as specialists (plan → code → review)
+ *
+ * Routing strategy:
+ *   - Aggregator available (Poe/OpenRouter): single endpoint, all models → cross-vendor diversity
+ *   - Aggregator down: each model routes to its direct provider endpoint
+ *   - resolveModelEndpoint() handles the routing per model
  */
 
 import { chatOnce } from './providers/openai-compat.js'
+import type { ModelEndpoint } from './config.js'
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -60,7 +66,7 @@ const DIVERSITY_GROUPS: string[][] = [
 
 /**
  * Pick N diverse models.
- * If providerModels is given (from config), pick from that list.
+ * If providerModels is given (single-provider fallback), pick from that list.
  * Otherwise fall back to DIVERSITY_GROUPS (cross-vendor selection).
  */
 export function pickDiverseModels(count: number, providerModels?: string[]): string[] {
@@ -78,45 +84,60 @@ export function pickDiverseModels(count: number, providerModels?: string[]): str
   return picks.slice(0, count)
 }
 
+// ── Model Endpoint Helper ───────────────────────────────────────
+
+/**
+ * Call chatOnce with a resolved ModelEndpoint.
+ * This is the single point where model→provider routing happens.
+ */
+async function callModel(endpoint: ModelEndpoint, prompt: string) {
+  return chatOnce(
+    { apiKey: endpoint.apiKey, baseURL: endpoint.baseURL, model: endpoint.model },
+    prompt,
+  )
+}
+
 // ── Council Mode ─────────────────────────────────────────────────
 
 export async function runCouncil(opts: {
   prompt: string
   models: string[]
   judgeModel: string
-  apiKey: string
-  baseURL: string
+  resolveEndpoint: (model: string) => ModelEndpoint | null
   onModelStart?: (model: string) => void
   onModelDone?: (model: string, durationMs: number) => void
 }): Promise<CouncilResult> {
   const startTime = Date.now()
-  const { prompt, models, judgeModel, apiKey, baseURL, onModelStart, onModelDone } = opts
+  const { prompt, models, judgeModel, resolveEndpoint, onModelStart, onModelDone } = opts
 
-  // Phase 1: Query all models in parallel
+  // Phase 1: Query all models in parallel — each routes to its own provider
   const promises = models.map(async (model) => {
     onModelStart?.(model)
     const t0 = Date.now()
-    try {
-      const result = await chatOnce(
-        { apiKey, baseURL, model },
-        prompt,
-      )
+
+    const endpoint = resolveEndpoint(model)
+    if (!endpoint) {
       const resp: ModelResponse = {
-        model,
-        text: result.text,
-        durationMs: Date.now() - t0,
-        inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens,
+        model, text: '', durationMs: Date.now() - t0,
+        inputTokens: 0, outputTokens: 0,
+        error: `No provider endpoint found for model "${model}"`,
+      }
+      onModelDone?.(model, resp.durationMs)
+      return resp
+    }
+
+    try {
+      const result = await callModel(endpoint, prompt)
+      const resp: ModelResponse = {
+        model, text: result.text, durationMs: Date.now() - t0,
+        inputTokens: result.inputTokens, outputTokens: result.outputTokens,
       }
       onModelDone?.(model, resp.durationMs)
       return resp
     } catch (err) {
       const resp: ModelResponse = {
-        model,
-        text: '',
-        durationMs: Date.now() - t0,
-        inputTokens: 0,
-        outputTokens: 0,
+        model, text: '', durationMs: Date.now() - t0,
+        inputTokens: 0, outputTokens: 0,
         error: err instanceof Error ? err.message : String(err),
       }
       onModelDone?.(model, resp.durationMs)
@@ -132,42 +153,36 @@ export async function runCouncil(opts: {
   onModelStart?.(judgeModel + ' (judge)')
   const jt0 = Date.now()
 
+  const judgeEndpoint = resolveEndpoint(judgeModel)
   let verdict: ModelResponse
-  try {
-    const judgeResult = await chatOnce(
-      { apiKey, baseURL, model: judgeModel },
-      judgePrompt,
-    )
+
+  if (!judgeEndpoint) {
     verdict = {
-      model: judgeModel,
-      text: judgeResult.text,
-      durationMs: Date.now() - jt0,
-      inputTokens: judgeResult.inputTokens,
-      outputTokens: judgeResult.outputTokens,
+      model: judgeModel, text: 'Judge error: no endpoint found',
+      durationMs: Date.now() - jt0, inputTokens: 0, outputTokens: 0, error: 'no endpoint',
     }
-  } catch (err) {
-    verdict = {
-      model: judgeModel,
-      text: `Judge error: ${err instanceof Error ? err.message : String(err)}`,
-      durationMs: Date.now() - jt0,
-      inputTokens: 0,
-      outputTokens: 0,
-      error: String(err),
+  } else {
+    try {
+      const judgeResult = await callModel(judgeEndpoint, judgePrompt)
+      verdict = {
+        model: judgeModel, text: judgeResult.text, durationMs: Date.now() - jt0,
+        inputTokens: judgeResult.inputTokens, outputTokens: judgeResult.outputTokens,
+      }
+    } catch (err) {
+      verdict = {
+        model: judgeModel,
+        text: `Judge error: ${err instanceof Error ? err.message : String(err)}`,
+        durationMs: Date.now() - jt0, inputTokens: 0, outputTokens: 0, error: String(err),
+      }
     }
   }
   onModelDone?.(judgeModel + ' (judge)', verdict.durationMs)
 
-  // Determine agreement level
   const agreement = validResponses.length <= 1 ? 'low'
     : validResponses.length === models.length ? 'high'
     : 'medium'
 
-  return {
-    responses,
-    verdict,
-    totalDurationMs: Date.now() - startTime,
-    agreement,
-  }
+  return { responses, verdict, totalDurationMs: Date.now() - startTime, agreement }
 }
 
 function buildJudgePrompt(originalPrompt: string, responses: ModelResponse[]): string {
@@ -200,14 +215,13 @@ Be concise and actionable. Lead with the recommendation, then explain difference
 export async function runRace(opts: {
   prompt: string
   models: string[]
-  apiKey: string
-  baseURL: string
+  resolveEndpoint: (model: string) => ModelEndpoint | null
   timeout?: number
   onModelStart?: (model: string) => void
   onModelDone?: (model: string, durationMs: number, won: boolean) => void
 }): Promise<RaceResult> {
   const startTime = Date.now()
-  const { prompt, models, apiKey, baseURL, timeout = 30_000, onModelStart, onModelDone } = opts
+  const { prompt, models, resolveEndpoint, timeout = 30_000, onModelStart, onModelDone } = opts
 
   const abortControllers = models.map(() => new AbortController())
   const cancelled: string[] = []
@@ -219,12 +233,8 @@ export async function runRace(opts: {
       if (!resolved) {
         resolved = true
         resolveRace({
-          model: 'timeout',
-          text: 'All models timed out.',
-          durationMs: timeout,
-          inputTokens: 0,
-          outputTokens: 0,
-          error: 'timeout',
+          model: 'timeout', text: 'All models timed out.',
+          durationMs: timeout, inputTokens: 0, outputTokens: 0, error: 'timeout',
         })
       }
     }, timeout)
@@ -232,29 +242,27 @@ export async function runRace(opts: {
     models.forEach(async (model, idx) => {
       onModelStart?.(model)
       const t0 = Date.now()
+
+      const endpoint = resolveEndpoint(model)
+      if (!endpoint) {
+        onModelDone?.(model, Date.now() - t0, false)
+        return
+      }
+
       try {
-        const result = await chatOnce({ apiKey, baseURL, model }, prompt)
+        const result = await callModel(endpoint, prompt)
         const resp: ModelResponse = {
-          model,
-          text: result.text,
-          durationMs: Date.now() - t0,
-          inputTokens: result.inputTokens,
-          outputTokens: result.outputTokens,
+          model, text: result.text, durationMs: Date.now() - t0,
+          inputTokens: result.inputTokens, outputTokens: result.outputTokens,
         }
 
         if (!resolved && resp.text) {
           resolved = true
           clearTimeout(timeoutId)
           onModelDone?.(model, resp.durationMs, true)
-
-          // Cancel remaining
           abortControllers.forEach((ac, i) => {
-            if (i !== idx) {
-              ac.abort()
-              cancelled.push(models[i]!)
-            }
+            if (i !== idx) { ac.abort(); cancelled.push(models[i]!) }
           })
-
           resolveRace(resp)
         } else {
           onModelDone?.(model, Date.now() - t0, false)
@@ -265,11 +273,7 @@ export async function runRace(opts: {
     })
   })
 
-  return {
-    winner: result,
-    cancelled,
-    totalDurationMs: Date.now() - startTime,
-  }
+  return { winner: result, cancelled, totalDurationMs: Date.now() - startTime }
 }
 
 // ── Pipeline Mode ────────────────────────────────────────────────
@@ -286,13 +290,12 @@ const STAGE_PROMPTS: Record<string, string> = {
 export async function runPipeline(opts: {
   prompt: string
   stages: PipelineStage[]
-  apiKey: string
-  baseURL: string
+  resolveEndpoint: (model: string) => ModelEndpoint | null
   onStageStart?: (stage: PipelineStage, index: number) => void
   onStageDone?: (stage: PipelineStage, index: number, durationMs: number) => void
 }): Promise<PipelineResult> {
   const startTime = Date.now()
-  const { prompt, stages, apiKey, baseURL, onStageStart, onStageDone } = opts
+  const { prompt, stages, resolveEndpoint, onStageStart, onStageDone } = opts
 
   const results: Array<{ stage: PipelineStage; response: ModelResponse }> = []
   let previousOutput = prompt
@@ -302,40 +305,44 @@ export async function runPipeline(opts: {
     onStageStart?.(stage, i)
     const t0 = Date.now()
 
+    const endpoint = resolveEndpoint(stage.model)
+    if (!endpoint) {
+      results.push({
+        stage,
+        response: {
+          model: stage.model, text: '', durationMs: Date.now() - t0,
+          inputTokens: 0, outputTokens: 0,
+          error: `No endpoint for model "${stage.model}"`,
+        },
+      })
+      onStageDone?.(stage, i, Date.now() - t0)
+      break
+    }
+
     const stagePrompt = (STAGE_PROMPTS[stage.role] || '') + previousOutput
 
     try {
-      const result = await chatOnce(
-        { apiKey, baseURL, model: stage.model },
-        stagePrompt,
-      )
+      const result = await callModel(endpoint, stagePrompt)
       const resp: ModelResponse = {
-        model: stage.model,
-        text: result.text,
-        durationMs: Date.now() - t0,
-        inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens,
+        model: stage.model, text: result.text, durationMs: Date.now() - t0,
+        inputTokens: result.inputTokens, outputTokens: result.outputTokens,
       }
       results.push({ stage, response: resp })
-      previousOutput = result.text // feed into next stage
+      previousOutput = result.text
       onStageDone?.(stage, i, resp.durationMs)
     } catch (err) {
-      const resp: ModelResponse = {
-        model: stage.model,
-        text: '',
-        durationMs: Date.now() - t0,
-        inputTokens: 0,
-        outputTokens: 0,
-        error: err instanceof Error ? err.message : String(err),
-      }
-      results.push({ stage, response: resp })
-      onStageDone?.(stage, i, resp.durationMs)
-      break // pipeline stops on error
+      results.push({
+        stage,
+        response: {
+          model: stage.model, text: '', durationMs: Date.now() - t0,
+          inputTokens: 0, outputTokens: 0,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      })
+      onStageDone?.(stage, i, Date.now() - t0)
+      break
     }
   }
 
-  return {
-    stages: results,
-    totalDurationMs: Date.now() - startTime,
-  }
+  return { stages: results, totalDurationMs: Date.now() - startTime }
 }

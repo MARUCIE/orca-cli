@@ -444,57 +444,42 @@ async function runREPL(
         }
         if (handled === 'handled') continue
 
-        // Multi-model commands (need async + baseURL)
+        // Multi-model commands — route each model to its provider
         if ((handled as string) === 'council' || (handled as string) === 'race' || (handled as string) === 'pipeline') {
           const mmPrompt = input.replace(/^\/(council|race|pipeline)\s*/, '').trim()
           if (!mmPrompt) continue
-          if (!resolved.baseURL) {
-            console.log('\x1b[33m  multi-model requires proxy provider (poe). Use -p poe.\x1b[0m')
-            continue
-          }
+
+          // Import routing functions
+          const { resolveModelEndpoint, findAggregator } = await import('../config.js')
+          const aggId = findAggregator(config)
+          const resolveEndpoint = (m: string) => resolveModelEndpoint(m, config, aggId)
 
           if ((handled as string) === 'council') {
             const models = pickDiverseModels(3)
             console.log(`\n\x1b[36m  ╭── Council: ${models.length} models ──╮\x1b[0m`)
             const result = await runCouncil({
-              prompt: mmPrompt,
-              models,
-              judgeModel: models[0]!,
-              apiKey: resolved.apiKey,
-              baseURL: resolved.baseURL,
+              prompt: mmPrompt, models, judgeModel: models[0]!, resolveEndpoint,
               onModelStart: (m) => process.stdout.write(`\x1b[90m  ● ${m}...\x1b[0m`),
               onModelDone: (m, ms) => console.log(` \x1b[32m${(ms/1000).toFixed(1)}s\x1b[0m`),
             })
             console.log()
             for (const r of result.responses) {
-              if (r.error) {
-                console.log(`\x1b[31m  ✗ ${r.model}: ${r.error}\x1b[0m`)
-              } else {
-                console.log(`\x1b[90m  ── ${r.model} (${(r.durationMs/1000).toFixed(1)}s) ──\x1b[0m`)
-                console.log(`  ${r.text.slice(0, 500)}${r.text.length > 500 ? '...' : ''}\n`)
-              }
+              if (r.error) { console.log(`\x1b[31m  ✗ ${r.model}: ${r.error}\x1b[0m`) }
+              else { console.log(`\x1b[90m  ── ${r.model} (${(r.durationMs/1000).toFixed(1)}s) ──\x1b[0m\n  ${r.text.slice(0, 500)}${r.text.length > 500 ? '...' : ''}\n`) }
             }
-            console.log(`\x1b[36m  ★ Verdict\x1b[0m \x1b[90m(${result.verdict.model}, ${(result.verdict.durationMs/1000).toFixed(1)}s)\x1b[0m`)
-            console.log(`  ${result.verdict.text}\n`)
+            console.log(`\x1b[36m  ★ Verdict\x1b[0m \x1b[90m(${result.verdict.model}, ${(result.verdict.durationMs/1000).toFixed(1)}s)\x1b[0m\n  ${result.verdict.text}\n`)
             console.log(`\x1b[90m  ─ ${result.responses.length} models · ${(result.totalDurationMs/1000).toFixed(1)}s · agreement: ${result.agreement} ─\x1b[0m\n`)
 
           } else if ((handled as string) === 'race') {
             const models = pickDiverseModels(5)
             console.log(`\n\x1b[33m  ╭── Race: ${models.length} models ──╮\x1b[0m`)
             const result = await runRace({
-              prompt: mmPrompt,
-              models,
-              apiKey: resolved.apiKey,
-              baseURL: resolved.baseURL,
+              prompt: mmPrompt, models, resolveEndpoint,
               onModelStart: (m) => process.stdout.write(`\x1b[90m  ◎ ${m}...\x1b[0m`),
               onModelDone: (m, ms, won) => console.log(won ? ` \x1b[32m★ WINNER ${(ms/1000).toFixed(1)}s\x1b[0m` : ` \x1b[90m${(ms/1000).toFixed(1)}s\x1b[0m`),
             })
-            console.log()
-            console.log(`\x1b[32m  Winner: ${result.winner.model} (${(result.winner.durationMs/1000).toFixed(1)}s)\x1b[0m`)
-            console.log(`  ${result.winner.text}\n`)
-            if (result.cancelled.length > 0) {
-              console.log(`\x1b[90m  cancelled: ${result.cancelled.join(', ')}\x1b[0m`)
-            }
+            console.log(`\n\x1b[32m  Winner: ${result.winner.model} (${(result.winner.durationMs/1000).toFixed(1)}s)\x1b[0m\n  ${result.winner.text}\n`)
+            if (result.cancelled.length > 0) console.log(`\x1b[90m  cancelled: ${result.cancelled.join(', ')}\x1b[0m`)
             console.log(`\x1b[90m  ─ ${(result.totalDurationMs/1000).toFixed(1)}s total ─\x1b[0m\n`)
 
           } else if ((handled as string) === 'pipeline') {
@@ -505,21 +490,15 @@ async function runREPL(
             ]
             console.log(`\n\x1b[35m  ╭── Pipeline: ${stages.length} stages ──╮\x1b[0m`)
             const result = await runPipeline({
-              prompt: mmPrompt,
-              stages,
-              apiKey: resolved.apiKey,
-              baseURL: resolved.baseURL,
+              prompt: mmPrompt, stages, resolveEndpoint,
               onStageStart: (s, i) => process.stdout.write(`\x1b[90m  ${i+1}. ${s.role} (${s.model})...\x1b[0m`),
               onStageDone: (_s, _i, ms) => console.log(` \x1b[32m${(ms/1000).toFixed(1)}s\x1b[0m`),
             })
             console.log()
             for (const { stage, response } of result.stages) {
               console.log(`\x1b[90m  ── ${stage.role} · ${response.model} (${(response.durationMs/1000).toFixed(1)}s) ──\x1b[0m`)
-              if (response.error) {
-                console.log(`\x1b[31m  error: ${response.error}\x1b[0m\n`)
-              } else {
-                console.log(`  ${response.text.slice(0, 800)}${response.text.length > 800 ? '...' : ''}\n`)
-              }
+              if (response.error) { console.log(`\x1b[31m  error: ${response.error}\x1b[0m\n`) }
+              else { console.log(`  ${response.text.slice(0, 800)}${response.text.length > 800 ? '...' : ''}\n`) }
             }
             console.log(`\x1b[90m  ─ ${result.stages.length} stages · ${(result.totalDurationMs/1000).toFixed(1)}s total ─\x1b[0m\n`)
           }

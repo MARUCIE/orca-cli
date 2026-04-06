@@ -7,5 +7,5 @@
 
 export { createProgram, run } from './program.js'
 export type { ForgeConfig, Provider } from './config.js'
-export { resolveConfig, resolveProvider, listProviders, initGlobalConfig, initProjectConfig } from './config.js'
-export type { ProviderConfig, ProviderInfo } from './config.js'
+export { resolveConfig, resolveProvider, resolveModelEndpoint, findAggregator, listProviders, initGlobalConfig, initProjectConfig } from './config.js'
+export type { ProviderConfig, ProviderInfo, ModelEndpoint } from './config.js'
