@@ -20,6 +20,21 @@ import { StreamMarkdown } from '../markdown.js'
 import type { ForgeConfig } from '../config.js'
 import type { PipelineStage } from '../multi-model.js'
 
+/**
+ * Resolve the provider for multi-model commands.
+ * Uses config.multiModel.provider if set, otherwise the default provider.
+ * Multi-model requires a baseURL (OpenAI-compatible endpoint).
+ */
+function resolveMultiProvider(config: ForgeConfig) {
+  const multiProviderId = config.multiModel?.provider
+  if (multiProviderId) {
+    // Override defaultProvider for this resolution
+    const overridden = { ...config, defaultProvider: multiProviderId }
+    return resolveProvider(overridden)
+  }
+  return resolveProvider(config)
+}
+
 // ── Council Command ──────────────────────────────────────────────
 
 export function createCouncilCommand(): Command {
@@ -35,10 +50,10 @@ export function createCouncilCommand(): Command {
 
       try {
         const config = resolveConfig({ cwd: process.cwd(), flags: buildMultiFlags(opts) })
-        const resolved = resolveProvider(config)
+        const resolved = resolveMultiProvider(config)
 
         if (!resolved.baseURL) {
-          printError('Multi-model requires proxy provider. Use -p poe or set POE_API_KEY.')
+          printError(`Provider "${resolved.provider}" has no baseURL. Multi-model needs an OpenAI-compatible endpoint.\nConfigure providers.${resolved.provider}.baseURL in ~/.armature/config.json`)
           process.exit(1)
         }
 
@@ -109,10 +124,10 @@ export function createRaceCommand(): Command {
 
       try {
         const config = resolveConfig({ cwd: process.cwd(), flags: buildMultiFlags(opts) })
-        const resolved = resolveProvider(config)
+        const resolved = resolveMultiProvider(config)
 
         if (!resolved.baseURL) {
-          printError('Multi-model requires proxy provider. Use -p poe or set POE_API_KEY.')
+          printError(`Provider "${resolved.provider}" has no baseURL. Multi-model needs an OpenAI-compatible endpoint.\nConfigure providers.${resolved.provider}.baseURL in ~/.armature/config.json`)
           process.exit(1)
         }
 
@@ -173,10 +188,10 @@ export function createPipelineCommand(): Command {
 
       try {
         const config = resolveConfig({ cwd: process.cwd(), flags: buildMultiFlags(opts) })
-        const resolved = resolveProvider(config)
+        const resolved = resolveMultiProvider(config)
 
         if (!resolved.baseURL) {
-          printError('Multi-model requires proxy provider. Use -p poe or set POE_API_KEY.')
+          printError(`Provider "${resolved.provider}" has no baseURL. Multi-model needs an OpenAI-compatible endpoint.\nConfigure providers.${resolved.provider}.baseURL in ~/.armature/config.json`)
           process.exit(1)
         }
 

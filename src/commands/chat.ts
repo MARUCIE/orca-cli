@@ -1352,9 +1352,14 @@ async function runSDKQuery(options: SDKQueryOptions): Promise<void> {
     throw new Error('@armature/sdk not installed. Use --provider poe for proxy mode, or npm install @armature/sdk for native mode.')
   }
 
+  // Map CLI provider to SDK provider option
+  const sdkProvider = resolved.provider === 'anthropic' ? 'anthropic' : 'openai-compat'
+
   const agent = sdk.createAgent({
+    provider: sdkProvider,
     apiKey: resolved.apiKey,
     model: resolved.model,
+    baseURL: resolved.baseURL,
     maxTurns: config.maxTurns,
     maxBudgetUsd: config.maxBudgetUsd,
     systemPrompt: config.systemPrompt,

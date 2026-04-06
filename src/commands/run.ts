@@ -57,18 +57,19 @@ export function createRunCommand(): Command {
           flags: buildFlags(opts),
         })
 
-        const { provider, apiKey, model } = resolveProvider(config)
+        const resolved = resolveProvider(config)
 
         if (outputMode === 'streaming') {
           printBanner()
-          printProviderInfo(provider, model)
+          printProviderInfo(resolved.provider, resolved.model)
         }
 
         await executeTask({
           task,
-          provider,
-          apiKey,
-          model,
+          provider: resolved.provider,
+          apiKey: resolved.apiKey,
+          model: resolved.model,
+          baseURL: resolved.baseURL,
           config,
           outputMode,
           cwd: opts.cwd || process.cwd(),
@@ -91,6 +92,7 @@ interface ExecuteTaskOptions {
   provider: string
   apiKey: string
   model: string
+  baseURL?: string
   config: ForgeConfig
   outputMode: OutputMode
   cwd: string
@@ -98,7 +100,7 @@ interface ExecuteTaskOptions {
 }
 
 async function executeTask(options: ExecuteTaskOptions): Promise<void> {
-  const { task, apiKey, model, config, outputMode, cwd, dangerously } = options
+  const { task, provider, apiKey, model, baseURL, config, outputMode, cwd, dangerously } = options
 
   let sdk: { createAgent: (opts: Record<string, unknown>) => { query: (p: string) => AsyncIterable<unknown> } }
   try {
@@ -116,9 +118,14 @@ async function executeTask(options: ExecuteTaskOptions): Promise<void> {
     ? 'bypassPermissions'
     : (config.permissionMode === 'default' ? 'acceptEdits' : config.permissionMode)
 
+  // Map CLI provider to SDK provider option
+  const sdkProvider = provider === 'anthropic' ? 'anthropic' : 'openai-compat'
+
   const agent = sdk.createAgent({
+    provider: sdkProvider,
     apiKey,
     model,
+    baseURL,
     maxTurns: config.maxTurns,
     maxBudgetUsd: config.maxBudgetUsd,
     systemPrompt: config.systemPrompt || buildSystemPrompt(cwd),

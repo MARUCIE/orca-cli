@@ -10,11 +10,14 @@ import { createChatCommand } from './commands/chat.js'
 import { createRunCommand } from './commands/run.js'
 import { createCouncilCommand, createRaceCommand, createPipelineCommand } from './commands/multi.js'
 import { createBenchCommand } from './commands/bench.js'
+import { createProvidersCommand } from './commands/providers.js'
 
 export function createProgram(): Command {
   const program = new Command()
     .name('forge')
     .version('0.1.0')
+    .enablePositionalOptions()
+    .passThroughOptions()
     .description(
       'Forge — provider-neutral agent runtime. 41 tools · 11 models · multi-model collaboration.\n\n' +
       'Commands:\n' +
@@ -24,6 +27,7 @@ export function createProgram(): Command {
       '  race              First model to answer wins (speed race)\n' +
       '  pipeline           Plan → Code → Review chain across models\n' +
       '  bench             Run agent benchmark (self-evaluation)\n' +
+      '  providers         List and test configured providers\n' +
       '  init              Initialize project configuration'
     )
 
@@ -34,6 +38,7 @@ export function createProgram(): Command {
   program.addCommand(createPipelineCommand())
   program.addCommand(createInitCommand())
   program.addCommand(createBenchCommand())
+  program.addCommand(createProvidersCommand())
 
   // Default: no subcommand → enter interactive REPL (like `claude` without args)
   program.argument('[prompt...]', 'Prompt text (omit for interactive REPL)')

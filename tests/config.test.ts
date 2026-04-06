@@ -21,8 +21,9 @@ describe('config', () => {
 
   describe('resolveConfig', () => {
     it('returns defaults when no config exists', () => {
-      const config = resolveConfig({ cwd: tempDir })
-      expect(config.provider).toBe('auto')
+      // Override global config's defaultProvider to test the schema default
+      const config = resolveConfig({ cwd: tempDir, flags: { defaultProvider: 'auto' } })
+      expect(config.defaultProvider).toBe('auto')
       expect(config.maxTurns).toBe(25)
       expect(config.permissionMode).toBe('default')
     })
@@ -32,15 +33,16 @@ describe('config', () => {
         cwd: tempDir,
         flags: { model: 'gpt-4.1', provider: 'openai', maxTurns: 10 },
       })
+      // v1 compat: flat flags.model goes to config.model, flags.provider sets defaultProvider
       expect(config.model).toBe('gpt-4.1')
-      expect(config.provider).toBe('openai')
+      expect(config.defaultProvider).toBe('openai')
       expect(config.maxTurns).toBe(10)
     })
 
     it('reads project config from .armature.json', () => {
       initProjectConfig(tempDir)
       const config = resolveConfig({ cwd: tempDir })
-      expect(config.provider).toBe('auto')
+      expect(config.defaultProvider).toBe('auto')
     })
 
     it('env variables override project config', () => {
@@ -48,7 +50,7 @@ describe('config', () => {
       process.env.ARMATURE_PROVIDER = 'openai'
       try {
         const config = resolveConfig({ cwd: tempDir })
-        expect(config.provider).toBe('openai')
+        expect(config.defaultProvider).toBe('openai')
       } finally {
         if (originalKey) {
           process.env.ARMATURE_PROVIDER = originalKey
@@ -66,7 +68,7 @@ describe('config', () => {
           cwd: tempDir,
           flags: { provider: 'anthropic' },
         })
-        expect(config.provider).toBe('anthropic')
+        expect(config.defaultProvider).toBe('anthropic')
       } finally {
         if (originalKey) {
           process.env.ARMATURE_PROVIDER = originalKey
@@ -81,7 +83,7 @@ describe('config', () => {
     it('auto-detects anthropic from model name', () => {
       const config = resolveConfig({
         cwd: tempDir,
-        flags: { model: 'claude-sonnet-4-20250514', apiKey: 'test-key' },
+        flags: { model: 'claude-sonnet-4-20250514', apiKey: 'test-key', defaultProvider: 'auto' },
       })
       const { provider, model } = resolveProvider(config)
       expect(provider).toBe('anthropic')
@@ -91,7 +93,7 @@ describe('config', () => {
     it('auto-detects openai from model name', () => {
       const config = resolveConfig({
         cwd: tempDir,
-        flags: { model: 'gpt-4.1', apiKey: 'test-key' },
+        flags: { model: 'gpt-4.1', apiKey: 'test-key', defaultProvider: 'auto' },
       })
       const { provider } = resolveProvider(config)
       expect(provider).toBe('openai')
@@ -100,7 +102,7 @@ describe('config', () => {
     it('auto-detects google from model name', () => {
       const config = resolveConfig({
         cwd: tempDir,
-        flags: { model: 'gemini-2.5-pro', apiKey: 'test-key' },
+        flags: { model: 'gemini-2.5-pro', apiKey: 'test-key', defaultProvider: 'auto' },
       })
       const { provider } = resolveProvider(config)
       expect(provider).toBe('google')
@@ -126,7 +128,7 @@ describe('config', () => {
           cwd: tempDir,
           flags: { provider: 'openai' },
         })
-        expect(() => resolveProvider(config)).toThrow('No API key found')
+        expect(() => resolveProvider(config)).toThrow('No API key for provider')
       } finally {
         // Restore
         for (const [k, v] of Object.entries(saved)) {
