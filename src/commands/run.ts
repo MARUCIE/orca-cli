@@ -23,6 +23,7 @@ import {
 import type { OutputMode } from '../output.js'
 import { StreamMarkdown } from '../markdown.js'
 import { buildSystemPrompt } from '../system-prompt.js'
+import { recordUsage } from '../usage-db.js'
 
 interface RunOptions {
   model?: string
@@ -183,6 +184,18 @@ async function executeTask(options: ExecuteTaskOptions): Promise<void> {
       durationMs: Date.now() - startTime,
     })
   }
+
+  recordUsage({
+    provider,
+    model,
+    inputTokens,
+    outputTokens,
+    costUsd: 0,
+    durationMs: Date.now() - startTime,
+    turns,
+    command: 'run',
+    cwd,
+  })
 }
 
 function buildFlags(opts: RunOptions): Partial<ForgeConfig> {

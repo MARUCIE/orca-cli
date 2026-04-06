@@ -35,6 +35,7 @@ import { TOOL_DEFINITIONS, executeTool, DANGEROUS_TOOLS } from '../tools.js'
 import { autoVerify, formatVerifyOutput } from '../auto-verify.js'
 import { TokenBudgetManager } from '../token-budget.js'
 import { RetryTracker } from '../retry-intelligence.js'
+import { recordUsage } from '../usage-db.js'
 
 interface ChatOptions {
   model?: string
@@ -410,6 +411,17 @@ async function runREPL(
             totalOutputTokens: stats.totalOutputTokens,
             durationMs: Date.now() - stats.startTime,
             model: currentModel,
+          })
+          recordUsage({
+            provider: resolved.provider,
+            model: currentModel,
+            inputTokens: stats.totalInputTokens,
+            outputTokens: stats.totalOutputTokens,
+            costUsd: 0,
+            durationMs: Date.now() - stats.startTime,
+            turns: stats.turns,
+            command: 'chat',
+            cwd,
           })
           const bye = GOODBYE_MESSAGES[Math.floor(Math.random() * GOODBYE_MESSAGES.length)]
           console.log(`\x1b[90m  ${bye}\x1b[0m`)
@@ -1311,6 +1323,17 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
     })
   }
 
+  recordUsage({
+    provider: resolved.provider,
+    model: resolved.model,
+    inputTokens,
+    outputTokens,
+    costUsd: 0,
+    durationMs: Date.now() - startTime,
+    turns: 1,
+    command: 'chat',
+  })
+
   return { inputTokens, outputTokens }
 }
 
@@ -1407,6 +1430,17 @@ async function runSDKQuery(options: SDKQueryOptions): Promise<void> {
       durationMs: Date.now() - startTime,
     })
   }
+
+  recordUsage({
+    provider: resolved.provider,
+    model: resolved.model,
+    inputTokens,
+    outputTokens,
+    costUsd: 0,
+    durationMs: Date.now() - startTime,
+    turns,
+    command: 'chat-sdk',
+  })
 }
 
 // ── Helpers ─────────────────────────────────────────────────────

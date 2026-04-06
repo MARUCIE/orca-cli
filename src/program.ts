@@ -11,6 +11,7 @@ import { createRunCommand } from './commands/run.js'
 import { createCouncilCommand, createRaceCommand, createPipelineCommand } from './commands/multi.js'
 import { createBenchCommand } from './commands/bench.js'
 import { createProvidersCommand } from './commands/providers.js'
+import { createStatsCommand } from './commands/stats.js'
 
 export function createProgram(): Command {
   const program = new Command()
@@ -27,6 +28,7 @@ export function createProgram(): Command {
       '  race              First model to answer wins (speed race)\n' +
       '  pipeline           Plan → Code → Review chain across models\n' +
       '  bench             Run agent benchmark (self-evaluation)\n' +
+      '  stats             Token usage and cost statistics\n' +
       '  providers         List and test configured providers\n' +
       '  init              Initialize project configuration'
     )
@@ -39,6 +41,7 @@ export function createProgram(): Command {
   program.addCommand(createInitCommand())
   program.addCommand(createBenchCommand())
   program.addCommand(createProvidersCommand())
+  program.addCommand(createStatsCommand())
 
   // Default: no subcommand → enter interactive REPL (like `claude` without args)
   program.argument('[prompt...]', 'Prompt text (omit for interactive REPL)')
