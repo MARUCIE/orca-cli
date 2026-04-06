@@ -35,11 +35,17 @@ export function createCouncilCommand(): Command {
 
       try {
         const config = resolveConfig({ cwd: process.cwd(), flags: buildMultiFlags(opts) })
-        const aggregatorId = opts.provider || findAggregator(config)
+        // -p flag: if aggregator → use it; if direct provider → disable aggregator, use its models
+        const explicitProvider = opts.provider
+        const isExplicitAggregator = explicitProvider && config.providers[explicitProvider]?.aggregator
+        const aggregatorId = explicitProvider
+          ? (isExplicitAggregator ? explicitProvider : undefined)  // explicit non-aggregator → no aggregator
+          : findAggregator(config)                                 // no -p → auto-detect
 
         // Pick models: aggregator → cross-vendor diversity, no aggregator → single-provider fallback
         const count = Math.min(parseInt(opts.models || '3', 10), 11)
-        const models = pickDiverseModels(count, aggregatorId ? undefined : getSingleProviderModels(config))
+        const singleProviderOverride = (explicitProvider && !isExplicitAggregator) ? explicitProvider : undefined
+        const models = pickDiverseModels(count, aggregatorId ? undefined : getSingleProviderModels(config, singleProviderOverride))
         const judgeModel = opts.judge || models[0]!
 
         // Build resolver closure that routes each model
@@ -120,10 +126,16 @@ export function createRaceCommand(): Command {
 
       try {
         const config = resolveConfig({ cwd: process.cwd(), flags: buildMultiFlags(opts) })
-        const aggregatorId = opts.provider || findAggregator(config)
+        // -p flag: if aggregator → use it; if direct provider → disable aggregator, use its models
+        const explicitProvider = opts.provider
+        const isExplicitAggregator = explicitProvider && config.providers[explicitProvider]?.aggregator
+        const aggregatorId = explicitProvider
+          ? (isExplicitAggregator ? explicitProvider : undefined)  // explicit non-aggregator → no aggregator
+          : findAggregator(config)                                 // no -p → auto-detect
 
         const count = Math.min(parseInt(opts.models || '5', 10), 11)
-        const models = pickDiverseModels(count, aggregatorId ? undefined : getSingleProviderModels(config))
+        const singleProviderOverride = (explicitProvider && !isExplicitAggregator) ? explicitProvider : undefined
+        const models = pickDiverseModels(count, aggregatorId ? undefined : getSingleProviderModels(config, singleProviderOverride))
         const resolveEndpoint = (model: string) => resolveModelEndpoint(model, config, aggregatorId)
 
         const testEndpoint = resolveEndpoint(models[0]!)
@@ -188,7 +200,12 @@ export function createPipelineCommand(): Command {
 
       try {
         const config = resolveConfig({ cwd: process.cwd(), flags: buildMultiFlags(opts) })
-        const aggregatorId = opts.provider || findAggregator(config)
+        // -p flag: if aggregator → use it; if direct provider → disable aggregator, use its models
+        const explicitProvider = opts.provider
+        const isExplicitAggregator = explicitProvider && config.providers[explicitProvider]?.aggregator
+        const aggregatorId = explicitProvider
+          ? (isExplicitAggregator ? explicitProvider : undefined)  // explicit non-aggregator → no aggregator
+          : findAggregator(config)                                 // no -p → auto-detect
         const resolveEndpoint = (model: string) => resolveModelEndpoint(model, config, aggregatorId)
 
         const stages: PipelineStage[] = [
@@ -250,11 +267,11 @@ function buildMultiFlags(opts: { provider?: string; apiKey?: string }): Partial<
   return flags
 }
 
-/** Get model list from the default provider (fallback when no aggregator) */
-function getSingleProviderModels(config: ForgeConfig): string[] | undefined {
+/** Get model list from a specific or default provider (fallback when no aggregator) */
+function getSingleProviderModels(config: ForgeConfig, overrideProviderId?: string): string[] | undefined {
+  if (overrideProviderId) return config.providers[overrideProviderId]?.models
   const defaultId = config.defaultProvider === 'auto' ? undefined : config.defaultProvider
   if (defaultId) return config.providers[defaultId]?.models
-  // Scan for first provider with models
   for (const [, pc] of Object.entries(config.providers)) {
     if (pc.models && pc.models.length > 0 && !pc.disabled) return pc.models
   }

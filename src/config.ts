@@ -577,11 +577,11 @@ export function resolveModelEndpoint(
  * Checks multiModel.provider first, then scans for any enabled aggregator with a key.
  */
 export function findAggregator(config: ForgeConfig): string | undefined {
-  // Explicit multiModel.provider
+  // Explicit multiModel.provider — must be a true aggregator (aggregator: true)
   const explicit = config.multiModel?.provider
   if (explicit) {
     const pc = config.providers[explicit]
-    if (pc && !pc.disabled) {
+    if (pc && !pc.disabled && pc.aggregator) {
       const wk = WELL_KNOWN_PROVIDERS[explicit]
       const hasKey = !!(resolveEnvTemplate(pc.apiKey) || (wk ? process.env[wk.envKey] : undefined))
       if (hasKey) return explicit
