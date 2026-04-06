@@ -96,10 +96,32 @@ async function createOpenAIClient(apiKey: string, baseURL: string) {
     const dispatcher = new ProxyAgent(proxyUrl)
     const proxyFetch = (url: string | URL | Request, init?: RequestInit) =>
       undiciFetch(url as string, { ...(init as Record<string, unknown>), dispatcher } as Parameters<typeof undiciFetch>[1]) as unknown as Promise<Response>
-    return new OpenAI({ apiKey, baseURL, fetch: proxyFetch })
+    return new OpenAI({ apiKey, baseURL, fetch: proxyFetch, maxRetries: 0 })
   }
 
-  return new OpenAI({ apiKey, baseURL })
+  return new OpenAI({ apiKey, baseURL, maxRetries: 0 })
+}
+
+/**
+ * Retry wrapper for 429 rate limit errors.
+ * Retries up to 3 times with exponential backoff (2s, 4s, 8s).
+ */
+async function withRateLimitRetry<T>(fn: () => Promise<T>, label?: string): Promise<T> {
+  const MAX_RETRIES = 3
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      const is429 = message.includes('429') || message.includes('rate')
+      if (!is429 || attempt === MAX_RETRIES) throw err
+
+      const delay = Math.pow(2, attempt + 1) * 1000 // 2s, 4s, 8s
+      console.error(`\x1b[33m  rate limited${label ? ` (${label})` : ''} — retrying in ${delay / 1000}s (${attempt + 1}/${MAX_RETRIES})\x1b[0m`)
+      await new Promise(r => setTimeout(r, delay))
+    }
+  }
+  throw new Error('unreachable')
 }
 
 /**
@@ -155,7 +177,10 @@ export async function* streamChat(
       }
 
       // Force stream=true typing with unknown cast (params built dynamically for tool support)
-      const response = await client.chat.completions.create(params as unknown as Parameters<typeof client.chat.completions.create>[0])
+      const response = await withRateLimitRetry(
+        () => client.chat.completions.create(params as unknown as Parameters<typeof client.chat.completions.create>[0]),
+        options.model,
+      )
       const stream = response as AsyncIterable<Record<string, unknown>>
 
       let textContent = ''
@@ -291,11 +316,14 @@ export async function chatOnce(
   }
   messages.push({ role: 'user', content: prompt })
 
-  const response = await client.chat.completions.create({
-    model: options.model,
-    messages,
-    max_tokens: options.maxTokens || getModelMaxOutput(options.model),
-  })
+  const response = await withRateLimitRetry(
+    () => client.chat.completions.create({
+      model: options.model,
+      messages,
+      max_tokens: options.maxTokens || getModelMaxOutput(options.model),
+    }),
+    options.model,
+  )
 
   const choice = response.choices?.[0]
   return {

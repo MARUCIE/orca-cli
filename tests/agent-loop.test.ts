@@ -202,12 +202,12 @@ describe('Agent Loop: Tool call accumulation', () => {
 
 describe('Agent Loop: Error handling', () => {
   it('4.7 yields error event on API failure', async () => {
-    mockState.responses.push(() => { throw new Error('API rate limit exceeded') })
+    mockState.responses.push(() => { throw new Error('API authentication failed: invalid key') })
 
     const events = await collectEvents(streamChat(baseOpts, 'Will fail'))
     const err = events.find(e => e.type === 'error')
     expect(err).toBeDefined()
-    expect(err!.error).toContain('rate limit')
+    expect(err!.error).toContain('authentication failed')
   })
 
   it('4.8 handles empty response gracefully', async () => {
