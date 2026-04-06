@@ -1,15 +1,15 @@
 # Forge CLI
 
-**Provider-neutral coding agent — 11 models · 41 tools · 8 hooks · multi-model collaboration.**
+**Provider-neutral coding agent — 9 providers · 41 tools · 8 hooks · multi-model collaboration.**
 
-The one CLI that can do what no single-vendor CLI can: ask Claude, GPT, and Gemini the same question simultaneously, race them, or chain them as specialists.
+The one CLI that can do what no single-vendor CLI can: ask Claude, GPT, and Gemini the same question simultaneously, race them, or chain them as specialists. Works with any OpenAI-compatible provider.
 
 ```
      · ✦ ·
-   ▄██████▄          Forge  v0.1.0
+   ▄██████▄          Forge  v0.2.0
   ██████████         armature agent runtime
   ▀████████▀
-    ██████           ▸ poe/claude-sonnet-4.6  200K ctx · 64K out  [yolo]
+    ██████           ▸ google/gemini-2.5-pro  1M ctx · 65K out  [yolo]
    ████████          ▸ ~/Projects/my-app
                      41 tools · 8 hooks
 ```
@@ -18,7 +18,15 @@ The one CLI that can do what no single-vendor CLI can: ask Claude, GPT, and Gemi
 
 ```bash
 npm install -g @armature/forge-cli
-export POE_API_KEY=your-poe-api-key
+```
+
+Any ONE of these keys gets you started:
+```bash
+export GOOGLE_API_KEY=...        # Google Gemini
+export ANTHROPIC_API_KEY=...     # Anthropic Claude
+export OPENAI_API_KEY=...        # OpenAI GPT
+export POE_API_KEY=...           # Poe (aggregator: all vendors via 1 key)
+export OPENROUTER_API_KEY=...    # OpenRouter (aggregator)
 ```
 
 ## Quick Start
@@ -30,6 +38,11 @@ forge run "fix the failing tests"             # task execution
 forge council "SQL or NoSQL for this?" -n 5   # 5 models + judge
 forge race "write a CSV parser"               # first model wins
 forge pipeline "build REST API" --stages 5    # plan→code→review→fix→verify
+forge stats                                   # token usage and cost
+forge session list                            # saved sessions
+forge pr 123                                  # checkout + review PR
+forge serve --port 9100                       # headless HTTP server
+forge providers                               # list configured providers
 ```
 
 ## Multi-Model Collaboration (Unique Feature)
@@ -81,9 +94,28 @@ forge pipeline "build auth middleware" --plan claude-opus-4.6 --code gpt-5.4 --r
 | Fix | gpt-5.4 | Address review findings |
 | Verify | claude-opus-4.6 | Confirm fix matches plan |
 
-## 11 Models via Poe
+## 9 Providers
 
-One API key, 9 vendors:
+Works with any OpenAI-compatible endpoint. Configure in `~/.armature/config.json`:
+
+| Provider | Type | API Key Env |
+|----------|------|-------------|
+| anthropic | Direct | `ANTHROPIC_API_KEY` |
+| google | Direct | `GOOGLE_API_KEY` |
+| openai | Direct | `OPENAI_API_KEY` |
+| poe | Aggregator | `POE_API_KEY` |
+| openrouter | Aggregator | `OPENROUTER_API_KEY` |
+| deepseek | Direct | `DEEPSEEK_API_KEY` |
+| groq | Direct | `GROQ_API_KEY` |
+| xai | Direct | `XAI_API_KEY` |
+| local | Direct | (Ollama at localhost:11434) |
+
+**Aggregators** (Poe, OpenRouter) route to all vendors via one API key — ideal for council/race/pipeline.
+**Direct** providers connect to each vendor's own API.
+
+Multi-model routing: aggregator first, direct fallback per model.
+
+## Model Diversity (via aggregator)
 
 | Model | Vendor | Strength |
 |-------|--------|----------|
@@ -185,33 +217,33 @@ Features that close the gap between "tool" and "agent":
 | Unlimited Agent Loop | Auto-continue on truncation, incomplete text detection | Tasks complete without artificial limits |
 | Multi-edit Atomicity | Failed batch edits leave file unchanged | No partial corruption on error |
 
-Tested: 289 tests across 18 files, 14 rounds covering 10 SOTA dimensions.
+Tested: 326 tests across 20 files, 10/10 SOTA benchmark.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Forge CLI  v0.1.0                                  │
-│  5,800+ LOC · 20 source files · 289 tests           │
+│  Forge CLI  v0.2.0                                  │
+│  7,200+ LOC · 26 source files · 326 tests           │
 ├─────────────────────────────────────────────────────┤
-│  SOTA Agent Layer                                   │
-│  project context · smart truncation · error hints   │
-│  shell escape · boundary protection                 │
+│  New in v0.2.0                                      │
+│  providers · stats · session · pr · serve            │
+│  per-model routing · aggregator+direct fallback      │
 ├─────────────────────────────────────────────────────┤
 │  Multi-Model Engine                                 │
 │  council · race · pipeline                          │
-│  11 models × 9 vendors via Poe proxy                │
+│  9 providers · aggregator or direct per-model        │
 ├─────────────────────────────────────────────────────┤
 │  Agent Runtime                                      │
 │  41 tools · 8 hooks · YOLO/safe · sub-agents        │
 │  StreamMarkdown · session persistence · MCP client   │
 ├─────────────────────────────────────────────────────┤
-│  OpenAI-compat Provider                             │
-│  Unlimited agent loop · model-aware max_tokens      │
-│  Auto-continue on truncation · proxy support         │
+│  OpenAI-compat Provider + SQLite Usage Tracking     │
+│  429 auto-retry · model-aware max_tokens · SSE      │
+│  headless serve mode · PR review workflow            │
 ├─────────────────────────────────────────────────────┤
-│  @armature/sdk  (optional, native Anthropic path)   │
-│  51 tools · full MCP · agent infrastructure          │
+│  @armature/sdk  (optional, any provider via shim)   │
+│  51 tools · full MCP · OpenAI-compat shim            │
 └─────────────────────────────────────────────────────┘
 ```
 

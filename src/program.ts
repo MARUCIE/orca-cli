@@ -19,7 +19,7 @@ import { createServeCommand } from './commands/serve.js'
 export function createProgram(): Command {
   const program = new Command()
     .name('forge')
-    .version('0.1.0')
+    .version('0.2.0')
     .enablePositionalOptions()
     .passThroughOptions()
     .description(
