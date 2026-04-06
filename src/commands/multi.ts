@@ -13,11 +13,10 @@
  */
 
 import { Command } from 'commander'
-import { resolveConfig, resolveProvider } from '../config.js'
+import { resolveConfig, resolveProvider, type ForgeConfig } from '../config.js'
 import { printBanner, printError } from '../output.js'
 import { runCouncil, runRace, runPipeline, pickDiverseModels } from '../multi-model.js'
 import { StreamMarkdown } from '../markdown.js'
-import type { ForgeConfig } from '../config.js'
 import type { PipelineStage } from '../multi-model.js'
 
 /**
@@ -28,11 +27,18 @@ import type { PipelineStage } from '../multi-model.js'
 function resolveMultiProvider(config: ForgeConfig) {
   const multiProviderId = config.multiModel?.provider
   if (multiProviderId) {
-    // Override defaultProvider for this resolution
     const overridden = { ...config, defaultProvider: multiProviderId }
     return resolveProvider(overridden)
   }
   return resolveProvider(config)
+}
+
+/**
+ * Get the model list for multi-model from the provider config.
+ * If the provider declares models[], use them for diversity selection.
+ */
+function getProviderModels(config: ForgeConfig, providerId: string): string[] | undefined {
+  return config.providers[providerId]?.models
 }
 
 // ── Council Command ──────────────────────────────────────────────
@@ -58,7 +64,8 @@ export function createCouncilCommand(): Command {
         }
 
         const count = Math.min(parseInt(opts.models || '3', 10), 11)
-        const models = pickDiverseModels(count)
+        const providerModels = getProviderModels(config, resolved.provider)
+        const models = pickDiverseModels(count, providerModels)
         const judgeModel = opts.judge || models[0]!
 
         console.log()
@@ -132,7 +139,8 @@ export function createRaceCommand(): Command {
         }
 
         const count = Math.min(parseInt(opts.models || '5', 10), 11)
-        const models = pickDiverseModels(count)
+        const providerModels = getProviderModels(config, resolved.provider)
+        const models = pickDiverseModels(count, providerModels)
 
         console.log()
         console.log(`\x1b[33m  ╭─────────────────────────────────────────╮\x1b[0m`)

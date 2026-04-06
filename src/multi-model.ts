@@ -58,8 +58,18 @@ const DIVERSITY_GROUPS: string[][] = [
   ['minimax-m2.7'],
 ]
 
-/** Pick N diverse models (one per vendor family, prioritized) */
-export function pickDiverseModels(count: number): string[] {
+/**
+ * Pick N diverse models.
+ * If providerModels is given (from config), pick from that list.
+ * Otherwise fall back to DIVERSITY_GROUPS (cross-vendor selection).
+ */
+export function pickDiverseModels(count: number, providerModels?: string[]): string[] {
+  // If provider declares its own model list, use that directly
+  if (providerModels && providerModels.length > 0) {
+    return providerModels.slice(0, count)
+  }
+
+  // Cross-vendor diversity: one per vendor family
   const picks: string[] = []
   for (const group of DIVERSITY_GROUPS) {
     if (picks.length >= count) break
