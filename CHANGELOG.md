@@ -2,6 +2,50 @@
 
 This file is a historical release log. Version-specific counts and examples reflect the release date they were recorded, not the current repo head.
 
+## v0.4.0 — SOTA Gap Closure (2026-04-12)
+
+Complete closure of all 6 SOTA gap dimensions identified by 3-agent parallel research.
+15 new source modules, 105 new tests.
+
+### Harness Engineering Layer (Phase 1)
+- **Verification Gate** — pre-completion lint/typecheck/test gate with remediation hints
+- **Loop Detector** — Tw93 rule: 2 failures → pivot, 3+ → escalate
+- **Context Monitor** — 4-tier risk alerts (green/yellow/orange/red at 40/50/60%)
+- **Error Classifier** — 9 error categories with retryable detection + recovery suggestions
+- Wired into agent loop: risk warnings, error hints, pivot injection
+
+### Agent Isolation (Phase 1)
+- **Sub-agent process isolation** — fork child process with restricted tool whitelist
+- **Git worktree teams** — WorktreeManager: create/merge/cleanup per-agent branches
+- **Session resume** — `-c/--continue` loads most recent saved session
+- **Effort flag** — `--effort low/medium/high/max` tunes system prompt
+- **Cost tracking** — computes from model pricing table (was always $0)
+
+### Skills Engine (Phase 2)
+- **SkillRegistry** — loads skill-groups.json, trigger-based routing
+- **SkillEngine** — 4 execution modes: swarm, pipeline, loop, sequential
+
+### Security Sandbox (Phase 2)
+- **macOS Seatbelt** — profile generation + sandbox-exec execution
+- **Linux bubblewrap** — bwrap command with --unshare-net isolation
+- **Platform detection** — unified executeSandboxed() with fallback
+
+### Platform Gateway (Phase 3)
+- **WebhookGateway** — HMAC-SHA256 validated HTTP endpoint with routing
+- **TelegramAdapter** — long-polling bot with sendMessage
+
+### Persistent Memory (Phase 3)
+- **DNARegistry** — load/search/inherit/solidify knowledge capsules
+- **KnowledgeCompounder** — fix → pattern → capsule promotion with dedup
+
+### Stats
+- 52 source files, ~10,300 LOC (was 37 files, ~7,200 LOC)
+- 42 test files, 598 tests (was 35 files, 464 tests)
+- 10 benchmark scenarios, Score: 100%
+- TypeScript: 0 errors
+
+---
+
 ## v0.3.0 — Orca Brand + SOTA Hardening (2026-04-12)
 
 Complete brand rename from Armature/Forge to Orca. Animated orca ASCII art, dynamic hook display, and 38 new tests.

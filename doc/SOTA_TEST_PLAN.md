@@ -224,7 +224,14 @@ From production audit research, each mode has dedicated test coverage:
 | 12 | protocol.test.ts | 15 | DONE |
 | 16 | v030-harness.test.ts | 20 | DONE |
 | 17 | v030-coverage.test.ts | 18 | DONE |
-| **Total** | | **300** | |
+| 18 | harness-core.test.ts | 29 | DONE |
+| 19 | phase1-agent.test.ts | 15 | DONE |
+| 20 | phase2-skills.test.ts | 15 | DONE |
+| 21 | phase2-sandbox.test.ts | 12 | DONE |
+| 22 | phase2-gateway.test.ts | 12 | DONE |
+| 23 | phase2-memory.test.ts | 12 | DONE |
+| 24 | sota-modules.test.ts | 52 | DONE |
+| **Total** | | **447** | |
 
 ---
 

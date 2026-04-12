@@ -6,7 +6,7 @@ The one CLI that can do what no single-vendor CLI can: ask Claude, GPT, and Gemi
 
 ```
        ..:::....
-    .::------::::..          Orca  v0.3.0
+    .::------::::..          Orca  v0.4.0
   .::--========----::::..    provider-neutral agent runtime
 .:--==+++*****+++===---::::..
 .:-=++**#########**++==---::..
@@ -275,33 +275,34 @@ Features that close the gap between "tool" and "agent":
 | Multi-edit Atomicity | Failed batch edits leave file unchanged | No partial corruption on error |
 | Background Completion Notifications | `run_background` jobs notify the REPL when they finish, and `/jobs` shows tracked state | Agent can keep working without manual PID polling |
 
-Tested: 464 tests across 35 files, 10/10 SOTA benchmark.
+Tested: 598 tests across 42 files, 10/10 SOTA benchmark.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Orca CLI  v0.3.0                                   │
-│  7,200+ LOC · 37 source files · 464 tests            │
+│  Orca CLI  v0.4.0                                   │
+│  10,300+ LOC · 52 source files · 598 tests          │
 ├─────────────────────────────────────────────────────┤
-│  New in v0.3.0                                      │
-│  providers · stats · session · pr · serve            │
-│  per-model routing · aggregator+direct fallback      │
+│  New in v0.4.0 — SOTA Gap Closure                   │
+│  harness layer · sub-agent isolation · sandbox       │
+│  skills engine · webhook gateway · DNA capsules      │
 ├─────────────────────────────────────────────────────┤
 │  Multi-Model Engine                                 │
 │  council · race · pipeline                          │
 │  9 providers · aggregator or direct per-model        │
 ├─────────────────────────────────────────────────────┤
-│  Agent Runtime                                      │
-│  41 tools · 8 hooks · YOLO/safe · sub-agents        │
-│  StreamMarkdown · session persistence · MCP client   │
+│  Agent Runtime + Harness Layer                      │
+│  41 tools · 10 hooks · YOLO/safe · sub-agents       │
+│  verification gate · loop detector · context monitor │
+├─────────────────────────────────────────────────────┤
+│  Skills · Sandbox · Gateway · Memory                │
+│  swarm/pipeline/loop · Seatbelt/bwrap · webhook     │
+│  DNA capsules · knowledge compounding · Telegram     │
 ├─────────────────────────────────────────────────────┤
 │  OpenAI-compat Provider + SQLite Usage Tracking     │
 │  429 auto-retry · model-aware max_tokens · SSE      │
-│  headless serve mode · PR review workflow            │
-├─────────────────────────────────────────────────────┤
-│  orca-cli  (any provider via OpenAI-compat shim)    │
-│  51 tools · full MCP · OpenAI-compat shim            │
+│  headless serve · PR review · session resume         │
 └─────────────────────────────────────────────────────┘
 ```
 
