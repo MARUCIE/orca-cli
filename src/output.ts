@@ -13,7 +13,7 @@ export type OutputMode = 'streaming' | 'json'
 
 // ── Banner ──────────────────────────────────────────────────────────
 
-const VERSION = '0.2.0'
+const VERSION = '0.3.0'
 
 // Orca — cute killer whale with dorsal fin, eye patch, body, belly, and iconic tail flukes
 // Tail section: body narrows → peduncle → flukes fork up/down (whale signature)
@@ -80,9 +80,10 @@ export async function printRichBanner(opts: {
   cwd: string
   configFiles?: string[]
   toolCount?: number
+  hookCount?: number
   mode?: 'yolo' | 'safe'
 }): Promise<void> {
-  const { provider, model, cwd, configFiles, toolCount, mode } = opts
+  const { provider, model, cwd, configFiles, toolCount, hookCount, mode } = opts
   const shortCwd = abbreviatePath(cwd)
   const cols = process.stdout.columns || 80
   const artHeight = ORCA_ART.length
@@ -182,7 +183,9 @@ export async function printRichBanner(opts: {
     console.log(`  ${label}config  ${configFiles.join(', ')}${reset}`)
   }
   if (toolCount) {
-    console.log(`  ${label}${toolCount} tools · 8 hooks${reset}`)
+    const hooksLabel = hookCount ? `${hookCount} hooks` : ''
+    const sep = hooksLabel ? ' · ' : ''
+    console.log(`  ${label}${toolCount} tools${sep}${hooksLabel}${reset}`)
   }
   console.log()
 }

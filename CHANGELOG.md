@@ -1,5 +1,41 @@
 # Changelog
 
+This file is a historical release log. Version-specific counts and examples reflect the release date they were recorded, not the current repo head.
+
+## v0.3.0 — Orca Brand + SOTA Hardening (2026-04-12)
+
+Complete brand rename from Armature/Forge to Orca. Animated orca ASCII art, dynamic hook display, and 38 new tests.
+
+### Brand Rename
+- **Armature SDK → Orca Agent SDK** (orca-agent-sdk)
+- **Forge CLI → Orca CLI** (orca-cli), global `orca` command
+- **AI-Fleet → OrcaOS** (L3 brand tier)
+- All source, tests, docs, config paths, and launcher updated
+- New GitHub repo: MARUCIE/orca-cli
+
+### Animated Orca Banner
+- Unicode block character killer whale silhouette (dorsal fin, eye patch, belly, tail flukes)
+- Right-to-left swimming animation with body-wave undulation (per-line phase-shifted sine)
+- Damped ease-out drift, 54+8 frames at 75ms
+
+### Hook Banner Fix
+- Fixed conflicting "8 hooks" (static) vs "51 hooks" (dynamic) display
+- Banner now shows actual registered hook count from HookManager
+- printStatus() outputs per-event breakdown without repeating the total
+
+### SOTA Test Expansion (426 → 464, +38 tests)
+- **Round 16** (v030-harness.test.ts, 20 tests): version consistency, shell injection protection, tool argument coercion (boolean/array/object), hook banner regression, doctor extended, brand identity
+- **Round 17** (v030-coverage.test.ts, 18 tests): usage-db SQLite (6 tests), config-diagnostics (6 tests), session management (3 tests), init command (3 tests)
+- Previously untested modules now covered: usage-db.ts, config-diagnostics.ts
+
+### Stats
+- 37 source files, ~7,200 LOC
+- 35 test files, 464 tests
+- 10 benchmark scenarios, Score: 100%
+- TypeScript: 0 errors
+
+---
+
 ## v0.1.0 — SOTA Programming Agent (2026-04-05)
 
 First release. Provider-neutral coding agent CLI with multi-model collaboration,

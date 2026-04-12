@@ -1,5 +1,7 @@
 # Orca CLI — SOTA Agent Test Plan
 
+Historical planning snapshot. Coverage counts in this document describe the planning baseline at the time it was written, not the current test total in the repository.
+
 > Goal: Transform Orca CLI from "feature-complete" to "SOTA programming agent"
 > by systematically testing and hardening every dimension that separates
 > a good coding agent from a great one.
@@ -220,7 +222,9 @@ From production audit research, each mode has dedicated test coverage:
 | 10 | determinism.test.ts | 15 | DONE |
 | 11 | adversarial.test.ts | 18 | DONE |
 | 12 | protocol.test.ts | 15 | DONE |
-| **Total** | | **262** | |
+| 16 | v030-harness.test.ts | 20 | DONE |
+| 17 | v030-coverage.test.ts | 18 | DONE |
+| **Total** | | **300** | |
 
 ---
 

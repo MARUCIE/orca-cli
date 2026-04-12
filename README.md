@@ -6,7 +6,7 @@ The one CLI that can do what no single-vendor CLI can: ask Claude, GPT, and Gemi
 
 ```
        ..:::....
-    .::------::::..          Orca  v0.2.0
+    .::------::::..          Orca  v0.3.0
   .::--========----::::..    provider-neutral agent runtime
 .:--==+++*****+++===---::::..
 .:-=++**#########**++==---::..
@@ -275,16 +275,16 @@ Features that close the gap between "tool" and "agent":
 | Multi-edit Atomicity | Failed batch edits leave file unchanged | No partial corruption on error |
 | Background Completion Notifications | `run_background` jobs notify the REPL when they finish, and `/jobs` shows tracked state | Agent can keep working without manual PID polling |
 
-Tested: 426 tests across 33 files, 10/10 SOTA benchmark.
+Tested: 464 tests across 35 files, 10/10 SOTA benchmark.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Orca CLI  v0.2.0                                   │
-│  7,200+ LOC · 37 source files · 426 tests           │
+│  Orca CLI  v0.3.0                                   │
+│  7,200+ LOC · 37 source files · 464 tests            │
 ├─────────────────────────────────────────────────────┤
-│  New in v0.2.0                                      │
+│  New in v0.3.0                                      │
 │  providers · stats · session · pr · serve            │
 │  per-model routing · aggregator+direct fallback      │
 ├─────────────────────────────────────────────────────┤

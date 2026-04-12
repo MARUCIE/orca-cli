@@ -92,7 +92,8 @@ export function createChatCommand(): Command {
               logWarning('model caution', { model: resolved.model, provider: resolved.provider, warning: startupWarning })
             }
           } else {
-            // Interactive REPL: rich banner with ASCII art
+            // Interactive REPL: load hooks early so banner can show actual count
+            hooks.load(cwd)
             const configFiles = detectConfigFiles(cwd)
             await printRichBanner({
               provider: resolved.provider,
@@ -100,6 +101,7 @@ export function createChatCommand(): Command {
               cwd,
               configFiles: configFiles.length > 0 ? configFiles : undefined,
               toolCount: TOOL_DEFINITIONS.length,
+              hookCount: hooks.totalHooks || undefined,
               mode: opts.safe ? 'safe' : 'yolo',
             })
           }

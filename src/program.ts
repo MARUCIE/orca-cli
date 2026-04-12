@@ -21,7 +21,7 @@ import { createServeCommand } from './commands/serve.js'
 export function createProgram(): Command {
   const program = new Command()
     .name('orca')
-    .version('0.2.0')
+    .version('0.3.0')
     .enablePositionalOptions()
     .passThroughOptions()
     .description(

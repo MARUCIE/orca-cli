@@ -283,19 +283,16 @@ export class HookManager {
 
   printStatus(): void {
     const total = this.totalHooks
-    if (total === 0) {
-      console.log('\x1b[90m  no hooks configured.\x1b[0m')
-      return
-    }
+    if (total === 0) return
 
-    // Group by event, show count per event
+    // Group by event, show count per event (no total — banner already shows it)
     const summary: string[] = []
     for (const [event, defs] of Object.entries(this.hooks)) {
       if (defs && defs.length > 0) {
         summary.push(`${event}:${defs.length}`)
       }
     }
-    console.log(`\x1b[90m  ${total} hooks · ${summary.join(' · ')}\x1b[0m`)
+    console.log(`\x1b[90m  ${summary.join(' · ')}\x1b[0m`)
   }
 }
 
