@@ -213,6 +213,10 @@ async function runREPL(
     return [[], line]
   }
 
+  // Prevent MaxListenersExceededWarning from repeated close listeners
+  process.stdin.setMaxListeners(20)
+  process.stdout.setMaxListeners(20)
+
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -517,7 +521,7 @@ async function runREPL(
           },
           getProvider: () => resolved.provider,
           getChoices,
-        }, { lastWrite })
+        }, { lastWrite }, { tokenBudget, contextMonitor })
         if (handled === 'exit') {
           saveInputHistory(historyFile, inputHistory)
           mcpClient.disconnectAll()
@@ -838,6 +842,7 @@ function handleSlashCommand(
   cwd: string,
   mc: ModelControl,
   undo?: UndoState,
+  harness?: { tokenBudget: TokenBudgetManager; contextMonitor: ContextMonitor },
 ): 'exit' | 'handled' | 'pick_model' | 'not_command' {
   const parts = input.split(/\s+/)
   const cmd = parts[0]!.toLowerCase()
@@ -950,14 +955,16 @@ function handleSlashCommand(
       return 'pick_model'
 
     case '/clear':
-      // Keep system prompt, clear conversation
+      // Clear screen + reset conversation (keep system prompt)
       {
+        process.stdout.write('\x1b[2J\x1b[H') // ANSI: clear screen + move cursor to top
         const sysMsg = history.find(m => m.role === 'system')
         history.length = 0
         if (sysMsg) history.push(sysMsg)
         stats.turns = 0
         stats.totalInputTokens = 0
         stats.totalOutputTokens = 0
+        harness?.contextMonitor.reset()
         console.log('\x1b[90m  conversation cleared.\x1b[0m')
       }
       return 'handled'
@@ -968,6 +975,11 @@ function handleSlashCommand(
         hooks.run('PreCompact', { event: 'PreCompact', cwd })
         const sysMsg = history.find(m => m.role === 'system')
         const convMsgs = history.filter(m => m.role !== 'system')
+        if (convMsgs.length <= 4) {
+          console.log(`\x1b[90m  nothing to compact (${convMsgs.length} messages, need >4).\x1b[0m`)
+          hooks.run('PostCompact', { event: 'PostCompact', cwd })
+          return 'handled' as const
+        }
         const keep = convMsgs.slice(-4) // last 2 turns (user + assistant each)
         const dropped = convMsgs.length - keep.length
         history.length = 0
@@ -1242,15 +1254,17 @@ function handleSlashCommand(
     }
 
     case '/status': {
-      const ctxChars = history.reduce((s, m) => s + m.content.length, 0)
-      const ctxTokens = Math.ceil(ctxChars / 4)
       const msgs = history.filter(m => m.role !== 'system').length
+      const budget = harness?.tokenBudget.getBudget(history)
+      const ctxLine = budget
+        ? `${budget.utilizationPct}% (${budget.historyTokensEst.toLocaleString()} / ${budget.contextWindow.toLocaleString()} tokens)`
+        : `~${Math.ceil(history.reduce((s, m) => s + m.content.length, 0) / 4).toLocaleString()} tokens (est)`
       console.log('\x1b[90m  Session status:\x1b[0m')
       console.log(`\x1b[90m    provider: \x1b[36m${mc.getProvider()}/${mc.getModel()}\x1b[0m`)
       console.log(`\x1b[90m    turns:    ${stats.turns}\x1b[0m`)
       console.log(`\x1b[90m    messages: ${msgs}\x1b[0m`)
-      console.log(`\x1b[90m    context:  ~${ctxTokens.toLocaleString()} tokens (${msgs} msgs)\x1b[0m`)
-      console.log(`\x1b[90m    consumed: ${(stats.totalInputTokens + stats.totalOutputTokens).toLocaleString()} tokens\x1b[0m`)
+      console.log(`\x1b[90m    context:  ${ctxLine}\x1b[0m`)
+      console.log(`\x1b[90m    consumed: ${(stats.totalInputTokens + stats.totalOutputTokens).toLocaleString()} tokens (cumulative)\x1b[0m`)
       console.log(`\x1b[90m    cwd:      ${cwd}\x1b[0m`)
       console.log(`\x1b[90m    hooks:    ${hooks.totalHooks}\x1b[0m`)
       console.log(`\x1b[90m    mcp:      ${mcpClient.configuredCount} servers\x1b[0m`)
