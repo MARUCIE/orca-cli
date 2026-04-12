@@ -53,6 +53,7 @@ interface ChatOptions {
   cwd?: string
   safe?: boolean
   effort?: string
+  continue?: boolean
 }
 
 export function createChatCommand(): Command {
@@ -68,6 +69,7 @@ export function createChatCommand(): Command {
     .option('--cwd <dir>', 'Working directory')
     .option('--safe', 'Enable permission prompts for dangerous tools (default: yolo)')
     .option('--effort <level>', 'Thinking effort: low, medium, high (default), max')
+    .option('-c, --continue', 'Resume the most recent saved session')
     .action(async (promptParts: string[], opts: ChatOptions) => {
       const prompt = promptParts.join(' ').trim()
       const outputMode: OutputMode = opts.json ? 'json' : 'streaming'
@@ -111,7 +113,7 @@ export function createChatCommand(): Command {
         if (prompt) {
           await executeOneShot(prompt, resolved, config, outputMode, cwd)
         } else {
-          await runREPL(resolved, config, outputMode, cwd, { safe: opts.safe, effort: opts.effort })
+          await runREPL(resolved, config, outputMode, cwd, { safe: opts.safe, effort: opts.effort, continue: opts.continue })
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
@@ -169,7 +171,7 @@ async function runREPL(
   config: OrcaConfig,
   outputMode: OutputMode,
   cwd: string,
-  opts: { safe?: boolean; effort?: string } = {},
+  opts: { safe?: boolean; effort?: string; continue?: boolean } = {},
 ): Promise<void> {
   const { createInterface } = await import('node:readline')
   const { homedir: getHomedir } = await import('node:os')
@@ -252,7 +254,19 @@ async function runREPL(
 
   // Multi-turn conversation history
   const history: ChatMessage[] = []
-  const sysPrompt = config.systemPrompt || buildSystemPrompt(cwd)
+  let sysPrompt = config.systemPrompt || buildSystemPrompt(cwd)
+
+  // Effort-based system prompt modification
+  const effortPrefix: Record<string, string> = {
+    low: 'Be concise. Give brief answers.\n\n',
+    high: 'Think carefully and thoroughly before answering.\n\n',
+    max: 'Use deep analysis. Consider all edge cases. Think step by step.\n\n',
+  }
+  const effortLevel = opts.effort || 'high'
+  if (effortPrefix[effortLevel]) {
+    sysPrompt = effortPrefix[effortLevel] + sysPrompt
+  }
+
   history.push({ role: 'system', content: sysPrompt })
 
   // Session statistics
@@ -261,6 +275,25 @@ async function runREPL(
     totalInputTokens: 0,
     totalOutputTokens: 0,
     startTime: Date.now(),
+  }
+
+  // Session resume: --continue flag loads most recent session
+  if (opts.continue) {
+    const { getLastSession } = await import('./session.js')
+    const last = getLastSession()
+    if (last) {
+      history.length = 0
+      history.push(...last.session.history.map((m: { role: string; content: string }) => ({
+        role: m.role as 'system' | 'user' | 'assistant',
+        content: m.content,
+      })))
+      stats.turns = last.session.stats?.turns || 0
+      stats.totalInputTokens = last.session.stats?.inputTokens || 0
+      stats.totalOutputTokens = last.session.stats?.outputTokens || 0
+      console.log(`\x1b[90m  Resuming session: ${last.name} (${stats.turns} turns, ${history.length} messages)\x1b[0m`)
+    } else {
+      console.log(`\x1b[90m  no saved sessions found — starting fresh.\x1b[0m`)
+    }
   }
 
   const homeDir = getHomedir()
@@ -1460,13 +1493,23 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
           }
         }
 
-        // Sub-agent tools — spawn a new streamChat conversation
+        // Sub-agent tools — fork a child process with restricted tools
         if (name === 'spawn_agent' || name === 'delegate_task') {
           const subTask = String(args.task || args.context || '')
           if (!subTask) return { success: false, output: 'task is required.' }
 
           await hooks.run('SubagentStart', { event: 'SubagentStart', cwd, model: resolved.model })
           console.log(`\x1b[90m  spawning sub-agent...\x1b[0m`)
+
+          const { spawnSubAgent, READ_ONLY_TOOLS, DELEGATE_TOOLS } = await import('../agent/sub-agent.js')
+          const toolSet = name === 'spawn_agent' ? READ_ONLY_TOOLS : DELEGATE_TOOLS
+          const result = await spawnSubAgent(
+            { task: subTask, cwd, tools: toolSet, timeout: 120_000 },
+            { model: resolved.model, apiKey: resolved.apiKey, baseURL: resolved.baseURL || '' },
+          )
+
+          console.log(`\x1b[90m  sub-agent done (${(result.duration / 1000).toFixed(1)}s, ${result.tokensUsed} tokens)\x1b[0m`)
+          return { success: result.success, output: result.output }
 
         // ask_user — prompt user for input via readline
         } else if (name === 'ask_user') {

@@ -65,6 +65,7 @@ export function createProgram(): Command {
   program.option('-k, --api-key <key>', 'API key')
   program.option('--safe', 'Enable permission prompts')
   program.option('--effort <level>', 'Thinking effort: low, medium, high, max')
+  program.option('-c, --continue', 'Resume the most recent saved session')
   program.action(async (prompt: string[], opts: Record<string, string | boolean | undefined>) => {
     // Delegate to chat command: orca "prompt" → orca chat "prompt"
     const args = ['node', 'orca', 'chat']
@@ -74,6 +75,7 @@ export function createProgram(): Command {
     if (opts.apiKey) args.push('-k', String(opts.apiKey))
     if (opts.safe) args.push('--safe')
     if (opts.effort) args.push('--effort', String(opts.effort))
+    if (opts.continue) args.push('--continue')
     await program.parseAsync(args)
   })
 
