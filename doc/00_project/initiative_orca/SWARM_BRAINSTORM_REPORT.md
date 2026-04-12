@@ -227,4 +227,73 @@ The good news: AI-Fleet already has mature implementations for most of these gap
 
 ---
 
+## v0.4.0 Closure Report (Post-Execution Update)
+
+> Updated 2026-04-12 after completing all 3 phases in a single session.
+
+### Gap Closure Status: ALL 6 DIMENSIONS CLOSED
+
+| Gap | Baseline (v0.3.0) | After (v0.4.0) | Status |
+|---|---|---|---|
+| Harness Layer | 0 modules | 4 modules (verification-gate, loop-detector, context-monitor, error-classifier) | CLOSED |
+| Agent Isolation | async stubs | Sub-agent fork+IPC, git worktree teams | CLOSED |
+| Security Sandbox | shellEscape only | Seatbelt (macOS) + bwrap (Linux) + platform detection | CLOSED |
+| Skills System | Context loading only | SkillRegistry + SkillEngine (4 execution modes) | CLOSED |
+| Platform Gateway | CLI + HTTP serve | WebhookGateway (HMAC) + TelegramAdapter (polling) | CLOSED |
+| Persistent Memory | Session save/load | DNARegistry + KnowledgeCompounder (capsule system) | CLOSED |
+
+### Metrics Comparison
+
+| Metric | v0.3.0 | v0.4.0 | Delta |
+|---|---|---|---|
+| Source files | 37 | 58 | +21 |
+| Source LOC | 7,200 | 12,234 | +5,034 |
+| Test files | 36 | 42 | +6 |
+| Tests | 493 | 598 | +105 |
+| Test LOC | — | 9,427 | — |
+| New modules | 0 | 15 | +15 |
+| Module directories | 4 | 10 | +6 |
+
+### Additional Fixes
+
+| Fix | Impact |
+|---|---|
+| Statusline context % | Now uses TokenBudgetManager — accurate per-model window |
+| Statusline display | Shows `15% (12K/200K)` + `total 1,618,413` (disambiguated) |
+| `/clear` | Now clears screen (ANSI escape) + resets context monitor |
+| `/compact` | Shows feedback when nothing to compact |
+| `/status` | Uses budget data instead of chars/4 estimate |
+| `/mcp` | Lists per-server name, status, pid |
+| Background jobs | Uses `process.env.SHELL` instead of hardcoded `/bin/sh` |
+| Cost tracking | Computes from model pricing table (was always $0) |
+| Session resume | `-c/--continue` loads most recent session |
+| Effort flag | `--effort low/medium/high/max` tunes system prompt |
+| MaxListeners | `setMaxListeners(20)` prevents EventEmitter warning |
+| Folder rename | `MARUCIE-forge-cli` → `orca-cli` |
+
+### Audit Result (Post-Closure)
+
+```
+Build:      0 errors
+TypeCheck:  0 errors
+Tests:      598/598 passed (42 files)
+TODOs:      0
+FIXMEs:     0
+Any types:  0
+Exports:    all modules properly exported
+Versions:   0.4.0 aligned across 5 files
+Slash cmds: 37 implemented, 0 stubs
+```
+
+### Remaining (v0.5.0 Scope)
+
+| Feature | Status | Notes |
+|---|---|---|
+| MCP server hosting | Not implemented | Orca is client-only; exposing tools as MCP server deferred |
+| Mode system (KiloCode-style) | Not implemented | Behavioral profiles mid-session |
+| Thread-based memory (Amp-style) | Not implemented | Version-controlled conversation records |
+| AGENTS.md auto-discovery | Not implemented | Hierarchical guidance from parent dirs |
+
+---
+
 Maurice | maurice_wen@proton.me
