@@ -1,5 +1,7 @@
 # HANDOFF — Orca CLI Provider Decoupling + Feature Parity (2026-04-06)
 
+Historical handoff snapshot from April 6, 2026. Commit IDs and verification numbers are preserved as recorded for that handoff point, even if newer work has changed the repository since then.
+
 ## Commits (10 Orca CLI + 2 SDK)
 
 ### Orca CLI (MARUCIE/orca-cli)

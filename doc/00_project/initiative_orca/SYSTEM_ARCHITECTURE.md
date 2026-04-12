@@ -74,6 +74,8 @@ flowchart TD
 | `orca run` | `src/commands/run.ts` | Agent task execution |
 | `orca council` / `orca race` / `orca pipeline` | `src/commands/multi.ts` | Multi-model collaboration flows |
 | `orca bench` | `src/commands/bench.ts` | Benchmark and self-evaluation |
+| `orca doctor` | `src/commands/doctor.ts` | Local runtime/config diagnostics |
+| `orca logs` | `src/commands/logs.ts` | Runtime log viewer |
 | `orca providers` | `src/commands/providers.ts` | Provider introspection |
 | `orca stats` | `src/commands/stats.ts` | Usage/cost reporting |
 | `orca session` | `src/commands/session.ts` | Session lifecycle |
@@ -88,6 +90,7 @@ flowchart TD
 - Headless HTTP surface: `orca serve` (see `src/commands/serve.ts`)
 - Detached job state: `~/.orca/background-jobs/` or `$ORCA_HOME/background-jobs/`
 - Runtime logs: `~/.orca/logs/` or `$ORCA_HOME/logs/`
+- Serve diagnostics: `/health`, `/providers`, `/doctor`
 - Serve diagnostics: `/health`, `/providers`, `/doctor`
 
 ## Legacy Documentation Cross-References

@@ -1,4 +1,4 @@
-# Multi-Model Collaboration — Design Document
+# Multi-Model Collaboration — Orca CLI Design Document
 
 > The one feature no single-vendor CLI can ever have.
 

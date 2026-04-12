@@ -1,5 +1,7 @@
 # Three-Tier Architecture — Orca Ecosystem
 
+Historical architecture snapshot. Some repository/package identifiers and counts may describe the architecture state at the time of writing rather than the current working tree.
+
 **Date**: 2026-04-04
 **Version**: 1.0
 **Scope**: SDK + CLI + AI-OS complete capability inventory
@@ -18,7 +20,7 @@
 │  REPL · 3 Commands · 13 Slash Commands · 5 Agent Tools          │
 │  Multi-Model · Poe/OpenRouter Proxy · Streaming · Cost Tracking  │
 ├─────────────────────────────────────────────────────────────────┤
-│                  Layer 1: Orca Agent SDK (Foundation)               │
+│                  Layer 1: Orca Agent SDK (Foundation)            │
 │  Agent Engine · 51 Built-in Tools · 12 Core Contracts           │
 │  2 Provider Adapters · Eval Framework · MCP Client (7 transports)│
 └─────────────────────────────────────────────────────────────────┘
