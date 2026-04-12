@@ -12,7 +12,7 @@ This file is the canonical path index for the `Orca CLI` repository.
 <!-- AI-FLEET:PATH_INDEX:START -->
 | Area | Path | Notes |
 | --- | --- | --- |
-| Project root | `/Users/mauricewen/Projects/MARUCIE-forge-cli` | Git root and canonical `PROJECT_DIR` |
+| Project root | `/Users/mauricewen/Projects/orca-cli` | Git root and canonical `PROJECT_DIR` |
 | CLI entry | `src/bin/orca.ts` | Node executable entry point |
 | Program assembly | `src/program.ts` | Registers all top-level commands |
 | Commands | `src/commands/` | `chat`, `doctor`, `run`, `multi`, `bench`, `logs`, `providers`, `stats`, `session`, `pr`, `serve`, `init` |
