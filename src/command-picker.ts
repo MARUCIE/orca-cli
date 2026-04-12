@@ -28,6 +28,7 @@ const COMMANDS: CommandDef[] = [
   { name: '/save', description: 'Save session to disk' },
   { name: '/load', description: 'Load saved session' },
   { name: '/sessions', description: 'List saved sessions' },
+  { name: '/jobs', description: 'List tracked background jobs' },
   { name: '/undo', description: 'Revert last file write' },
   { name: '/effort', description: 'Set thinking: low/medium/high/max' },
   { name: '/retry', description: 'Retry last message' },

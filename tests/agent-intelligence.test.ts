@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os'
 // ── Auto-Verify ─────────────────────────────────────────────────
 
 describe('Auto-verify: check detection and execution', () => {
-  const verifyDir = join(tmpdir(), `forge-verify-${Date.now()}`)
+  const verifyDir = join(tmpdir(), `orca-verify-${Date.now()}`)
 
   beforeAll(() => {
     mkdirSync(join(verifyDir, 'src'), { recursive: true })

@@ -1,5 +1,5 @@
 /**
- * Markdown rendering for Forge CLI.
+ * Markdown rendering for Orca CLI.
  *
  * Two rendering paths:
  *   1. StreamMarkdown — line-buffered streaming renderer for real-time output.

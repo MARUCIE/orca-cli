@@ -11,7 +11,7 @@ import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const baseDir = join(tmpdir(), `forge-bench-test-${Date.now()}`)
+const baseDir = join(tmpdir(), `orca-bench-test-${Date.now()}`)
 
 afterAll(() => {
   try { rmSync(baseDir, { recursive: true, force: true }) } catch { /* */ }

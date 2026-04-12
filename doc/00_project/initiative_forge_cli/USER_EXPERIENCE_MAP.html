@@ -1,0 +1,221 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Forge CLI User Experience Map</title><style>:root { --primary:#003a70; --accent:#0077c8; --gold:#c4a35a; --bg:#f4f6f9; --card:#ffffff; --text:#172033; --muted:#4b5b73; --border:#d8e1eb; --code-bg:#0f1c2e; --code-text:#e8eef8; --shadow:0 10px 30px rgba(0,58,112,0.08); } * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); line-height:1.7; } header { background:linear-gradient(135deg,#003a70,#001f3f); color:#fff; padding:56px 24px 40px; } header h1 { margin:0 0 10px; font-size:clamp(28px,5vw,44px); } header p { margin:0; color:rgba(255,255,255,0.78); } .shell { max-width:1280px; margin:-24px auto 48px; padding:0 24px; display:grid; grid-template-columns:minmax(0,1fr); gap:20px; } .toc { background:rgba(255,255,255,0.9); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); padding:20px; position:sticky; top:16px; height:fit-content; } .toc-title { font-size:12px; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); margin-bottom:12px; font-weight:700; } .toc a { display:block; color:var(--primary); text-decoration:none; padding:6px 0; font-size:14px; } .content { background:var(--card); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow); padding:32px; min-width:0; } .content h1:first-child { display:none; } .content h2 { color:var(--primary); margin-top:36px; scroll-margin-top:24px; } .content h3 { color:var(--accent); margin-top:28px; scroll-margin-top:24px; } .content p, .content li { color:var(--text); } .content code { background:rgba(15,28,46,0.08); padding:0.1em 0.35em; border-radius:6px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:0.92em; } .content pre { background:var(--code-bg); color:var(--code-text); padding:18px; border-radius:14px; overflow:auto; } .content pre code { background:transparent; color:inherit; padding:0; } .content table { width:100%; border-collapse:collapse; margin:16px 0 24px; display:block; overflow-x:auto; } .content th, .content td { border:1px solid var(--border); padding:10px 12px; text-align:left; vertical-align:top; min-width:120px; } .content th { background:#eef5fb; color:var(--primary); } .content blockquote { margin:16px 0; padding:12px 16px; border-left:4px solid var(--gold); background:#f8fbfe; color:var(--muted); } @media (min-width:1080px) { .shell { grid-template-columns:260px minmax(0,1fr); } } @media (max-width:1079px) { .toc { position:static; } }</style></head><body><header><h1>Forge CLI User Experience Map</h1><p>Canonical Markdown source rendered as a single-file offline HTML companion.</p></header><main class="shell"><aside class="toc"><div class="toc-title">Sections</div><a href="#experience-model">Experience Model</a><a href="#journey-map">Journey Map</a><a href="#command-flow-details">Command Flow Details</a><a href="#ux-constraints">UX Constraints</a><a href="#page-route-equivalents">Page / Route Equivalents</a></aside><article class="content markdown-body"><h1>Forge CLI User Experience Map</h1>
+<!-- AI-FLEET:PROJECT_DIR:START -->
+<ul>
+<li><code>PROJECT_DIR</code>: <code>/Users/mauricewen/Projects/MARUCIE-forge-cli</code></li>
+</ul>
+<!-- AI-FLEET:PROJECT_DIR:END -->
+
+<h2 id="experience-model">Experience Model</h2>
+<p>Forge CLI is a command-first product. User journeys are structured around terminal entry points, not URLs.</p>
+<h2 id="journey-map">Journey Map</h2>
+<table>
+<thead>
+<tr>
+<th>Journey</th>
+<th>User Intent</th>
+<th>Command / Entry</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Onboard</td>
+<td>Configure a provider and initialize usage</td>
+<td><code>forge init</code>, env vars, config files</td>
+<td><code>src/commands/init.ts</code>, <code>src/config.ts</code></td>
+</tr>
+<tr>
+<td>Explore interactively</td>
+<td>Ask questions or operate in a REPL</td>
+<td><code>forge</code>, <code>forge chat</code></td>
+<td><code>src/bin/forge.ts</code>, <code>src/commands/chat.ts</code></td>
+</tr>
+<tr>
+<td>Diagnose the runtime</td>
+<td>Check config/provider/hook/MCP/session/log state before debugging by hand</td>
+<td><code>forge doctor</code></td>
+<td><code>src/commands/doctor.ts</code>, <code>src/doctor.ts</code></td>
+</tr>
+<tr>
+<td>Pick a model safely</td>
+<td>Inspect provider, context window, approximate pricing, and caution notes before switching</td>
+<td><code>/model</code>, <code>/models</code></td>
+<td><code>src/commands/chat.ts</code>, <code>src/model-catalog.ts</code></td>
+</tr>
+<tr>
+<td>Check providers before starting</td>
+<td>Inspect provider readiness and default-model metadata before entering a session</td>
+<td><code>forge providers</code>, <code>forge providers test</code></td>
+<td><code>src/commands/providers.ts</code>, <code>src/model-catalog.ts</code></td>
+</tr>
+<tr>
+<td>Inspect runtime logs</td>
+<td>Read recent info/warn/error entries without opening files manually</td>
+<td><code>forge logs</code>, <code>forge logs errors</code></td>
+<td><code>src/commands/logs.ts</code>, <code>src/logger.ts</code></td>
+</tr>
+<tr>
+<td>Review runtime dashboard</td>
+<td>See usage, runtime health, and recent error signals in one place</td>
+<td><code>forge stats</code></td>
+<td><code>src/commands/stats.ts</code>, <code>src/doctor.ts</code>, <code>src/logger.ts</code></td>
+</tr>
+<tr>
+<td>Inspect headless runtime state</td>
+<td>Query health/provider/doctor metadata over HTTP before attaching a client</td>
+<td><code>forge serve</code> + `GET /health</td>
+<td>/providers</td>
+</tr>
+<tr>
+<td>Execute work</td>
+<td>Run a coding or analysis task</td>
+<td><code>forge run</code></td>
+<td><code>src/commands/run.ts</code></td>
+</tr>
+<tr>
+<td>Compare models</td>
+<td>Get multiple opinions or race for speed</td>
+<td><code>forge council</code>, <code>forge race</code>, <code>forge pipeline</code></td>
+<td><code>src/commands/multi.ts</code>, <code>src/multi-model.ts</code></td>
+</tr>
+<tr>
+<td>Inspect routing</td>
+<td>Check configured providers</td>
+<td><code>forge providers</code></td>
+<td><code>src/commands/providers.ts</code></td>
+</tr>
+<tr>
+<td>Review cost and sessions</td>
+<td>Inspect usage history and saved sessions</td>
+<td><code>forge stats</code>, <code>forge session</code></td>
+<td><code>src/commands/stats.ts</code>, <code>src/commands/session.ts</code></td>
+</tr>
+<tr>
+<td>Track background work</td>
+<td>Start detached work and get notified when it finishes</td>
+<td><code>run_background</code>, <code>/jobs</code></td>
+<td><code>src/tools.ts</code>, <code>src/background-jobs.ts</code>, <code>src/commands/chat.ts</code></td>
+</tr>
+<tr>
+<td>Review a PR</td>
+<td>Pull and review GitHub PRs</td>
+<td><code>forge pr</code></td>
+<td><code>src/commands/pr.ts</code></td>
+</tr>
+<tr>
+<td>Run headless</td>
+<td>Expose the runtime over HTTP/SSE</td>
+<td><code>forge serve</code></td>
+<td><code>src/commands/serve.ts</code></td>
+</tr>
+<tr>
+<td>Benchmark quality</td>
+<td>Measure runtime quality and capability</td>
+<td><code>forge bench</code></td>
+<td><code>src/commands/bench.ts</code></td>
+</tr>
+</tbody></table>
+<h2 id="command-flow-details">Command Flow Details</h2>
+<h3 id="1-repl-one-shot-flow">1. REPL / One-Shot Flow</h3>
+<ol>
+<li>User invokes <code>forge</code> or <code>forge chat</code>.</li>
+<li><code>src/bin/forge.ts</code> hands off to <code>src/program.ts</code>.</li>
+<li><code>src/commands/chat.ts</code> resolves config, model, prompt, tool loop, and streaming output.</li>
+<li>User receives formatted markdown and tool events in terminal.</li>
+</ol>
+<h3 id="1b-model-selection-flow">1b. Model Selection Flow</h3>
+<ol>
+<li>User invokes <code>/model</code> or <code>/models</code>.</li>
+<li><code>src/model-catalog.ts</code> derives model metadata from config + known model hints.</li>
+<li>The REPL shows provider, context window, approximate pricing, and caution notes.</li>
+<li>If a cautionary model is selected, the REPL warns immediately instead of failing later through degraded tool use.</li>
+</ol>
+<h3 id="1c-provider-inspection-flow">1c. Provider Inspection Flow</h3>
+<ol>
+<li>User invokes <code>forge providers</code> or <code>forge providers test</code>.</li>
+<li><code>src/commands/providers.ts</code> resolves configured providers and decorates them with model-catalog metadata.</li>
+<li>The CLI shows readiness plus context/pricing/caution data before the user commits to a session or connectivity test.</li>
+</ol>
+<h3 id="1d-doctor-flow">1d. Doctor Flow</h3>
+<ol>
+<li>User invokes <code>forge doctor</code>.</li>
+<li><code>src/doctor.ts</code> gathers provider, project, hook, MCP, session, background-job, and log diagnostics.</li>
+<li>The command emits either a human-readable health summary or JSON for automation.</li>
+<li>Malformed local JSON config files are called out explicitly instead of being hidden in generic stderr noise.</li>
+</ol>
+<h3 id="1f-serve-metadata-flow">1f. Serve Metadata Flow</h3>
+<ol>
+<li>User starts <code>forge serve</code>.</li>
+<li>HTTP clients can call <code>/health</code>, <code>/providers</code>, and <code>/doctor</code>.</li>
+<li>The headless server returns the same provider/runtime metadata already exposed in the CLI surfaces.</li>
+</ol>
+<h3 id="1g-stats-dashboard-flow">1g. Stats Dashboard Flow</h3>
+<ol>
+<li>User invokes <code>forge stats</code>.</li>
+<li><code>src/commands/stats.ts</code> reads usage history from SQLite.</li>
+<li>The command merges in runtime health from <code>doctor</code> and recent errors from the local logger.</li>
+<li>The user sees both cost metrics and operational state in a single output.</li>
+</ol>
+<h3 id="1e-runtime-log-flow">1e. Runtime Log Flow</h3>
+<ol>
+<li>Runtime warnings/errors and selected info events are persisted via <code>src/logger.ts</code>.</li>
+<li>Files are written to <code>~/.armature/logs/</code> (or <code>$ARMATURE_HOME/logs/</code>).</li>
+<li><code>forge logs</code> and <code>forge logs errors</code> surface recent entries without requiring direct file inspection.</li>
+</ol>
+<h3 id="2-task-execution-flow">2. Task Execution Flow</h3>
+<ol>
+<li>User invokes <code>forge run &quot;task&quot;</code>.</li>
+<li><code>src/commands/run.ts</code> packages the task for the runtime.</li>
+<li>Runtime resolves provider/model config and tool permissions.</li>
+<li>Output streams back through <code>src/output.ts</code> and <code>src/markdown.ts</code>.</li>
+</ol>
+<h3 id="3-multi-model-collaboration-flow">3. Multi-Model Collaboration Flow</h3>
+<ol>
+<li>User chooses <code>council</code>, <code>race</code>, or <code>pipeline</code>.</li>
+<li><code>src/commands/multi.ts</code> resolves provider strategy.</li>
+<li><code>src/multi-model.ts</code> coordinates parallel or staged calls.</li>
+<li>Result is rendered with verdict, winner, or stage-by-stage output.</li>
+</ol>
+<h3 id="4-background-job-flow">4. Background Job Flow</h3>
+<ol>
+<li>The agent invokes <code>run_background</code>.</li>
+<li><code>src/background-jobs.ts</code> creates a tracked detached job and log artifact.</li>
+<li>The REPL surfaces completion notifications before the next prompt.</li>
+<li><code>/jobs</code> provides a quick state view without falling back to raw PID inspection.</li>
+</ol>
+<h2 id="ux-constraints">UX Constraints</h2>
+<ul>
+<li>No browser dependency for core workflows</li>
+<li>Provider configuration must stay legible from CLI affordances</li>
+<li>Multi-model output must remain understandable in a terminal session</li>
+<li>Safe mode vs YOLO mode must remain obvious when dangerous actions exist</li>
+<li>Detached work must stay observable without forcing manual shell polling</li>
+<li>Model switching should expose enough metadata to prevent obviously bad runtime choices</li>
+<li>Runtime diagnostics should stay available even after the terminal session ends</li>
+<li>The runtime should provide one explicit health-check surface before users fall back to manual file inspection</li>
+</ul>
+<h2 id="page-route-equivalents">Page / Route Equivalents</h2>
+<table>
+<thead>
+<tr>
+<th>Equivalent Surface</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Web pages</td>
+<td><code>N/A</code></td>
+</tr>
+<tr>
+<td>Primary navigation</td>
+<td>top-level commands in <code>src/program.ts</code></td>
+</tr>
+<tr>
+<td>Secondary navigation</td>
+<td>slash commands and options inside REPL / command modules, including <code>/jobs</code> for detached work</td>
+</tr>
+<tr>
+<td>API surface</td>
+<td>headless serve mode from <code>src/commands/serve.ts</code></td>
+</tr>
+</tbody></table>
+</article></main></body></html>

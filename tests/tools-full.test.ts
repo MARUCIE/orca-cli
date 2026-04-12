@@ -9,8 +9,9 @@ import { writeFileSync, mkdirSync, rmSync, readFileSync, existsSync } from 'node
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { execSync } from 'node:child_process'
+import { createServer } from 'node:net'
 
-const testDir = join(tmpdir(), `forge-full-${Date.now()}`)
+const testDir = join(tmpdir(), `orca-full-${Date.now()}`)
 
 beforeAll(() => {
   mkdirSync(join(testDir, 'src'), { recursive: true })
@@ -293,9 +294,9 @@ describe('Round 1: Git', () => {
 
 describe('Round 1: Execution', () => {
   it('run_command — echo', () => {
-    const r = executeTool('run_command', { command: 'echo "hello from forge"' }, testDir)
+    const r = executeTool('run_command', { command: 'echo "hello from orca"' }, testDir)
     expect(r.success).toBe(true)
-    expect(r.output).toContain('hello from forge')
+    expect(r.output).toContain('hello from orca')
   })
 
   it('run_command — cwd override', () => {
@@ -309,10 +310,15 @@ describe('Round 1: Execution', () => {
     expect(r.success).toBe(true)
   })
 
-  it('check_port — free port', () => {
-    const r = executeTool('check_port', { port: 59999 }, testDir)
+  it('check_port — reports an occupied port', async () => {
+    const server = createServer()
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()))
+    const address = server.address()
+    const port = typeof address === 'object' && address ? address.port : 0
+    const r = executeTool('check_port', { port }, testDir)
     expect(r.success).toBe(true)
-    expect(r.output).toContain('free')
+    expect(r.output.toLowerCase()).not.toContain('free')
+    await new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve()))
   })
 })
 

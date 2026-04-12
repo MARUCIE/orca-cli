@@ -1,9 +1,9 @@
 /**
- * `forge init` — Initialize Armature configuration.
+ * `orca init` — Initialize Orca configuration.
  *
  * Creates:
- *   - ~/.armature/config.json  (global, if missing)
- *   - .armature.json           (project-local)
+ *   - ~/.orca/config.json  (global, if missing)
+ *   - .orca.json           (project-local)
  */
 
 import { Command } from 'commander'
@@ -12,7 +12,7 @@ import { printSuccess, printInfo } from '../output.js'
 
 export function createInitCommand(): Command {
   return new Command('init')
-    .description('Initialize forge configuration for this project')
+    .description('Initialize orca configuration for this project')
     .option('--global-only', 'Only create global config, skip project config')
     .action(async (opts: { globalOnly?: boolean }) => {
       // Always ensure global config exists
@@ -31,16 +31,16 @@ export function createInitCommand(): Command {
       printInfo('     export ANTHROPIC_API_KEY=sk-... # or direct Anthropic')
       printInfo('')
       printInfo('  2. Start chatting:')
-      printInfo('     forge chat                      # interactive REPL (41 tools)')
-      printInfo('     forge chat "explain this code"  # one-shot query')
+      printInfo('     orca chat                      # interactive REPL (41 tools)')
+      printInfo('     orca chat "explain this code"  # one-shot query')
       printInfo('')
       printInfo('  3. Run an agent task:')
-      printInfo('     forge run "fix failing tests"   # task execution mode')
+      printInfo('     orca run "fix failing tests"   # task execution mode')
       printInfo('')
-      printInfo('  4. Configure hooks (.armature/hooks.json):')
+      printInfo('  4. Configure hooks (.orca/hooks.json):')
       printInfo('     { "hooks": { "PreToolUse": [{ "command": "..." }] } }')
       printInfo('')
-      printInfo('  5. Connect MCP servers (.armature.json):')
+      printInfo('  5. Connect MCP servers (.orca.json):')
       printInfo('     { "mcpServers": { "myserver": { "command": "npx myserver" } } }')
       printInfo('')
       printInfo('  Modes: --safe (permission prompts) | default: yolo (auto-approve)')

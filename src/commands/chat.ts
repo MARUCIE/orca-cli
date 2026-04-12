@@ -1,16 +1,17 @@
 /**
- * `forge chat` — Interactive or one-shot agent conversation.
+ * `orca chat` — Interactive or one-shot agent conversation.
  *
  * Usage:
- *   forge chat "your prompt"       — one-shot query with streaming output
- *   forge chat                      — interactive REPL mode with multi-turn history
- *   forge chat --json "prompt"     — NDJSON output for CI/pipelines
+ *   orca chat "your prompt"       — one-shot query with streaming output
+ *   orca chat                      — interactive REPL mode with multi-turn history
+ *   orca chat --json "prompt"     — NDJSON output for CI/pipelines
  */
 
 import { Command } from 'commander'
+import { execSync } from 'node:child_process'
 import { basename } from 'node:path'
-import type { ForgeConfig } from '../config.js'
-import { resolveConfig, resolveProvider } from '../config.js'
+import type { OrcaConfig } from '../config.js'
+import { resolveConfig, resolveProvider, getGlobalConfigPath, listProviders, initProjectConfig } from '../config.js'
 import { existsSync, appendFileSync, mkdirSync as fsMkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import {
@@ -19,6 +20,7 @@ import {
   printUsageSummary, printSessionSummary, emitJson,
   askPermission, printDiffPreview,
   printSeparator, printStatusLine,
+  ProgressIndicator,
 } from '../output.js'
 import type { OutputMode } from '../output.js'
 import { streamChat } from '../providers/openai-compat.js'
@@ -36,6 +38,9 @@ import { autoVerify, formatVerifyOutput } from '../auto-verify.js'
 import { TokenBudgetManager } from '../token-budget.js'
 import { RetryTracker } from '../retry-intelligence.js'
 import { recordUsage } from '../usage-db.js'
+import { consumeCompletedBackgroundJobs, listBackgroundJobs, readBackgroundJobLog } from '../background-jobs.js'
+import { formatContextWindow, formatPricing, getAgenticWarning, listModelChoices, type ModelChoice } from '../model-catalog.js'
+import { logInfo, logWarning } from '../logger.js'
 
 interface ChatOptions {
   model?: string
@@ -81,6 +86,11 @@ export function createChatCommand(): Command {
             // One-shot mode: compact banner
             printBanner(TOOL_DEFINITIONS.length)
             printProviderInfo(resolved.provider, resolved.model)
+            const startupWarning = getAgenticWarning(resolved.model)
+            if (startupWarning) {
+              console.log(`\x1b[33m  model caution: ${resolved.model} — ${startupWarning}\x1b[0m\n`)
+              logWarning('model caution', { model: resolved.model, provider: resolved.provider, warning: startupWarning })
+            }
           } else {
             // Interactive REPL: rich banner with ASCII art
             const configFiles = detectConfigFiles(cwd)
@@ -134,7 +144,7 @@ interface SessionStats {
 async function executeOneShot(
   prompt: string,
   resolved: ResolvedProvider,
-  config: ForgeConfig,
+  config: OrcaConfig,
   outputMode: OutputMode,
   cwd: string,
 ): Promise<void> {
@@ -153,7 +163,7 @@ const GOODBYE_MESSAGES = [
 
 async function runREPL(
   resolved: ResolvedProvider,
-  config: ForgeConfig,
+  config: OrcaConfig,
   outputMode: OutputMode,
   cwd: string,
   opts: { safe?: boolean; effort?: string } = {},
@@ -162,7 +172,7 @@ async function runREPL(
   const { homedir: getHomedir } = await import('node:os')
 
   // Enable input history (up/down arrow) with persistent file
-  const historyFile = join(getHomedir(), '.armature', 'repl_history')
+  const historyFile = join(getHomedir(), '.orca', 'repl_history')
   let savedHistory: string[] = []
   try {
     const { readFileSync, existsSync } = await import('node:fs')
@@ -173,10 +183,22 @@ async function runREPL(
 
   // Tab completion for slash commands
   const SLASH_COMMANDS = [
-    '/help', '/model', '/models', '/clear', '/compact', '/system',
-    '/history', '/tokens', '/stats', '/retry', '/diff', '/git',
-    '/save', '/load', '/sessions', '/undo', '/effort', '/council', '/race', '/pipeline',
-    '/cwd', '/exit', '/quit',
+    // Session
+    '/help', '/clear', '/compact', '/status', '/cost', '/doctor',
+    // Model
+    '/model', '/models', '/providers', '/effort',
+    // Context
+    '/history', '/tokens', '/stats', '/system',
+    // Session management
+    '/save', '/load', '/sessions', '/continue',
+    // Git workflow
+    '/diff', '/git', '/commit', '/review', '/pr', '/undo',
+    // Multi-model
+    '/council', '/race', '/pipeline',
+    // System
+    '/config', '/init', '/hooks', '/mcp', '/jobs', '/cwd',
+    // Exit
+    '/exit', '/quit', '/retry',
   ]
   const completer = (line: string): [string[], string] => {
     if (line.startsWith('/')) {
@@ -198,31 +220,27 @@ async function runREPL(
   let lastHintLen = 0
   rl.on('SIGCONT', () => { /* resume after bg */ })
   rl.on('line', () => { lastHintLen = 0 }) // clear hint state on submit
-  process.stdin.on('keypress', (_ch: string, key: { name?: string; ctrl?: boolean }) => {
+
+  // Ctrl+L to clear screen
+  process.stdin.on('keypress', (_ch: string, key: { name?: string; ctrl?: boolean; sequence?: string }) => {
     if (key && key.ctrl && key.name === 'l') {
       process.stdout.write('\x1b[2J\x1b[H')
       rl.prompt()
       return
     }
 
-    // Live slash command hint — show matching commands as user types
+    // Slash command hint: when user types exactly '/', show all commands
     const line = (rl as unknown as { line: string }).line
-    if (line && line.startsWith('/') && line.length > 1 && line.length < 15) {
-      const matches = SLASH_COMMANDS.filter(c => c.startsWith(line))
-      // Clear previous hint
-      if (lastHintLen > 0) {
-        process.stdout.write(`\x1b[s\x1b[1B\x1b[2K\x1b[u`) // save, down, clear, restore
+    if (line === '/' && lastHintLen === 0) {
+      // Print command menu below the prompt (no cursor tricks — works in all terminals)
+      const cols = process.stdout.columns || 80
+      const cmdsPerRow = Math.floor(cols / 16)
+      const rows: string[] = []
+      for (let i = 0; i < SLASH_COMMANDS.length; i += cmdsPerRow) {
+        rows.push(SLASH_COMMANDS.slice(i, i + cmdsPerRow).map(c => `\x1b[36m${c.padEnd(15)}\x1b[0m`).join(' '))
       }
-      if (matches.length > 0 && matches.length <= 8) {
-        const hint = matches.map(m => m === matches[0] ? `\x1b[36m${m}\x1b[0m` : `\x1b[90m${m}\x1b[0m`).join('  ')
-        process.stdout.write(`\x1b[s\n\x1b[2K  ${hint}\x1b[u`) // save, newline, clear, write, restore
-        lastHintLen = 1
-      } else {
-        lastHintLen = 0
-      }
-    } else if (lastHintLen > 0) {
-      process.stdout.write(`\x1b[s\x1b[1B\x1b[2K\x1b[u`)
-      lastHintLen = 0
+      process.stdout.write(`\n${rows.join('\n')}\n\x1b[90m  tab to complete · type to filter\x1b[0m\n`)
+      lastHintLen = 1
     }
   })
 
@@ -256,6 +274,7 @@ async function runREPL(
   const retryTracker = new RetryTracker(2)
 
   const shortModel = (m: string) => m.length > 24 ? m.slice(0, 22) + '..' : m
+  const getChoices = (): ModelChoice[] => listModelChoices(config, currentModel)
 
   // Get git branch (cached)
   let gitBranch: string | undefined
@@ -270,7 +289,7 @@ async function runREPL(
 
     // Layout (reliable, no cursor tricks):
     //   ─────────────────────
-    //   ◇ FORGE │ model │ ██ │ project git:(branch)
+    //   ◇ ORCA │ model │ ██ │ project git:(branch)
     //   ▸▸ yolo │ ⚡⚡⚡high            tokens
     //   ❯ (user input here)
 
@@ -311,6 +330,31 @@ async function runREPL(
   }
 
   await hooks.run('SessionStart', { event: 'SessionStart', cwd, model: currentModel })
+  logInfo('chat session started', { cwd, model: currentModel, provider: resolved.provider })
+
+  // ── Provider preflight check ──
+  if (resolved.baseURL) {
+    try {
+      const { chatOnce } = await import('../providers/openai-compat.js')
+      const probe = await Promise.race([
+        chatOnce({ apiKey: resolved.apiKey, baseURL: resolved.baseURL, model: resolved.model, maxTokens: 1 }, 'ping'),
+        new Promise<null>((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
+      ])
+      if (probe) {
+        console.log(`\x1b[32m  provider: ${resolved.provider}/${resolved.model} — connected\x1b[0m`)
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.log(`\x1b[33m  provider: ${resolved.provider}/${resolved.model} — ${msg}\x1b[0m`)
+      console.log(`\x1b[33m  hint: check proxy/network. Session will continue — requests may fail.\x1b[0m`)
+    }
+  }
+
+  const startupWarning = getAgenticWarning(currentModel)
+  if (startupWarning) {
+    console.log(`\x1b[33m  model caution: ${currentModel} — ${startupWarning}\x1b[0m`)
+    logWarning('model caution', { model: currentModel, provider: resolved.provider, warning: startupWarning })
+  }
 
   console.log('\x1b[90m  Type your message. /help for commands. Ctrl+C to quit.\x1b[0m')
   console.log('\x1b[90m  /council /race /pipeline — multi-model collaboration\x1b[0m\n')
@@ -321,7 +365,32 @@ async function runREPL(
   // Undo stack: track last write_file for /undo
   let lastWrite: { path: string; oldContent: string | null } | null = null
 
+  // Periodic auto-save interval (every 5 turns or 3 minutes)
+  let lastAutoSave = Date.now()
+  const AUTO_SAVE_INTERVAL_MS = 3 * 60 * 1000
+
   while (true) {
+    // Periodic auto-save for crash recovery
+    if (stats.turns > 0 && (Date.now() - lastAutoSave > AUTO_SAVE_INTERVAL_MS)) {
+      autoSaveSession(currentModel, history, stats)
+      lastAutoSave = Date.now()
+    }
+
+    const completedJobs = consumeCompletedBackgroundJobs()
+    for (const job of completedJobs) {
+      const status = job.status === 'completed' ? '\x1b[32mcompleted\x1b[0m' : '\x1b[31mfailed\x1b[0m'
+      const exitText = typeof job.exitCode === 'number' ? `exit ${job.exitCode}` : 'no exit code'
+      console.log(`\x1b[90m  background job ${job.id}\x1b[0m ${status} \x1b[90m(${exitText})\x1b[0m`)
+      console.log(`\x1b[90m  command: ${job.command.slice(0, 100)}${job.command.length > 100 ? '...' : ''}\x1b[0m`)
+      console.log(`\x1b[90m  log: ${job.logPath}\x1b[0m`)
+      const tail = readBackgroundJobLog(job, 6)
+      if (tail) {
+        console.log(`\x1b[90m  tail:\n${tail.slice(0, 800)}\x1b[0m`)
+      }
+      logInfo('background job notification surfaced', { id: job.id, status: job.status, exitCode: job.exitCode ?? null })
+      console.log()
+    }
+
     let input = await promptUser()
 
     if (input === null) break
@@ -343,6 +412,9 @@ async function runREPL(
       }
       input = lines.join('\n')
     }
+
+    // ── Crash-safe turn boundary: uncaught errors here don't kill the session ──
+    try {
 
     // Slash command dispatch
     if (input.startsWith('/')) {
@@ -395,7 +467,22 @@ async function runREPL(
       } else {
         const handled = handleSlashCommand(input, resolved, history, stats, cwd, {
           getModel: () => currentModel,
-          setModel: (m: string) => { currentModel = m; resolved.model = m },
+          setModel: (m: string) => {
+            currentModel = m
+            resolved.model = m
+            // Re-resolve provider if the model family changed and we're not on an aggregator
+            const providerConfig = config.providers[resolved.provider]
+            if (!providerConfig?.aggregator) {
+              try {
+                const newResolved = resolveProvider({ ...config, defaultModel: m })
+                resolved.provider = newResolved.provider
+                resolved.apiKey = newResolved.apiKey
+                if (newResolved.baseURL) resolved.baseURL = newResolved.baseURL
+              } catch { /* keep current provider if re-resolve fails */ }
+            }
+          },
+          getProvider: () => resolved.provider,
+          getChoices,
         }, { lastWrite })
         if (handled === 'exit') {
           saveInputHistory(historyFile, inputHistory)
@@ -423,6 +510,14 @@ async function runREPL(
             command: 'chat',
             cwd,
           })
+          logInfo('chat session ended', {
+            cwd,
+            model: currentModel,
+            provider: resolved.provider,
+            turns: stats.turns,
+            inputTokens: stats.totalInputTokens,
+            outputTokens: stats.totalOutputTokens,
+          })
           const bye = GOODBYE_MESSAGES[Math.floor(Math.random() * GOODBYE_MESSAGES.length)]
           console.log(`\x1b[90m  ${bye}\x1b[0m`)
           break
@@ -432,13 +527,18 @@ async function runREPL(
           const pick = await promptUser()
           if (pick === null) break
           const num = parseInt(pick, 10)
-          if (num >= 1 && num <= POE_MODELS.length) {
+          const choices = getChoices()
+          if (num >= 1 && num <= choices.length) {
             const oldModel = currentModel
-            currentModel = POE_MODELS[num - 1]!
+            currentModel = choices[num - 1]!.model
             resolved.model = currentModel
             console.log(`\x1b[90m  model: ${oldModel} → \x1b[36m${currentModel}\x1b[0m`)
+            const warning = getAgenticWarning(currentModel)
+            if (warning) console.log(`\x1b[33m  model caution: ${warning}\x1b[0m`)
+            logInfo('model switched via picker', { from: oldModel, to: currentModel, provider: resolved.provider })
+            if (warning) logWarning('model caution', { model: currentModel, provider: resolved.provider, warning })
           } else if (pick) {
-            console.log('\x1b[33m  invalid selection. Use 1-' + POE_MODELS.length + '.\x1b[0m')
+            console.log('\x1b[33m  invalid selection. Use 1-' + choices.length + '.\x1b[0m')
           }
           continue
         }
@@ -549,18 +649,10 @@ async function runREPL(
       process.stdin.on('data', escHandler)
     }
 
-    // Show thinking spinner
-    const spinnerFrames = ['·', '··', '···', '····', '···', '··']
-    let spinnerIdx = 0
+    // Progress indicator (thinking → working with elapsed time + token count)
+    const progress = new ProgressIndicator()
     let firstToken = false
-    const spinnerStartTime = Date.now()
-    const spinner = setInterval(() => {
-      if (!firstToken && !abortController.signal.aborted) {
-        const frame = spinnerFrames[spinnerIdx % spinnerFrames.length]!
-        process.stdout.write(`\r\x1b[90m  thinking ${frame} \x1b[90m(esc to cancel)\x1b[0m`)
-        spinnerIdx++
-      }
-    }, 150)
+    progress.start()
 
     try {
       if (resolved.baseURL && !abortController.signal.aborted) {
@@ -574,12 +666,15 @@ async function runREPL(
           abortSignal: abortController.signal,
           onFirstToken: () => {
             firstToken = true
-            clearInterval(spinner)
-            const ttft = Date.now() - spinnerStartTime
-            process.stdout.write(`\r\x1b[K`)
-            if (ttft > 1000) {
-              process.stdout.write(`\x1b[90m  [${(ttft / 1000).toFixed(1)}s to first token]\x1b[0m\n`)
+            const { elapsed } = progress.stop()
+            if (elapsed > 1000) {
+              process.stdout.write(`\x1b[90m  [${(elapsed / 1000).toFixed(1)}s to first token]\x1b[0m\n`)
             }
+            progress.start()
+            progress.markWorking()
+          },
+          onStreamToken: (text: string) => {
+            progress.addTokens(text.length)
           },
           onFileWrite: (path, oldContent) => { lastWrite = { path, oldContent } },
           safeMode: opts.safe || false,
@@ -591,19 +686,17 @@ async function runREPL(
         tokenBudget.recordUsage(result.inputTokens, result.outputTokens)
       } else if (!abortController.signal.aborted) {
         firstToken = true
-        clearInterval(spinner)
-        process.stdout.write('\r\x1b[K')
+        progress.stop()
         await runSDKQuery({ prompt: messageToSend, resolved, config, outputMode, cwd })
         stats.turns++
       }
     } catch (err) {
-      clearInterval(spinner)
-      process.stdout.write('\r\x1b[K')
+      progress.stop()
       if (!abortController.signal.aborted) {
         printError(err instanceof Error ? err.message : String(err))
       }
     } finally {
-      clearInterval(spinner)
+      progress.stop()
       if (rawMode) {
         process.stdin.setRawMode(false)
         process.stdin.removeListener('data', escHandler)
@@ -613,22 +706,35 @@ async function runREPL(
 
     // ── Auto-compact: smart context management via TokenBudgetManager ──
     const budget = tokenBudget.getBudget(history)
+    const msgCount = history.filter(m => m.role !== 'system').length
 
     if (budget.risk === 'red') {
-      // Aggressive: smart compact keeping only last turn + decisions
       hooks.run('PreCompact', { event: 'PreCompact', cwd })
       const result = tokenBudget.smartCompact(history, 1)
       hooks.run('PostCompact', { event: 'PostCompact', cwd })
-      console.log(`\x1b[31m  auto-compact (${budget.utilizationPct}%): ${result.summary}\x1b[0m`)
+      console.log(`\x1b[31m  auto-compact (${budget.utilizationPct}% · ${msgCount} msgs): ${result.summary}\x1b[0m`)
       retryTracker.cleanup()
     } else if (budget.risk === 'orange') {
-      // Standard: smart compact keeping last 2 turns + decisions
       hooks.run('PreCompact', { event: 'PreCompact', cwd })
       const result = tokenBudget.smartCompact(history, 2)
       hooks.run('PostCompact', { event: 'PostCompact', cwd })
-      console.log(`\x1b[33m  auto-compact (${budget.utilizationPct}%): ${result.summary}\x1b[0m`)
+      console.log(`\x1b[33m  auto-compact (${budget.utilizationPct}% · ${msgCount} msgs): ${result.summary}\x1b[0m`)
     } else if (budget.risk === 'yellow') {
-      console.log(`\x1b[33m  context: ${budget.utilizationPct}% — consider /compact to free space.\x1b[0m`)
+      console.log(`\x1b[33m  context: ${budget.utilizationPct}% · ${msgCount} msgs — /compact to free space\x1b[0m`)
+    } else if (msgCount >= 6) {
+      // Show context info after first few turns so user knows the system is tracking
+      console.log(`\x1b[90m  context: ${budget.utilizationPct}% · ${msgCount} msgs · auto-compact at 40%\x1b[0m`)
+    }
+
+    } catch (turnErr) {
+      // ── Crash-safe: catch ANY uncaught error in this turn, log it, continue REPL ──
+      const msg = turnErr instanceof Error ? turnErr.message : String(turnErr)
+      console.error(`\x1b[31m  turn error: ${msg}\x1b[0m`)
+      console.error(`\x1b[90m  session continues — type /clear to reset if state is corrupted.\x1b[0m`)
+      // Auto-save on error for recovery
+      if (stats.turns > 0) {
+        autoSaveSession(currentModel, history, stats)
+      }
     }
   }
 
@@ -647,7 +753,7 @@ function saveInputHistory(historyFile: string, entries: string[]): void {
 
 function autoSaveSession(model: string, history: ChatMessage[], stats: SessionStats): void {
   try {
-    const sessDir = join(process.env.HOME || '/tmp', '.armature', 'sessions')
+    const sessDir = join(process.env.HOME || '/tmp', '.orca', 'sessions')
     fsMkdirSync(sessDir, { recursive: true })
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     const sessFile = join(sessDir, `auto-${ts}.json`)
@@ -666,25 +772,13 @@ function autoSaveSession(model: string, history: ChatMessage[], stats: SessionSt
 interface ModelControl {
   getModel: () => string
   setModel: (m: string) => void
+  getProvider: () => string
+  getChoices: () => ModelChoice[]
 }
 
 interface UndoState {
   lastWrite: { path: string; oldContent: string | null } | null
 }
-
-const POE_MODELS = [
-  'claude-opus-4.6',
-  'claude-sonnet-4.6',
-  'gpt-5.4',
-  'gemini-3.1-pro',
-  'gemini-3.1-flash-lite',
-  'gemma-4-31b',
-  'glm-5',
-  'grok-4.20-multi-agent',
-  'qwen3.6-plus',
-  'kimi-k2.5',
-  'minimax-m2.7',
-]
 
 function handleSlashCommand(
   input: string,
@@ -709,35 +803,58 @@ function handleSlashCommand(
     case '/h':
     case '/?':
       console.log('\x1b[90m')
-      console.log('  Commands:')
-      console.log('  /help, /h              Show this help')
-      console.log('  /model, /m             Show current model')
-      console.log('  /model set <name>      Switch model mid-session')
-      console.log('  /models                List available Poe models')
+      console.log('  \x1b[1mSession\x1b[0m\x1b[90m')
+      console.log('  /help, /h, /?          Show this help')
       console.log('  /clear                 Clear conversation history')
-      console.log('  /compact               Keep last 2 turns, drop older')
+      console.log('  /compact               Compress — keep last 2 turns')
+      console.log('  /status                Session status overview')
+      console.log('  /cost                  API cost breakdown')
+      console.log('  /doctor                Health check (provider/proxy/tools)')
+      console.log('')
+      console.log('  \x1b[1mModel\x1b[0m\x1b[90m')
+      console.log('  /model, /m             Show/switch model')
+      console.log('  /models                List available models')
+      console.log('  /providers             List all providers')
+      console.log('  /effort <lvl>          Thinking: low/medium/high/max')
+      console.log('')
+      console.log('  \x1b[1mContext\x1b[0m\x1b[90m')
+      console.log('  /history               Message counts')
+      console.log('  /tokens                Token breakdown')
+      console.log('  /stats                 Full statistics')
       console.log('  /system <prompt>       Set system prompt')
-      console.log('  /history               Show message counts')
-      console.log('  /tokens                Show token breakdown')
-      console.log('  /stats                 Session statistics')
-      console.log('  /retry, /r             Retry last message')
+      console.log('')
+      console.log('  \x1b[1mSession Management\x1b[0m\x1b[90m')
+      console.log('  /save [name]           Save session')
+      console.log('  /load [name]           Load session')
+      console.log('  /sessions              List saved sessions')
+      console.log('  /continue              Resume last session')
+      console.log('')
+      console.log('  \x1b[1mGit Workflow\x1b[0m\x1b[90m')
       console.log('  /diff                  Show git diff')
       console.log('  /git <cmd>             Run git command')
-      console.log('  /save [name]           Save session to disk')
-      console.log('  /load [name]           Load a saved session')
-      console.log('  /sessions              List saved sessions')
+      console.log('  /commit                Create commit (via agent)')
+      console.log('  /review                Review current changes (via agent)')
+      console.log('  /pr                    Create PR (via agent)')
       console.log('  /undo                  Revert last file write')
-      console.log('  /effort <level>        Set thinking: low/medium/high/max')
+      console.log('')
+      console.log('  \x1b[1mMulti-Model\x1b[0m\x1b[90m')
+      console.log('  /council <prompt>      N models + judge synthesis')
+      console.log('  /race <prompt>         First answer wins')
+      console.log('  /pipeline <prompt>     Plan→Code→Review chain')
+      console.log('')
+      console.log('  \x1b[1mSystem\x1b[0m\x1b[90m')
+      console.log('  /config                Show configuration')
+      console.log('  /init                  Initialize project config')
       console.log('  /hooks                 Show registered hooks')
-      console.log('  /council <prompt>      Ask N models, judge synthesizes (multi-model)')
-      console.log('  /race <prompt>         First model to answer wins (speed race)')
-      console.log('  /pipeline <prompt>     Plan→Code→Review chain across models')
+      console.log('  /mcp                   MCP server status')
+      console.log('  /jobs                  Background jobs')
       console.log('  /cwd                   Working directory')
+      console.log('  /retry, /r             Retry last message')
       console.log('  /exit, /quit, /q       Exit')
       console.log('')
-      console.log('  Tips:')
-      console.log('  Start with ``` for multi-line input (close with ```)')
-      console.log('  Esc interrupts generation. Ctrl+L clears screen.')
+      console.log('  \x1b[1mTips\x1b[0m\x1b[90m')
+      console.log('  /  shows all commands · Tab completes · ``` for multi-line')
+      console.log('  Esc interrupts · Ctrl+L clears screen')
       console.log('\x1b[0m')
       return 'handled'
 
@@ -751,23 +868,35 @@ function handleSlashCommand(
         }
         const oldModel = mc.getModel()
         mc.setModel(newModel)
-        console.log(`\x1b[90m  model: ${oldModel} → \x1b[36m${newModel}\x1b[0m`)
+        console.log(`\x1b[90m  model: ${oldModel} → \x1b[36m${newModel}\x1b[0m \x1b[90m(${mc.getProvider()})\x1b[0m`)
+        const warning = getAgenticWarning(newModel)
+        if (warning) console.log(`\x1b[33m  caution: ${warning}\x1b[0m`)
+        logInfo('model switched via command', { from: oldModel, to: newModel, provider: mc.getProvider() })
+        if (warning) logWarning('model caution', { model: newModel, provider: mc.getProvider(), warning })
         return 'handled'
       }
-      console.log(`\x1b[90m  provider: ${resolved.provider}  model: \x1b[36m${mc.getModel()}\x1b[0m`)
+      {
+        const current = mc.getChoices().find((choice) => choice.model === mc.getModel())
+        console.log(`\x1b[90m  provider: ${mc.getProvider()}  model: \x1b[36m${mc.getModel()}\x1b[0m`)
+        if (current) {
+          console.log(`\x1b[90m  context: ${formatContextWindow(current.contextWindow)}  max out: ${formatContextWindow(current.maxOutput)}  pricing: ${formatPricing(current.pricing)} per 1M in/out\x1b[0m`)
+          if (current.note) console.log(`\x1b[33m  caution: ${current.note}\x1b[0m`)
+        }
+      }
       return 'handled'
 
     case '/models':
-      console.log('\x1b[90m  Available Poe models:\x1b[0m')
-      for (let i = 0; i < POE_MODELS.length; i++) {
-        const m = POE_MODELS[i]!
+      console.log('\x1b[90m  Available models:\x1b[0m')
+      for (const [i, choice] of mc.getChoices().entries()) {
+        const m = choice.model
         const current = m === mc.getModel()
         const idx = `${i + 1}`.padStart(2)
         const marker = current ? '\x1b[36m' : '\x1b[90m'
         const arrow = current ? ' →' : '  '
         console.log(`${marker}  ${idx}.${arrow} ${m}\x1b[0m`)
+        console.log(`\x1b[90m      ${choice.provider} · ${formatContextWindow(choice.contextWindow)} ctx · ${formatPricing(choice.pricing)} per 1M in/out${choice.agentic === 'caution' ? ' · caution' : ''}\x1b[0m`)
       }
-      console.log('\x1b[90m  Enter number (1-' + POE_MODELS.length + '):\x1b[0m')
+      console.log('\x1b[90m  Enter number (1-' + mc.getChoices().length + '):\x1b[0m')
       return 'pick_model'
 
     case '/clear':
@@ -890,7 +1019,7 @@ function handleSlashCommand(
 
     case '/diff': {
       try {
-        const { execSync } = require('node:child_process') as typeof import('node:child_process')
+        // execSync imported at top level
         const diff = execSync('git diff --stat && echo "---" && git diff --no-color', {
           cwd, encoding: 'utf-8', timeout: 10_000, maxBuffer: 1024 * 1024,
         })
@@ -912,7 +1041,7 @@ function handleSlashCommand(
         return 'handled'
       }
       try {
-        const { execSync } = require('node:child_process') as typeof import('node:child_process')
+        // execSync imported at top level
         const output = execSync(`git ${arg}`, {
           cwd, encoding: 'utf-8', timeout: 10_000, maxBuffer: 1024 * 1024,
         })
@@ -927,7 +1056,7 @@ function handleSlashCommand(
 
     case '/save': {
       const sessionName = arg || `session-${Date.now()}`
-      const sessDir = join(process.env.HOME || '/tmp', '.armature', 'sessions')
+      const sessDir = join(process.env.HOME || '/tmp', '.orca', 'sessions')
       try {
         fsMkdirSync(sessDir, { recursive: true })
         const sessFile = join(sessDir, `${sessionName}.json`)
@@ -949,7 +1078,7 @@ function handleSlashCommand(
         console.log('\x1b[33m  usage: /load <name>  (see /sessions for available)\x1b[0m')
         return 'handled'
       }
-      const sessDir = join(process.env.HOME || '/tmp', '.armature', 'sessions')
+      const sessDir = join(process.env.HOME || '/tmp', '.orca', 'sessions')
       const sessFile = join(sessDir, arg.endsWith('.json') ? arg : `${arg}.json`)
       try {
         const data = JSON.parse(readFileSync(sessFile, 'utf-8'))
@@ -972,7 +1101,7 @@ function handleSlashCommand(
     }
 
     case '/sessions': {
-      const sessDir = join(process.env.HOME || '/tmp', '.armature', 'sessions')
+      const sessDir = join(process.env.HOME || '/tmp', '.orca', 'sessions')
       try {
         if (!existsSync(sessDir)) {
           console.log('\x1b[90m  no saved sessions.\x1b[0m')
@@ -1004,6 +1133,26 @@ function handleSlashCommand(
       return 'handled'
     }
 
+    case '/jobs': {
+      const jobs = listBackgroundJobs(10)
+      if (jobs.length === 0) {
+        console.log('\x1b[90m  no background jobs.\x1b[0m')
+        return 'handled'
+      }
+      console.log('\x1b[90m  Background jobs:\x1b[0m')
+      for (const job of jobs) {
+        const completed = job.completedAt ? ` · ${job.completedAt}` : ''
+        const status = job.status === 'completed'
+          ? '\x1b[32mcompleted\x1b[0m'
+          : job.status === 'failed'
+            ? '\x1b[31mfailed\x1b[0m'
+            : '\x1b[33mrunning\x1b[0m'
+        console.log(`\x1b[90m    ${job.id}\x1b[0m ${status}\x1b[90m${completed}\x1b[0m`)
+        console.log(`\x1b[90m      ${job.command.slice(0, 90)}${job.command.length > 90 ? '...' : ''}\x1b[0m`)
+      }
+      return 'handled'
+    }
+
     case '/undo': {
       if (!undo?.lastWrite) {
         console.log('\x1b[90m  nothing to undo.\x1b[0m')
@@ -1027,15 +1176,159 @@ function handleSlashCommand(
       return 'handled'
     }
 
+    // ── CC/Codex compatible commands ──────────────────────────────
+
+    case '/cost': {
+      // Simple cost estimation: ~$3/M input, ~$15/M output (Poe/Claude average)
+      const cost = (stats.totalInputTokens * 3 + stats.totalOutputTokens * 15) / 1_000_000
+      console.log('\x1b[90m  Cost breakdown:\x1b[0m')
+      console.log(`\x1b[90m    input:  ${stats.totalInputTokens.toLocaleString()} tokens\x1b[0m`)
+      console.log(`\x1b[90m    output: ${stats.totalOutputTokens.toLocaleString()} tokens\x1b[0m`)
+      console.log(`\x1b[90m    total:  ${(stats.totalInputTokens + stats.totalOutputTokens).toLocaleString()} tokens\x1b[0m`)
+      console.log(`\x1b[90m    est:    \x1b[36m$${cost.toFixed(4)}\x1b[0m`)
+      console.log(`\x1b[90m    turns:  ${stats.turns}\x1b[0m`)
+      console.log(`\x1b[90m    time:   ${((Date.now() - stats.startTime) / 1000 / 60).toFixed(1)} min\x1b[0m`)
+      return 'handled'
+    }
+
+    case '/status': {
+      const ctxChars = history.reduce((s, m) => s + m.content.length, 0)
+      const ctxTokens = Math.ceil(ctxChars / 4)
+      const msgs = history.filter(m => m.role !== 'system').length
+      console.log('\x1b[90m  Session status:\x1b[0m')
+      console.log(`\x1b[90m    provider: \x1b[36m${mc.getProvider()}/${mc.getModel()}\x1b[0m`)
+      console.log(`\x1b[90m    turns:    ${stats.turns}\x1b[0m`)
+      console.log(`\x1b[90m    messages: ${msgs}\x1b[0m`)
+      console.log(`\x1b[90m    context:  ~${ctxTokens.toLocaleString()} tokens (${msgs} msgs)\x1b[0m`)
+      console.log(`\x1b[90m    consumed: ${(stats.totalInputTokens + stats.totalOutputTokens).toLocaleString()} tokens\x1b[0m`)
+      console.log(`\x1b[90m    cwd:      ${cwd}\x1b[0m`)
+      console.log(`\x1b[90m    hooks:    ${hooks.totalHooks}\x1b[0m`)
+      console.log(`\x1b[90m    mcp:      ${mcpClient.configuredCount} servers\x1b[0m`)
+      return 'handled'
+    }
+
+    case '/doctor': {
+      console.log('\x1b[90m  Health check:\x1b[0m')
+      // Provider
+      const provOk = !!resolved.apiKey && !!resolved.baseURL
+      console.log(`\x1b[90m    provider: ${provOk ? '\x1b[32mOK\x1b[0m' : '\x1b[31mNO KEY\x1b[0m'} (${resolved.provider})\x1b[0m`)
+      // Proxy
+      const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || '(system auto-detect)'
+      console.log(`\x1b[90m    proxy:    ${proxy}\x1b[0m`)
+      // Git
+      try {
+        execSync('git --version', { stdio: 'pipe' })
+        console.log(`\x1b[90m    git:      \x1b[32mOK\x1b[0m`)
+      } catch { console.log(`\x1b[90m    git:      \x1b[31mNOT FOUND\x1b[0m`) }
+      // Node
+      console.log(`\x1b[90m    node:     ${process.version}\x1b[0m`)
+      // Hooks
+      console.log(`\x1b[90m    hooks:    ${hooks.totalHooks}\x1b[0m`)
+      // MCP
+      console.log(`\x1b[90m    mcp:      ${mcpClient.configuredCount} configured\x1b[0m`)
+      // Tools
+      console.log(`\x1b[90m    tools:    ${TOOL_DEFINITIONS.length}\x1b[0m`)
+      return 'handled'
+    }
+
+    case '/config': {
+      console.log(`\x1b[90m  Config files:\x1b[0m`)
+      console.log(`\x1b[90m    global: ${getGlobalConfigPath()}\x1b[0m`)
+      console.log(`\x1b[90m    project: ${join(cwd, '.orca.json')}\x1b[0m`)
+      console.log(`\x1b[90m  Current:\x1b[0m`)
+      console.log(`\x1b[90m    provider: ${mc.getProvider()}\x1b[0m`)
+      console.log(`\x1b[90m    model:    ${mc.getModel()}\x1b[0m`)
+      console.log(`\x1b[90m    mode:     ${undo ? 'yolo' : 'safe'}\x1b[0m`)
+      console.log(`\x1b[90m  Edit: orca init (project) or ~/.orca/config.json (global)\x1b[0m`)
+      return 'handled'
+    }
+
+    case '/continue': {
+      // Load most recent auto-saved session
+      try {
+        const sessDir = join(process.env.HOME || '/tmp', '.orca', 'sessions')
+        const files = readdirSync(sessDir).filter(f => f.endsWith('.json')).sort().reverse()
+        if (files.length === 0) {
+          console.log('\x1b[90m  no saved sessions found.\x1b[0m')
+          return 'handled'
+        }
+        const latest = files[0]!
+        const sess = JSON.parse(readFileSync(join(sessDir, latest), 'utf-8'))
+        if (sess.history && Array.isArray(sess.history)) {
+          history.length = 0
+          history.push(...sess.history)
+          stats.turns = sess.stats?.turns || 0
+          stats.totalInputTokens = sess.stats?.inputTokens || 0
+          stats.totalOutputTokens = sess.stats?.outputTokens || 0
+          console.log(`\x1b[90m  restored session: ${latest} (${stats.turns} turns, ${history.length} messages)\x1b[0m`)
+        }
+      } catch (err) {
+        console.log(`\x1b[31m  continue failed: ${err instanceof Error ? err.message : err}\x1b[0m`)
+      }
+      return 'handled'
+    }
+
+    case '/commit': {
+      try {
+        const status = execSync('git status --porcelain', { cwd, encoding: 'utf-8', timeout: 5000 }).trim()
+        if (!status) {
+          console.log('\x1b[90m  nothing to commit (working tree clean).\x1b[0m')
+        } else {
+          // Send as a prompt to the agent: "create a git commit for the current changes"
+          return 'not_command' // fall through — let the model handle the commit
+        }
+      } catch { return 'not_command' }
+      return 'handled'
+    }
+
+    case '/review': {
+      // Fall through to model — treat as prompt "review my current changes"
+      return 'not_command'
+    }
+
+    case '/pr': {
+      // Fall through to model — treat as prompt "create a PR for current changes"
+      return 'not_command'
+    }
+
+    case '/mcp': {
+      console.log(`\x1b[90m  MCP servers: ${mcpClient.configuredCount} configured\x1b[0m`)
+      // TODO: show individual server status
+      return 'handled'
+    }
+
+    case '/providers': {
+      const resolvedConfig = resolveConfig({ cwd })
+      const providers = listProviders(resolvedConfig)
+      console.log('\x1b[90m  Providers:\x1b[0m')
+      for (const p of providers) {
+        const status = p.disabled ? '\x1b[90mdisabled\x1b[0m' : p.hasKey ? '\x1b[32mready\x1b[0m' : '\x1b[31mno key\x1b[0m'
+        const active = p.id === mc.getProvider() ? ' \x1b[36m←\x1b[0m' : ''
+        console.log(`\x1b[90m    ${p.id.padEnd(14)} ${p.model.padEnd(24)} ${status}${active}\x1b[0m`)
+      }
+      return 'handled'
+    }
+
+    case '/init': {
+      const configPath = initProjectConfig(cwd)
+      console.log(`\x1b[90m  created: ${configPath}\x1b[0m`)
+      return 'handled'
+    }
+
     default:
       // Check if it's a model number (e.g., "/1" to "/11")
       if (/^\/\d+$/.test(cmd)) {
         const idx = parseInt(cmd.slice(1), 10) - 1
-        if (idx >= 0 && idx < POE_MODELS.length) {
-          const newModel = POE_MODELS[idx]!
+        const choices = mc.getChoices()
+        if (idx >= 0 && idx < choices.length) {
+          const newModel = choices[idx]!.model
           const oldModel = mc.getModel()
           mc.setModel(newModel)
           console.log(`\x1b[90m  model: ${oldModel} → \x1b[36m${newModel}\x1b[0m`)
+          const warning = getAgenticWarning(newModel)
+          if (warning) console.log(`\x1b[33m  caution: ${warning}\x1b[0m`)
+          logInfo('model switched via numeric shortcut', { from: oldModel, to: newModel, provider: mc.getProvider() })
+          if (warning) logWarning('model caution', { model: newModel, provider: mc.getProvider(), warning })
           return 'handled'
         }
       }
@@ -1048,19 +1341,20 @@ function handleSlashCommand(
 interface ProxyTurnOptions {
   prompt: string
   resolved: ResolvedProvider
-  config: ForgeConfig
+  config: OrcaConfig
   outputMode: OutputMode
   history: ChatMessage[]
   cwd: string
   abortSignal?: AbortSignal
   onFirstToken?: () => void
+  onStreamToken?: (text: string) => void
   onFileWrite?: (path: string, oldContent: string | null) => void
   safeMode?: boolean
   retryTracker?: RetryTracker
 }
 
 async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: number; outputTokens: number }> {
-  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onFileWrite, safeMode, retryTracker } = options
+  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onStreamToken, onFileWrite, safeMode, retryTracker } = options
 
   const startTime = Date.now()
   let inputTokens = 0
@@ -1250,6 +1544,7 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
         if (event.text) {
           md.push(event.text)
           responseText += event.text
+          if (onStreamToken) onStreamToken(event.text)
         }
         break
       case 'tool_use':
@@ -1321,7 +1616,7 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
 interface ProxyQueryOptions {
   prompt: string
   resolved: ResolvedProvider
-  config: ForgeConfig
+  config: OrcaConfig
   outputMode: OutputMode
 }
 
@@ -1338,7 +1633,7 @@ async function runProxyQuery(options: ProxyQueryOptions & { cwd?: string }): Pro
 interface SDKQueryOptions {
   prompt: string
   resolved: ResolvedProvider
-  config: ForgeConfig
+  config: OrcaConfig
   outputMode: OutputMode
   cwd: string
 }
@@ -1348,10 +1643,10 @@ async function runSDKQuery(options: SDKQueryOptions): Promise<void> {
 
   let sdk: { createAgent: (opts: Record<string, unknown>) => { query: (p: string) => AsyncIterable<unknown> } }
   try {
-    // @ts-ignore — @armature/sdk is an optional dependency for native provider path
-    sdk = await import('@armature/sdk')
+    // @ts-ignore — @orca/sdk is an optional dependency for native provider path
+    sdk = await import('@orca/sdk')
   } catch {
-    throw new Error('@armature/sdk not installed. Use --provider poe for proxy mode, or npm install @armature/sdk for native mode.')
+    throw new Error('@orca/sdk not installed. Use --provider poe for proxy mode, or npm install @orca/sdk for native mode.')
   }
 
   // Map CLI provider to SDK provider option
@@ -1427,7 +1722,7 @@ async function runSDKQuery(options: SDKQueryOptions): Promise<void> {
 function detectConfigFiles(cwd: string): string[] {
   const found: string[] = []
   const candidates = [
-    '.armature.json',
+    '.orca.json',
     'CLAUDE.md',
     '.claude/settings.json',
     'AGENTS.md',
@@ -1442,10 +1737,10 @@ function detectConfigFiles(cwd: string): string[] {
   return found
 }
 
-function buildFlags(opts: ChatOptions): Partial<ForgeConfig> {
-  const flags: Partial<ForgeConfig> = {}
+function buildFlags(opts: ChatOptions): Partial<OrcaConfig> {
+  const flags: Partial<OrcaConfig> = {}
   if (opts.model) flags.model = opts.model
-  if (opts.provider) flags.provider = opts.provider as ForgeConfig['provider']
+  if (opts.provider) flags.provider = opts.provider as OrcaConfig['provider']
   if (opts.apiKey) flags.apiKey = opts.apiKey
   if (opts.maxTurns) flags.maxTurns = parseInt(opts.maxTurns, 10)
   if (opts.systemPrompt) flags.systemPrompt = opts.systemPrompt

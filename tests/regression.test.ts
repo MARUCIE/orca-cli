@@ -12,7 +12,7 @@ import { writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const testDir = join(tmpdir(), `forge-regression-${Date.now()}`)
+const testDir = join(tmpdir(), `orca-regression-${Date.now()}`)
 
 beforeAll(() => {
   mkdirSync(join(testDir, 'src'), { recursive: true })

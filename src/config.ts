@@ -1,10 +1,10 @@
 /**
- * Forge CLI configuration system.
+ * Orca CLI configuration system.
  *
  * Three-tier config resolution (highest priority wins):
  *   1. CLI flags + environment variables (runtime)
- *   2. Project-local .armature.json (project)
- *   3. Global ~/.armature/config.json (global)
+ *   2. Project-local .orca.json (project)
+ *   3. Global ~/.orca/config.json (global)
  *
  * Provider architecture (v2):
  *   - Each provider is an independent config block with apiKey, baseURL, models
@@ -17,6 +17,7 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { z } from 'zod'
+import { logWarning } from './logger.js'
 
 // ── Schema ──────────────────────────────────────────────────────────
 
@@ -36,7 +37,7 @@ const ProviderConfigSchema = z.object({
 
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>
 
-const ForgeConfigSchema = z.object({
+const OrcaConfigSchema = z.object({
   // v2: per-provider config blocks
   providers: z.record(z.string(), ProviderConfigSchema).default({}),
   defaultProvider: z.string().default('auto'),
@@ -66,16 +67,16 @@ const ForgeConfigSchema = z.object({
   baseURL: z.string().optional(),
 })
 
-export type ForgeConfig = z.infer<typeof ForgeConfigSchema>
+export type OrcaConfig = z.infer<typeof OrcaConfigSchema>
 
 // Legacy type alias for backward-compatible imports
 export type Provider = string
 
 // ── Paths ───────────────────────────────────────────────────────────
 
-const GLOBAL_DIR = join(homedir(), '.armature')
+const GLOBAL_DIR = join(homedir(), '.orca')
 const GLOBAL_CONFIG = join(GLOBAL_DIR, 'config.json')
-const PROJECT_CONFIG = '.armature.json'
+const PROJECT_CONFIG = '.orca.json'
 
 export function getGlobalDir(): string {
   return GLOBAL_DIR
@@ -169,7 +170,7 @@ function loadJsonFile(path: string): Record<string, unknown> {
     return JSON.parse(readFileSync(path, 'utf-8'))
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error(`warn: failed to parse ${path}: ${msg}`)
+    logWarning('failed to parse config file', { path, error: msg })
     return {}
   }
 }
@@ -224,13 +225,13 @@ function migrateV1Config(raw: Record<string, unknown>): Record<string, unknown> 
 function loadEnvOverrides(): Record<string, unknown> {
   const env: Record<string, unknown> = {}
 
-  if (process.env.ARMATURE_PROVIDER) env.defaultProvider = process.env.ARMATURE_PROVIDER
-  if (process.env.ARMATURE_MODEL) env.defaultModel = process.env.ARMATURE_MODEL
-  if (process.env.ARMATURE_MAX_TURNS) env.maxTurns = parseInt(process.env.ARMATURE_MAX_TURNS, 10)
-  if (process.env.ARMATURE_MAX_BUDGET) env.maxBudgetUsd = parseFloat(process.env.ARMATURE_MAX_BUDGET)
-  if (process.env.ARMATURE_PERMISSION_MODE) env.permissionMode = process.env.ARMATURE_PERMISSION_MODE
-  if (process.env.ARMATURE_SYSTEM_PROMPT) env.systemPrompt = process.env.ARMATURE_SYSTEM_PROMPT
-  if (process.env.ARMATURE_BASE_URL) env.baseURL = process.env.ARMATURE_BASE_URL
+  if (process.env.ORCA_PROVIDER) env.defaultProvider = process.env.ORCA_PROVIDER
+  if (process.env.ORCA_MODEL) env.defaultModel = process.env.ORCA_MODEL
+  if (process.env.ORCA_MAX_TURNS) env.maxTurns = parseInt(process.env.ORCA_MAX_TURNS, 10)
+  if (process.env.ORCA_MAX_BUDGET) env.maxBudgetUsd = parseFloat(process.env.ORCA_MAX_BUDGET)
+  if (process.env.ORCA_PERMISSION_MODE) env.permissionMode = process.env.ORCA_PERMISSION_MODE
+  if (process.env.ORCA_SYSTEM_PROMPT) env.systemPrompt = process.env.ORCA_SYSTEM_PROMPT
+  if (process.env.ORCA_BASE_URL) env.baseURL = process.env.ORCA_BASE_URL
 
   return env
 }
@@ -239,14 +240,14 @@ function loadEnvOverrides(): Record<string, unknown> {
 
 export interface ResolveConfigOptions {
   cwd?: string
-  flags?: Partial<ForgeConfig>
+  flags?: Partial<OrcaConfig>
 }
 
 /**
  * Resolve configuration from all three tiers.
  * Priority: flags > env > project > global > defaults
  */
-export function resolveConfig(options: ResolveConfigOptions = {}): ForgeConfig {
+export function resolveConfig(options: ResolveConfigOptions = {}): OrcaConfig {
   const { cwd = process.cwd(), flags = {} } = options
 
   const global = migrateV1Config(loadGlobalConfig())
@@ -288,7 +289,7 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ForgeConfig {
   }
 
   try {
-    return ForgeConfigSchema.parse(merged)
+    return OrcaConfigSchema.parse(merged)
   } catch (err) {
     if (err instanceof z.ZodError) {
       const issues = err.issues.map(i => `  - ${i.path.join('.')}: ${i.message}`).join('\n')
@@ -345,9 +346,9 @@ export function initProjectConfig(cwd: string): string {
  *   3. If no configured provider has a key, scan well-known env vars
  *   4. Fill in defaults from WELL_KNOWN_PROVIDERS
  *
- * The sdkProvider is always 'openai' — Forge uses a single SDK.
+ * The sdkProvider is always 'openai' — Orca uses a single SDK.
  */
-export function resolveProvider(config: ForgeConfig): {
+export function resolveProvider(config: OrcaConfig): {
   provider: string
   apiKey: string
   model: string
@@ -361,18 +362,18 @@ export function resolveProvider(config: ForgeConfig): {
   const providerConfig = config.providers[providerId] || {}
   const wellKnown = WELL_KNOWN_PROVIDERS[providerId]
 
-  // Resolve apiKey: config (with env template) > well-known env var > v1 compat apiKey > ARMATURE_API_KEY
+  // Resolve apiKey: config (with env template) > well-known env var > v1 compat apiKey > ORCA_API_KEY
   const apiKey =
     resolveEnvTemplate(providerConfig.apiKey) ||
     (wellKnown ? process.env[wellKnown.envKey] : undefined) ||
     config.apiKey ||  // v1 compat: flat apiKey from flags
-    process.env.ARMATURE_API_KEY
+    process.env.ORCA_API_KEY
 
   if (!apiKey) {
     const envHint = wellKnown ? wellKnown.envKey : `${providerId.toUpperCase()}_API_KEY`
     throw new Error(
       `No API key for provider "${providerId}". ` +
-      `Set ${envHint}, or configure providers.${providerId}.apiKey in ~/.armature/config.json`
+      `Set ${envHint}, or configure providers.${providerId}.apiKey in ~/.orca/config.json`
     )
   }
 
@@ -389,7 +390,7 @@ export function resolveProvider(config: ForgeConfig): {
     resolveEnvTemplate(providerConfig.baseURL) ||
     (wellKnown ? wellKnown.baseURL : undefined)
 
-  // Forge always uses OpenAI-compatible protocol
+  // Orca always uses OpenAI-compatible protocol
   const sdkProvider = 'openai' as const
 
   return { provider: providerId, apiKey, model, baseURL, sdkProvider }
@@ -402,7 +403,7 @@ export function resolveProvider(config: ForgeConfig): {
  *   1. Configured providers with resolvable apiKey (in config order)
  *   2. Well-known env vars (anthropic > openai > google > poe)
  */
-function detectProvider(config: ForgeConfig): string {
+function detectProvider(config: OrcaConfig): string {
   // Check model name hint first (v2 defaultModel or v1 compat model)
   const modelHint = config.defaultModel || config.model
   if (modelHint) {
@@ -432,7 +433,7 @@ function detectProvider(config: ForgeConfig): string {
   return 'anthropic' // ultimate default
 }
 
-// ── Provider Listing (for `forge providers` command) ────────────────
+// ── Provider Listing (for `orca providers` command) ────────────────
 
 export interface ProviderInfo {
   id: string
@@ -446,7 +447,7 @@ export interface ProviderInfo {
 /**
  * List all available providers (configured + well-known with env keys).
  */
-export function listProviders(config: ForgeConfig): ProviderInfo[] {
+export function listProviders(config: OrcaConfig): ProviderInfo[] {
   const result: ProviderInfo[] = []
   const seen = new Set<string>()
 
@@ -533,7 +534,7 @@ function detectProviderForModel(model: string): string | undefined {
  */
 export function resolveModelEndpoint(
   model: string,
-  config: ForgeConfig,
+  config: OrcaConfig,
   aggregatorId?: string,
 ): ModelEndpoint | null {
   // Path 1: Aggregator available — use it for everything
@@ -576,7 +577,7 @@ export function resolveModelEndpoint(
  * Find the best aggregator provider from config, or undefined if none available.
  * Checks multiModel.provider first, then scans for any enabled aggregator with a key.
  */
-export function findAggregator(config: ForgeConfig): string | undefined {
+export function findAggregator(config: OrcaConfig): string | undefined {
   // Explicit multiModel.provider — must be a true aggregator (aggregator: true)
   const explicit = config.multiModel?.provider
   if (explicit) {

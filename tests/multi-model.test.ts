@@ -1,6 +1,6 @@
 /**
  * Round 9: Multi-Model Collaboration — 11 tests
- * SOTA Dimension D4: Council/Race/Pipeline (Forge-unique feature)
+ * SOTA Dimension D4: Council/Race/Pipeline (Orca-unique feature)
  *
  * Tests the multi-model collaboration engine that no single-vendor
  * CLI can offer. Uses vi.mock to intercept chatOnce API calls.

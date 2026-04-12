@@ -1,8 +1,8 @@
 /**
  * Persistent usage tracking with Node.js built-in SQLite.
  *
- * Stores every API call's token/cost/duration data in ~/.armature/usage.db.
- * Used by `forge stats` and the session summary.
+ * Stores every API call's token/cost/duration data in ~/.orca/usage.db.
+ * Used by `orca stats` and the session summary.
  *
  * Zero external dependencies — uses node:sqlite (Node 22+).
  */

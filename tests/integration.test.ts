@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { execSync } from 'node:child_process'
 
-const testDir = join(tmpdir(), `forge-integ-${Date.now()}`)
+const testDir = join(tmpdir(), `orca-integ-${Date.now()}`)
 
 beforeAll(() => {
   mkdirSync(join(testDir, 'src'), { recursive: true })

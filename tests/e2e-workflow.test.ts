@@ -15,7 +15,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { execSync } from 'node:child_process'
 
-const testDir = join(tmpdir(), `forge-e2e-${Date.now()}`)
+const testDir = join(tmpdir(), `orca-e2e-${Date.now()}`)
 
 beforeAll(() => {
   mkdirSync(join(testDir, 'src'), { recursive: true })
@@ -131,7 +131,7 @@ describe('StreamMarkdown renderer', () => {
   it('8.7 JSON highlighting — keys and values colored', () => {
     const out = capture(sm => {
       sm.push('```json\n')
-      sm.push('{"name": "forge", "active": true}\n')
+      sm.push('{"name": "orca", "active": true}\n')
       sm.push('```\n')
     })
     // Keys should be cyan, strings green, booleans yellow

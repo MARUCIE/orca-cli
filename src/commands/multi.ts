@@ -1,5 +1,5 @@
 /**
- * `forge council` / `forge race` / `forge pipeline`
+ * `orca council` / `orca race` / `orca pipeline`
  *
  * Multi-model collaboration commands — the feature no single-vendor CLI can have.
  *
@@ -8,13 +8,13 @@
  *   - No aggregator: each model routes to its direct provider (Anthropic/OpenAI/Google)
  *
  * Usage:
- *   forge council "should we use SQL or NoSQL?"           # 3 models + judge
- *   forge race "write a CSV parser"                       # first model wins
- *   forge pipeline "build a REST API"                     # plan→code→review
+ *   orca council "should we use SQL or NoSQL?"           # 3 models + judge
+ *   orca race "write a CSV parser"                       # first model wins
+ *   orca pipeline "build a REST API"                     # plan→code→review
  */
 
 import { Command } from 'commander'
-import { resolveConfig, resolveModelEndpoint, findAggregator, type ForgeConfig } from '../config.js'
+import { resolveConfig, resolveModelEndpoint, findAggregator, type OrcaConfig } from '../config.js'
 import { printError } from '../output.js'
 import { runCouncil, runRace, runPipeline, pickDiverseModels } from '../multi-model.js'
 import { StreamMarkdown } from '../markdown.js'
@@ -56,7 +56,7 @@ export function createCouncilCommand(): Command {
         if (!testEndpoint) {
           printError(
             `Cannot route model "${models[0]}". Configure an aggregator (Poe/OpenRouter) or direct provider API keys.\n` +
-            `  forge council -p poe "..."      (aggregator)\n` +
+            `  orca council -p poe "..."      (aggregator)\n` +
             `  Set ANTHROPIC_API_KEY + OPENAI_API_KEY for direct routing`
           )
           process.exit(1)
@@ -260,15 +260,15 @@ export function createPipelineCommand(): Command {
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-function buildMultiFlags(opts: { provider?: string; apiKey?: string }): Partial<ForgeConfig> {
-  const flags: Partial<ForgeConfig> = {}
-  if (opts.provider) flags.provider = opts.provider as ForgeConfig['provider']
+function buildMultiFlags(opts: { provider?: string; apiKey?: string }): Partial<OrcaConfig> {
+  const flags: Partial<OrcaConfig> = {}
+  if (opts.provider) flags.provider = opts.provider as OrcaConfig['provider']
   if (opts.apiKey) flags.apiKey = opts.apiKey
   return flags
 }
 
 /** Get model list from a specific or default provider (fallback when no aggregator) */
-function getSingleProviderModels(config: ForgeConfig, overrideProviderId?: string): string[] | undefined {
+function getSingleProviderModels(config: OrcaConfig, overrideProviderId?: string): string[] | undefined {
   if (overrideProviderId) return config.providers[overrideProviderId]?.models
   const defaultId = config.defaultProvider === 'auto' ? undefined : config.defaultProvider
   if (defaultId) return config.providers[defaultId]?.models

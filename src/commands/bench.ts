@@ -1,14 +1,14 @@
 /**
- * `forge bench` — Self-evaluation benchmark runner.
+ * `orca bench` — Self-evaluation benchmark runner.
  *
  * Runs standardized coding scenarios and reports pass/fail + score.
  * This is the SOTA capability that makes the agent self-evaluating:
- * run `forge bench` after any change to verify agent quality.
+ * run `orca bench` after any change to verify agent quality.
  *
  * Usage:
- *   forge bench            — run all 5 scenarios
- *   forge bench --quick    — run easy scenarios only (2 tasks)
- *   forge bench --json     — output results as JSON
+ *   orca bench            — run all 5 scenarios
+ *   orca bench --quick    — run easy scenarios only (2 tasks)
+ *   orca bench --json     — output results as JSON
  */
 
 import { Command } from 'commander'
@@ -31,7 +31,7 @@ export function createBenchCommand(): Command {
     .option('--json', 'Output results as JSON')
     .option('--keep', 'Keep temp directory after run (for debugging)')
     .action(async (opts: { quick?: boolean; json?: boolean; keep?: boolean }) => {
-      const baseDir = join(tmpdir(), `forge-bench-${Date.now()}`)
+      const baseDir = join(tmpdir(), `orca-bench-${Date.now()}`)
       mkdirSync(baseDir, { recursive: true })
 
       const scenarios = opts.quick
@@ -40,7 +40,7 @@ export function createBenchCommand(): Command {
 
       if (!opts.json) {
         console.log()
-        console.log(`${CYAN}${BOLD}  Forge Benchmark${RESET}`)
+        console.log(`${CYAN}${BOLD}  Orca Benchmark${RESET}`)
         console.log(`${DIM}  ${scenarios.length} scenarios · ${opts.quick ? 'quick' : 'full'} suite${RESET}`)
         console.log()
       }

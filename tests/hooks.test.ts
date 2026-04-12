@@ -10,24 +10,28 @@ import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const testDir = join(tmpdir(), `forge-hooks-${Date.now()}`)
+const testDir = join(tmpdir(), `orca-hooks-${Date.now()}`)
+const previousHome = process.env.HOME
 
 beforeAll(() => {
-  mkdirSync(join(testDir, '.armature'), { recursive: true })
+  process.env.HOME = testDir
+  mkdirSync(join(testDir, '.orca'), { recursive: true })
   mkdirSync(join(testDir, '.claude'), { recursive: true })
 })
 
 afterAll(() => {
+  if (previousHome === undefined) delete process.env.HOME
+  else process.env.HOME = previousHome
   try { rmSync(testDir, { recursive: true, force: true }) } catch { /* ignore */ }
 })
 
 // ── Config Loading ──────────────────────────────────────────────
 
 describe('Hook config loading', () => {
-  it('5.1 loads hooks from .armature/hooks.json', () => {
-    const dir = join(testDir, 'armature-hooks')
-    mkdirSync(join(dir, '.armature'), { recursive: true })
-    writeFileSync(join(dir, '.armature', 'hooks.json'), JSON.stringify({
+  it('5.1 loads hooks from .orca/hooks.json', () => {
+    const dir = join(testDir, 'orca-hooks')
+    mkdirSync(join(dir, '.orca'), { recursive: true })
+    writeFileSync(join(dir, '.orca', 'hooks.json'), JSON.stringify({
       PreToolUse: [{ command: 'echo ok', matcher: 'run_command' }],
     }))
 
@@ -37,10 +41,10 @@ describe('Hook config loading', () => {
     expect(manager.totalHooks).toBe(1)
   })
 
-  it('5.2 loads hooks from .armature.json (nested hooks key)', () => {
-    const dir = join(testDir, 'armature-json')
+  it('5.2 loads hooks from .orca.json (nested hooks key)', () => {
+    const dir = join(testDir, 'orca-json')
     mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, '.armature.json'), JSON.stringify({
+    writeFileSync(join(dir, '.orca.json'), JSON.stringify({
       hooks: {
         SessionStart: [{ command: 'echo startup' }],
         SessionEnd: [{ command: 'echo shutdown' }],
@@ -73,9 +77,9 @@ describe('Hook config loading', () => {
 describe('Hook execution', () => {
   it('5.4 PreToolUse receives tool name and input as JSON stdin', async () => {
     const dir = join(testDir, 'pre-tool-input')
-    mkdirSync(join(dir, '.armature'), { recursive: true })
+    mkdirSync(join(dir, '.orca'), { recursive: true })
     // Hook script reads stdin JSON and echoes the tool name from it
-    writeFileSync(join(dir, '.armature', 'hooks.json'), JSON.stringify({
+    writeFileSync(join(dir, '.orca', 'hooks.json'), JSON.stringify({
       PreToolUse: [{
         command: 'cat | python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({\'continue\':True,\'additionalContext\':d.get(\'toolName\',\'\')}))"',
         matcher: '.*',
@@ -96,8 +100,8 @@ describe('Hook execution', () => {
 
   it('5.5 PreToolUse non-zero exit blocks tool execution', async () => {
     const dir = join(testDir, 'pre-tool-block')
-    mkdirSync(join(dir, '.armature'), { recursive: true })
-    writeFileSync(join(dir, '.armature', 'hooks.json'), JSON.stringify({
+    mkdirSync(join(dir, '.orca'), { recursive: true })
+    writeFileSync(join(dir, '.orca', 'hooks.json'), JSON.stringify({
       PreToolUse: [{
         command: 'echo "BLOCKED: dangerous operation" >&2 && exit 1',
         matcher: 'run_command',
@@ -119,8 +123,8 @@ describe('Hook execution', () => {
 
   it('5.6 PostToolUse receives tool result', async () => {
     const dir = join(testDir, 'post-tool')
-    mkdirSync(join(dir, '.armature'), { recursive: true })
-    writeFileSync(join(dir, '.armature', 'hooks.json'), JSON.stringify({
+    mkdirSync(join(dir, '.orca'), { recursive: true })
+    writeFileSync(join(dir, '.orca', 'hooks.json'), JSON.stringify({
       PostToolUse: [{
         command: 'cat | python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({\'continue\':True,\'additionalContext\':\'success=\'+str(d.get(\'toolSuccess\',\'\'))}))"',
         matcher: '.*',
@@ -142,8 +146,8 @@ describe('Hook execution', () => {
 
   it('5.7 SessionStart hook fires and returns context', async () => {
     const dir = join(testDir, 'session-start')
-    mkdirSync(join(dir, '.armature'), { recursive: true })
-    writeFileSync(join(dir, '.armature', 'hooks.json'), JSON.stringify({
+    mkdirSync(join(dir, '.orca'), { recursive: true })
+    writeFileSync(join(dir, '.orca', 'hooks.json'), JSON.stringify({
       SessionStart: [{ command: 'echo "Session initialized"' }],
     }))
 
@@ -159,8 +163,8 @@ describe('Hook execution', () => {
 
   it('5.8 SessionEnd hook fires on clean exit', async () => {
     const dir = join(testDir, 'session-end')
-    mkdirSync(join(dir, '.armature'), { recursive: true })
-    writeFileSync(join(dir, '.armature', 'hooks.json'), JSON.stringify({
+    mkdirSync(join(dir, '.orca'), { recursive: true })
+    writeFileSync(join(dir, '.orca', 'hooks.json'), JSON.stringify({
       SessionEnd: [{ command: 'echo "Goodbye"' }],
     }))
 
@@ -180,8 +184,8 @@ describe('Hook execution', () => {
 describe('Hook matching and env vars', () => {
   it('5.9 Matcher regex filters tool-specific hooks', async () => {
     const dir = join(testDir, 'matcher')
-    mkdirSync(join(dir, '.armature'), { recursive: true })
-    writeFileSync(join(dir, '.armature', 'hooks.json'), JSON.stringify({
+    mkdirSync(join(dir, '.orca'), { recursive: true })
+    writeFileSync(join(dir, '.orca', 'hooks.json'), JSON.stringify({
       PreToolUse: [{
         command: 'echo "should not fire" && exit 1',
         matcher: 'delete_file',  // only matches delete_file
@@ -201,12 +205,12 @@ describe('Hook matching and env vars', () => {
     expect(result.decision).not.toBe('block')
   })
 
-  it('5.10 Env vars FORGE_HOOK_EVENT and FORGE_HOOK_TOOL are set', async () => {
+  it('5.10 Env vars ORCA_HOOK_EVENT and ORCA_HOOK_TOOL are set', async () => {
     const dir = join(testDir, 'env-vars')
-    mkdirSync(join(dir, '.armature'), { recursive: true })
-    writeFileSync(join(dir, '.armature', 'hooks.json'), JSON.stringify({
+    mkdirSync(join(dir, '.orca'), { recursive: true })
+    writeFileSync(join(dir, '.orca', 'hooks.json'), JSON.stringify({
       PreToolUse: [{
-        command: 'echo "$FORGE_HOOK_EVENT:$FORGE_HOOK_TOOL"',
+        command: 'echo "$ORCA_HOOK_EVENT:$ORCA_HOOK_TOOL"',
         matcher: '.*',
       }],
     }))
@@ -237,8 +241,8 @@ describe('Hook matching and env vars', () => {
 
   it('5.12 Hook returning JSON result is parsed correctly', async () => {
     const dir = join(testDir, 'json-result')
-    mkdirSync(join(dir, '.armature'), { recursive: true })
-    writeFileSync(join(dir, '.armature', 'hooks.json'), JSON.stringify({
+    mkdirSync(join(dir, '.orca'), { recursive: true })
+    writeFileSync(join(dir, '.orca', 'hooks.json'), JSON.stringify({
       UserPromptSubmit: [{
         command: 'echo \'{"continue": true, "systemMessage": "context injected"}\'',
       }],
@@ -278,12 +282,12 @@ describe('Safety system', () => {
     ]
     // Create a config with all 8 events
     const dir = join(testDir, 'all-events')
-    mkdirSync(join(dir, '.armature'), { recursive: true })
+    mkdirSync(join(dir, '.orca'), { recursive: true })
     const config: Record<string, unknown[]> = {}
     for (const e of events) {
       config[e] = [{ command: 'echo ok' }]
     }
-    writeFileSync(join(dir, '.armature', 'hooks.json'), JSON.stringify(config))
+    writeFileSync(join(dir, '.orca', 'hooks.json'), JSON.stringify(config))
 
     const manager = new HookManager()
     manager.load(dir)

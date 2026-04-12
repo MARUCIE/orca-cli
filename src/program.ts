@@ -1,5 +1,5 @@
 /**
- * Forge CLI program assembly.
+ * Orca CLI program assembly.
  *
  * Creates the Commander program with all subcommands registered.
  */
@@ -7,9 +7,11 @@
 import { Command } from 'commander'
 import { createInitCommand } from './commands/init.js'
 import { createChatCommand } from './commands/chat.js'
+import { createDoctorCommand } from './commands/doctor.js'
 import { createRunCommand } from './commands/run.js'
 import { createCouncilCommand, createRaceCommand, createPipelineCommand } from './commands/multi.js'
 import { createBenchCommand } from './commands/bench.js'
+import { createLogsCommand } from './commands/logs.js'
 import { createProvidersCommand } from './commands/providers.js'
 import { createStatsCommand } from './commands/stats.js'
 import { createSessionCommand } from './commands/session.js'
@@ -18,19 +20,21 @@ import { createServeCommand } from './commands/serve.js'
 
 export function createProgram(): Command {
   const program = new Command()
-    .name('forge')
+    .name('orca')
     .version('0.2.0')
     .enablePositionalOptions()
     .passThroughOptions()
     .description(
-      'Forge — provider-neutral agent runtime. 41 tools · 11 models · multi-model collaboration.\n\n' +
+      'Orca — provider-neutral agent runtime. 41 tools · 11 models · multi-model collaboration.\n\n' +
       'Commands:\n' +
       '  chat              Interactive REPL or one-shot query\n' +
+      '  doctor            Run local Orca diagnostics\n' +
       '  run               Execute an agent task\n' +
       '  council           Ask N models, judge synthesizes (multi-model)\n' +
       '  race              First model to answer wins (speed race)\n' +
       '  pipeline           Plan → Code → Review chain across models\n' +
       '  bench             Run agent benchmark (self-evaluation)\n' +
+      '  logs              Show local Orca runtime logs\n' +
       '  stats             Token usage and cost statistics\n' +
       '  session           Manage saved sessions\n' +
       '  pr                Checkout a GitHub PR and review it\n' +
@@ -40,12 +44,14 @@ export function createProgram(): Command {
     )
 
   program.addCommand(createChatCommand())
+  program.addCommand(createDoctorCommand())
   program.addCommand(createRunCommand())
   program.addCommand(createCouncilCommand())
   program.addCommand(createRaceCommand())
   program.addCommand(createPipelineCommand())
   program.addCommand(createInitCommand())
   program.addCommand(createBenchCommand())
+  program.addCommand(createLogsCommand())
   program.addCommand(createProvidersCommand())
   program.addCommand(createStatsCommand())
   program.addCommand(createSessionCommand())
@@ -60,8 +66,8 @@ export function createProgram(): Command {
   program.option('--safe', 'Enable permission prompts')
   program.option('--effort <level>', 'Thinking effort: low, medium, high, max')
   program.action(async (prompt: string[], opts: Record<string, string | boolean | undefined>) => {
-    // Delegate to chat command: forge "prompt" → forge chat "prompt"
-    const args = ['node', 'forge', 'chat']
+    // Delegate to chat command: orca "prompt" → orca chat "prompt"
+    const args = ['node', 'orca', 'chat']
     if (prompt.length > 0) args.push(prompt.join(' '))
     if (opts.model) args.push('-m', String(opts.model))
     if (opts.provider) args.push('-p', String(opts.provider))

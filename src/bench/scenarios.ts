@@ -572,7 +572,7 @@ export function warn(message: string): void { log('warn', message) }
         path: 'src/config.ts',
         content: `export const config = {
   logLevel: process.env.LOG_LEVEL || 'info',
-  appName: 'forge-app',
+  appName: 'orca-app',
   version: '1.0.0',
 }
 `,

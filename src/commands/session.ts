@@ -1,10 +1,10 @@
 /**
- * `forge session` — Session management.
+ * `orca session` — Session management.
  *
  * Usage:
- *   forge session list          List saved sessions
- *   forge session show <id>     Show session details
- *   forge session delete <id>   Delete a session
+ *   orca session list          List saved sessions
+ *   orca session show <id>     Show session details
+ *   orca session delete <id>   Delete a session
  */
 
 import { Command } from 'commander'
@@ -12,7 +12,7 @@ import { readdirSync, readFileSync, unlinkSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 
-const SESSIONS_DIR = join(homedir(), '.armature', 'sessions')
+const SESSIONS_DIR = join(homedir(), '.orca', 'sessions')
 
 interface SavedSession {
   model: string
@@ -45,7 +45,7 @@ function loadSession(path: string): SavedSession | null {
 }
 
 /**
- * Get the most recent session for `forge -c` continuation.
+ * Get the most recent session for `orca -c` continuation.
  */
 export function getLastSession(): { name: string; session: SavedSession } | null {
   const files = listSessionFiles()
@@ -102,13 +102,13 @@ export function createSessionCommand(): Command {
       }
 
       console.log()
-      console.log(`  \x1b[90m${files.length} session(s) · Continue last: forge -c\x1b[0m`)
+      console.log(`  \x1b[90m${files.length} session(s) · Continue last: orca -c\x1b[0m`)
       console.log()
     })
 
   // Default action: same as list
   cmd.action(async () => {
-    await cmd.parseAsync(['node', 'forge', 'session', 'list'])
+    await cmd.parseAsync(['node', 'orca', 'session', 'list'])
   })
 
   cmd.command('show')

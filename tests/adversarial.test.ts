@@ -15,7 +15,7 @@ import { writeFileSync, mkdirSync, rmSync, readFileSync, symlinkSync, existsSync
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const testDir = join(tmpdir(), `forge-adversarial-${Date.now()}`)
+const testDir = join(tmpdir(), `orca-adversarial-${Date.now()}`)
 
 beforeAll(() => {
   mkdirSync(join(testDir, 'safe'), { recursive: true })

@@ -1,0 +1,181 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Forge CLI System Architecture</title><style>:root { --primary:#003a70; --accent:#0077c8; --gold:#c4a35a; --bg:#f4f6f9; --card:#ffffff; --text:#172033; --muted:#4b5b73; --border:#d8e1eb; --code-bg:#0f1c2e; --code-text:#e8eef8; --shadow:0 10px 30px rgba(0,58,112,0.08); } * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); line-height:1.7; } header { background:linear-gradient(135deg,#003a70,#001f3f); color:#fff; padding:56px 24px 40px; } header h1 { margin:0 0 10px; font-size:clamp(28px,5vw,44px); } header p { margin:0; color:rgba(255,255,255,0.78); } .shell { max-width:1280px; margin:-24px auto 48px; padding:0 24px; display:grid; grid-template-columns:minmax(0,1fr); gap:20px; } .toc { background:rgba(255,255,255,0.9); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); padding:20px; position:sticky; top:16px; height:fit-content; } .toc-title { font-size:12px; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); margin-bottom:12px; font-weight:700; } .toc a { display:block; color:var(--primary); text-decoration:none; padding:6px 0; font-size:14px; } .content { background:var(--card); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow); padding:32px; min-width:0; } .content h1:first-child { display:none; } .content h2 { color:var(--primary); margin-top:36px; scroll-margin-top:24px; } .content h3 { color:var(--accent); margin-top:28px; scroll-margin-top:24px; } .content p, .content li { color:var(--text); } .content code { background:rgba(15,28,46,0.08); padding:0.1em 0.35em; border-radius:6px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:0.92em; } .content pre { background:var(--code-bg); color:var(--code-text); padding:18px; border-radius:14px; overflow:auto; } .content pre code { background:transparent; color:inherit; padding:0; } .content table { width:100%; border-collapse:collapse; margin:16px 0 24px; display:block; overflow-x:auto; } .content th, .content td { border:1px solid var(--border); padding:10px 12px; text-align:left; vertical-align:top; min-width:120px; } .content th { background:#eef5fb; color:var(--primary); } .content blockquote { margin:16px 0; padding:12px 16px; border-left:4px solid var(--gold); background:#f8fbfe; color:var(--muted); } @media (min-width:1080px) { .shell { grid-template-columns:260px minmax(0,1fr); } } @media (max-width:1079px) { .toc { position:static; } }</style></head><body><header><h1>Forge CLI System Architecture</h1><p>Canonical Markdown source rendered as a single-file offline HTML companion.</p></header><main class="shell"><aside class="toc"><div class="toc-title">Sections</div><a href="#architecture-summary">Architecture Summary</a><a href="#high-level-diagram">High-Level Diagram</a><a href="#layer-breakdown">Layer Breakdown</a><a href="#command-surface-map">Command Surface Map</a><a href="#route-page-map">Route / Page Map</a><a href="#legacy-documentation-cross-references">Legacy Documentation Cross-References</a></aside><article class="content markdown-body"><h1>Forge CLI System Architecture</h1>
+<!-- AI-FLEET:PROJECT_DIR:START -->
+<ul>
+<li><code>PROJECT_DIR</code>: <code>/Users/mauricewen/Projects/MARUCIE-forge-cli</code></li>
+</ul>
+<!-- AI-FLEET:PROJECT_DIR:END -->
+
+<h2 id="architecture-summary">Architecture Summary</h2>
+<p>Forge CLI is a TypeScript ESM CLI product composed of a terminal entry layer, command layer, runtime/config layer, provider bridge, and test/verification layer. It is a CLI runtime, so the primary surface is command invocation and streaming terminal output rather than browser routes.</p>
+<h2 id="high-level-diagram">High-Level Diagram</h2>
+<pre><code class="language-mermaid">flowchart TD
+  User[Developer in Terminal]
+  Bin[src/bin/forge.ts]
+  Program[src/program.ts]
+  Commands[src/commands/*.ts]
+  Runtime[src/commands/chat.ts&lt;br/&gt;src/commands/run.ts]
+  Doctor[src/doctor.ts]
+  Multi[src/multi-model.ts]
+  ModelCatalog[src/model-catalog.ts]
+  Config[src/config.ts]
+  Provider[src/providers/openai-compat.ts]
+  Tools[src/tools.ts]
+  BgJobs[src/background-jobs.ts]
+  Logger[src/logger.ts]
+  Hooks[src/hooks.ts]
+  Usage[src/usage-db.ts]
+  Output[src/output.ts&lt;br/&gt;src/markdown.ts]
+  Tests[tests/*.test.ts]
+
+  User --&gt; Bin --&gt; Program --&gt; Commands
+  Commands --&gt; Runtime
+  Commands --&gt; Doctor
+  Commands --&gt; Multi
+  Commands --&gt; ModelCatalog
+  Runtime --&gt; Config
+  Multi --&gt; Config
+  Runtime --&gt; Provider
+  Multi --&gt; Provider
+  Runtime --&gt; Tools
+  Runtime --&gt; BgJobs
+  Runtime --&gt; Logger
+  Runtime --&gt; Hooks
+  Runtime --&gt; Usage
+  Runtime --&gt; Output
+  Tests --&gt; Commands
+  Tests --&gt; Multi
+  Tests --&gt; Hooks
+  Tests --&gt; Provider
+  Tests --&gt; Tools
+</code></pre>
+<h2 id="layer-breakdown">Layer Breakdown</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Files</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Entry</td>
+<td><code>src/bin/forge.ts</code></td>
+<td>Shell entry point and signal handling</td>
+</tr>
+<tr>
+<td>Command assembly</td>
+<td><code>src/program.ts</code></td>
+<td>Registers commands and default prompt passthrough</td>
+</tr>
+<tr>
+<td>Command modules</td>
+<td><code>src/commands/*.ts</code></td>
+<td>User-facing CLI flows (<code>chat</code>, <code>run</code>, <code>multi</code>, <code>bench</code>, <code>providers</code>, <code>stats</code>, <code>session</code>, <code>pr</code>, <code>serve</code>, <code>init</code>)</td>
+</tr>
+<tr>
+<td>Runtime/config</td>
+<td><code>src/config.ts</code>, <code>src/context.ts</code>, <code>src/system-prompt.ts</code>, <code>src/token-budget.ts</code>, <code>src/model-catalog.ts</code>, <code>src/doctor.ts</code></td>
+<td>Resolve providers, model metadata, runtime diagnostics, context, prompts, and runtime limits</td>
+</tr>
+<tr>
+<td>Provider bridge</td>
+<td><code>src/providers/openai-compat.ts</code></td>
+<td>Provider-neutral transport and model interaction</td>
+</tr>
+<tr>
+<td>Agent runtime</td>
+<td><code>src/tools.ts</code>, <code>src/background-jobs.ts</code>, <code>src/logger.ts</code>, <code>src/hooks.ts</code>, <code>src/mcp-client.ts</code>, <code>src/retry-intelligence.ts</code>, <code>src/auto-verify.ts</code></td>
+<td>Tool execution, detached job tracking, local runtime logging, hooks, MCP, retry behavior, verification helpers</td>
+</tr>
+<tr>
+<td>Presentation</td>
+<td><code>src/output.ts</code>, <code>src/markdown.ts</code>, <code>src/command-picker.ts</code></td>
+<td>Terminal rendering and output formatting</td>
+</tr>
+<tr>
+<td>Persistence</td>
+<td><code>src/usage-db.ts</code></td>
+<td>Persistent usage/cost tracking</td>
+</tr>
+<tr>
+<td>Verification</td>
+<td><code>tests/*.test.ts</code></td>
+<td>Automated verification across tool, runtime, hook, SOTA, and multi-model paths</td>
+</tr>
+</tbody></table>
+<h2 id="command-surface-map">Command Surface Map</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Source File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>forge</code> / <code>forge chat</code></td>
+<td><code>src/commands/chat.ts</code></td>
+<td>Interactive REPL and one-shot prompting</td>
+</tr>
+<tr>
+<td><code>forge run</code></td>
+<td><code>src/commands/run.ts</code></td>
+<td>Agent task execution</td>
+</tr>
+<tr>
+<td><code>forge council</code> / <code>forge race</code> / <code>forge pipeline</code></td>
+<td><code>src/commands/multi.ts</code></td>
+<td>Multi-model collaboration flows</td>
+</tr>
+<tr>
+<td><code>forge bench</code></td>
+<td><code>src/commands/bench.ts</code></td>
+<td>Benchmark and self-evaluation</td>
+</tr>
+<tr>
+<td><code>forge providers</code></td>
+<td><code>src/commands/providers.ts</code></td>
+<td>Provider introspection</td>
+</tr>
+<tr>
+<td><code>forge stats</code></td>
+<td><code>src/commands/stats.ts</code></td>
+<td>Usage/cost reporting</td>
+</tr>
+<tr>
+<td><code>forge session</code></td>
+<td><code>src/commands/session.ts</code></td>
+<td>Session lifecycle</td>
+</tr>
+<tr>
+<td><code>forge pr</code></td>
+<td><code>src/commands/pr.ts</code></td>
+<td>Pull request review workflow</td>
+</tr>
+<tr>
+<td><code>forge serve</code></td>
+<td><code>src/commands/serve.ts</code></td>
+<td>Headless HTTP + SSE runtime</td>
+</tr>
+<tr>
+<td><code>forge init</code></td>
+<td><code>src/commands/init.ts</code></td>
+<td>Local configuration bootstrap</td>
+</tr>
+</tbody></table>
+<h2 id="route-page-map">Route / Page Map</h2>
+<ul>
+<li>Web routes: <code>N/A</code></li>
+<li>Primary interaction surface: terminal commands and REPL slash-style workflows</li>
+<li>Headless HTTP surface: <code>forge serve</code> (see <code>src/commands/serve.ts</code>)</li>
+<li>Detached job state: <code>~/.armature/background-jobs/</code> or <code>$ARMATURE_HOME/background-jobs/</code></li>
+<li>Runtime logs: <code>~/.armature/logs/</code> or <code>$ARMATURE_HOME/logs/</code></li>
+<li>Serve diagnostics: <code>/health</code>, <code>/providers</code>, <code>/doctor</code></li>
+</ul>
+<h2 id="legacy-documentation-cross-references">Legacy Documentation Cross-References</h2>
+<ul>
+<li><code>doc/THREE_TIER_ARCHITECTURE.md</code>: historical broader ecosystem architecture</li>
+<li><code>doc/MULTI_MODEL_COLLABORATION.md</code>: early collaboration-mode design</li>
+<li><code>doc/SOTA_TEST_PLAN.md</code>: historical hardening plan</li>
+</ul>
+</article></main></body></html>

@@ -1,13 +1,15 @@
 /**
- * `forge providers` — List and test configured providers.
+ * `orca providers` — List and test configured providers.
  *
  * Usage:
- *   forge providers             List all configured providers with status
- *   forge providers test [id]   Test connectivity to a specific provider
+ *   orca providers             List all configured providers with status
+ *   orca providers test [id]   Test connectivity to a specific provider
  */
 
 import { Command } from 'commander'
 import { resolveConfig, listProviders, resolveProvider } from '../config.js'
+import { formatContextWindow, formatPricing, getModelChoice } from '../model-catalog.js'
+import { logInfo, logWarning } from '../logger.js'
 
 export function createProvidersCommand(): Command {
   const cmd = new Command('providers')
@@ -17,6 +19,7 @@ export function createProvidersCommand(): Command {
   cmd.action(async () => {
     const config = resolveConfig({ cwd: process.cwd() })
     const providers = listProviders(config)
+    logInfo('providers listed', { count: providers.length })
 
     // Detect which provider auto-detect would choose
     let activeId: string | undefined
@@ -30,7 +33,7 @@ export function createProvidersCommand(): Command {
     console.log()
 
     if (providers.length === 0) {
-      console.log('  \x1b[90m(none) — configure providers in ~/.armature/config.json\x1b[0m')
+      console.log('  \x1b[90m(none) — configure providers in ~/.orca/config.json\x1b[0m')
       console.log()
       return
     }
@@ -47,22 +50,28 @@ export function createProvidersCommand(): Command {
       const keyStr = p.hasKey
         ? '\x1b[32m  yes \x1b[0m'
         : '\x1b[31m  no  \x1b[0m'
-      const status = p.disabled
-        ? '\x1b[90mdisabled\x1b[0m'
-        : isActive
+      const status = isActive
           ? '\x1b[32mactive\x1b[0m'
+          : p.disabled
+            ? '\x1b[90mdisabled\x1b[0m'
           : p.hasKey
             ? 'ready'
             : '\x1b[90mno key\x1b[0m'
 
       console.log(`  ${idStr} ${modelStr} ${sourceStr} ${keyStr} ${status}`)
+      const choice = getModelChoice(p.model, p.id)
+      const context = formatContextWindow(choice.contextWindow)
+      const pricing = formatPricing(choice.pricing)
+      const caution = choice.note ? ` · caution: ${choice.note}` : ''
+      console.log(`  \x1b[90m${' '.repeat(16)}ctx ${context} · ${pricing}/1M in/out${caution}\x1b[0m`)
+      if (choice.note) logWarning('provider model caution', { provider: p.id, model: p.model, warning: choice.note })
     }
 
     console.log()
     if (activeId) {
       console.log(`  \x1b[90mDefault provider: ${activeId}\x1b[0m`)
     }
-    console.log(`  \x1b[90mConfig: ~/.armature/config.json\x1b[0m`)
+    console.log(`  \x1b[90mConfig: ~/.orca/config.json\x1b[0m`)
     console.log()
   })
 
@@ -89,6 +98,12 @@ export function createProvidersCommand(): Command {
       console.log(`  Testing \x1b[1m${resolved.provider}\x1b[0m ...`)
       console.log(`  \x1b[90mEndpoint: ${resolved.baseURL || '(not set)'}\x1b[0m`)
       console.log(`  \x1b[90mModel: ${resolved.model}\x1b[0m`)
+      const choice = getModelChoice(resolved.model, resolved.provider)
+      console.log(`  \x1b[90mContext: ${formatContextWindow(choice.contextWindow)} · Pricing: ${formatPricing(choice.pricing)} per 1M in/out\x1b[0m`)
+      if (choice.note) {
+        console.log(`  \x1b[33mCaution: ${choice.note}\x1b[0m`)
+        logWarning('provider test caution', { provider: resolved.provider, model: resolved.model, warning: choice.note })
+      }
 
       if (!resolved.baseURL) {
         console.log(`  \x1b[31m  FAIL — no baseURL configured\x1b[0m`)
@@ -112,13 +127,16 @@ export function createProvidersCommand(): Command {
           // 401/403/405 still means the endpoint is reachable
           const reachable = resp.ok ? 'OK' : `reachable (HTTP ${resp.status})`
           console.log(`  \x1b[32m  ${reachable} — ${elapsed}ms\x1b[0m`)
+          logInfo('provider test completed', { provider: resolved.provider, model: resolved.model, status: reachable, elapsedMs: elapsed })
         } else {
           console.log(`  \x1b[31m  HTTP ${resp.status} — ${elapsed}ms\x1b[0m`)
+          logWarning('provider test returned non-ok status', { provider: resolved.provider, model: resolved.model, status: resp.status, elapsedMs: elapsed })
         }
       } catch (err) {
         const elapsed = Date.now() - start
         const msg = err instanceof Error ? err.message : String(err)
         console.log(`  \x1b[31m  FAIL — ${msg} (${elapsed}ms)\x1b[0m`)
+        logWarning('provider test failed', { provider: resolved.provider, model: resolved.model, elapsedMs: elapsed, error: msg })
       }
       console.log()
     })

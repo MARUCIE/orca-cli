@@ -1,5 +1,5 @@
 /**
- * Forge CLI output formatting.
+ * Orca CLI output formatting.
  *
  * Supports two modes:
  *   - streaming (interactive terminal): real-time token output with spinners
@@ -7,26 +7,32 @@
  */
 
 import chalk from 'chalk'
+import { logError, logWarning } from './logger.js'
 
 export type OutputMode = 'streaming' | 'json'
 
 // ── Banner ──────────────────────────────────────────────────────────
 
-const VERSION = '0.1.0'
+const VERSION = '0.2.0'
 
-// Anvil with sparks — the forge where tools are made
-// Each line is padded to exactly 20 visible chars for alignment
-const ART_WIDTH = 20 // visible character width of art column
-const ANVIL_ART = [
-  '\x1b[33m     · ✦ ·\x1b[0m',          //  10 vis chars
-  '\x1b[36m   ▄██████▄\x1b[0m',          //  11 vis chars
-  '\x1b[36m  ██████████\x1b[0m',          //  12 vis chars
-  '\x1b[36m  ▀████████▀\x1b[0m',          //  12 vis chars
-  '\x1b[36m    ██████\x1b[0m',            //  10 vis chars
-  '\x1b[36m   ████████\x1b[0m',           //  11 vis chars
+// Orca — density-gradient whale silhouette (horizontal oval + tail)
+const ART_WIDTH = 38 // visible character width of art column (widest line + gap)
+const ORCA_ART = [
+  '\x1b[36m       ..:::....\x1b[0m',
+  '\x1b[36m    .::------::::..\x1b[0m',
+  '\x1b[36m  .::--========----::::..\x1b[0m',
+  '\x1b[36m.:--==+++*****+++===---::::..\x1b[0m',
+  '\x1b[36m.:-=++**#########**++==---::..\x1b[0m',
+  '\x1b[36m.:-=+*##############*++==--::..\x1b[0m',
+  '\x1b[36m.:-=+*##############*++==-::..\x1b[0m',
+  '\x1b[36m.:-=++**#########**++==---::..\x1b[0m',
+  '\x1b[36m.:--==+++*****+++===---::::..\x1b[0m',
+  '\x1b[36m  .::--========----::::..\x1b[0m',
+  '\x1b[36m    .::------::::..\x1b[0m',
+  '\x1b[36m       ..:::....\x1b[0m',
 ]
 // Visible widths of each art line (excluding ANSI codes)
-const ART_VIS_WIDTHS = [10, 11, 12, 12, 10, 11]
+const ART_VIS_WIDTHS = [16, 22, 28, 32, 33, 34, 33, 33, 32, 28, 22, 16]
 
 // Model context window sizes (for display)
 const MODEL_CONTEXT: Record<string, string> = {
@@ -59,7 +65,7 @@ function abbreviatePath(p: string): string {
 }
 
 /**
- * Rich startup banner with ASCII art anvil, model info, and project context.
+ * Rich startup banner with ASCII art orca, model info, and project context.
  */
 export function printRichBanner(opts: {
   provider: string
@@ -73,22 +79,27 @@ export function printRichBanner(opts: {
   const spec = getModelSpec(model)
   const shortCwd = abbreviatePath(cwd)
 
-  // Build right-side info lines (only name + version + project context)
-  // Model/mode/effort shown in status line — no duplication
+  // Build right-side info lines — aligned to middle of the orca art
   const info: string[] = [
-    '',  // sparks line — no text
-    `\x1b[1;37mForge\x1b[0m  \x1b[90mv${VERSION}\x1b[0m`,
-    `\x1b[90marmature agent runtime\x1b[0m`,
-    '',  // spacer
+    '',  // line 0
+    '',  // line 1
+    '',  // line 2
+    '',  // line 3
+    `\x1b[1;37mOrca\x1b[0m  \x1b[90mv${VERSION}\x1b[0m`,
+    `\x1b[90mprovider-neutral agent runtime\x1b[0m`,
+    '',  // line 6
     `\x1b[36m▸\x1b[0m \x1b[90m${shortCwd}\x1b[0m`,
-    '',
+    '',  // line 8
+    '',  // line 9
+    '',  // line 10
+    '',  // line 11
   ]
 
   // Print art + info side by side with consistent padding
   const pad = ' '.repeat(ART_WIDTH)
   console.log()
-  for (let i = 0; i < ANVIL_ART.length; i++) {
-    const artLine = ANVIL_ART[i]!
+  for (let i = 0; i < ORCA_ART.length; i++) {
+    const artLine = ORCA_ART[i]!
     const visWidth = ART_VIS_WIDTHS[i] || 0
     const gap = ' '.repeat(Math.max(0, ART_WIDTH - visWidth))
     const infoLine = info[i] || ''
@@ -116,8 +127,8 @@ export function printRichBanner(opts: {
 /** Simple banner for non-interactive / one-shot mode */
 export function printBanner(toolCount?: number): void {
   const tools = toolCount ? `${toolCount} tools` : 'multi-model'
-  console.log(chalk.blue.bold(`\n  forge`) + chalk.gray(` v${VERSION}`) + chalk.gray(` — armature agent runtime`))
-  console.log(chalk.gray(`  provider-neutral · ${tools}\n`))
+  console.log(chalk.blue.bold(`\n  orca`) + chalk.gray(` v${VERSION}`) + chalk.gray(` — provider-neutral agent runtime`))
+  console.log(chalk.gray(`  multi-model · ${tools}\n`))
 }
 
 export function printProviderInfo(provider: string, model: string): void {
@@ -144,6 +155,7 @@ export function printProjectContext(cwd: string, configFiles: string[]): void {
 
 export function printError(message: string): void {
   const classified = classifyError(message)
+  logError(classified.message)
   console.error(chalk.red.bold(`  error: `) + chalk.red(classified.message))
   if (classified.suggestion) {
     console.error(chalk.yellow(`  hint: ${classified.suggestion}`))
@@ -151,6 +163,7 @@ export function printError(message: string): void {
 }
 
 export function printWarning(message: string): void {
+  logWarning(message)
   console.error(chalk.yellow.bold('  warn: ') + chalk.yellow(message))
 }
 
@@ -173,7 +186,7 @@ function classifyError(message: string): ClassifiedError {
   if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('invalid api key')) {
     return {
       message,
-      suggestion: 'Check your API key. Set ARMATURE_API_KEY or POE_API_KEY environment variable.',
+      suggestion: 'Check your API key. Set ORCA_API_KEY or POE_API_KEY environment variable.',
     }
   }
   if (lower.includes('429') || lower.includes('rate limit') || lower.includes('too many requests')) {
@@ -382,12 +395,87 @@ export function printStatusLine(info: StatusLineInfo): void {
   // Tokens right-aligned
   const tokenStr = `${info.totalTokens.toLocaleString()} tokens`
 
-  // Left side: ◇ FORGE │ model │ ██░░ 15% │ project git:(branch)
-  const left = `\x1b[36m◇\x1b[0m \x1b[1;37mFORGE\x1b[0m \x1b[90m│\x1b[0m ${modelShort} \x1b[90m│\x1b[0m ${bar} ${pct}% \x1b[90m│\x1b[0m \x1b[36m${project}\x1b[0m${gitPart}`
+  // Left side: ◇ ORCA │ model │ ██░░ 15% │ project git:(branch)
+  const left = `\x1b[36m◇\x1b[0m \x1b[1;37mORCA\x1b[0m \x1b[90m│\x1b[0m ${modelShort} \x1b[90m│\x1b[0m ${bar} ${pct}% \x1b[90m│\x1b[0m \x1b[36m${project}\x1b[0m${gitPart}`
 
   // Print status line
   console.log(`${left}`)
   console.log(`${modeTag} \x1b[90m│\x1b[0m ${effortTag}${' '.repeat(Math.max(0, cols - 45 - tokenStr.length))}\x1b[90m${tokenStr}\x1b[0m`)
+}
+
+// ── Progress Indicator ──────────────────────────────────────────────
+
+function formatElapsed(ms: number): string {
+  const sec = Math.floor(ms / 1000)
+  if (sec < 60) return `${sec}s`
+  const min = Math.floor(sec / 60)
+  const remSec = sec % 60
+  return `${min}m ${remSec}s`
+}
+
+/**
+ * Animated progress indicator during generation.
+ * Shows "Working (Xm Ys · ↓ N tokens • esc to interrupt)" on stderr,
+ * updating in-place without polluting stdout's streaming text.
+ */
+export class ProgressIndicator {
+  private interval: ReturnType<typeof setInterval> | null = null
+  private startTime: number = 0
+  private tokenCount: number = 0
+  private phase: 'thinking' | 'working' = 'thinking'
+  private spinIdx: number = 0
+  private readonly thinkFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+  private lastLineLen: number = 0
+
+  start(): void {
+    this.startTime = Date.now()
+    this.phase = 'thinking'
+    this.spinIdx = 0
+    this.tokenCount = 0
+    this.lastLineLen = 0
+    this.interval = setInterval(() => this.render(), 100)
+  }
+
+  /** Switch from "thinking" to "working" once first token arrives */
+  markWorking(): void {
+    this.phase = 'working'
+  }
+
+  addTokens(n: number): void {
+    this.tokenCount += n
+  }
+
+  private render(): void {
+    const elapsed = formatElapsed(Date.now() - this.startTime)
+    const frame = this.thinkFrames[this.spinIdx % this.thinkFrames.length]!
+    this.spinIdx++
+
+    let line: string
+    if (this.phase === 'thinking') {
+      line = `  ${frame} Thinking... (${elapsed} • esc to interrupt)`
+    } else {
+      const tokStr = this.tokenCount > 0 ? ` · ↓ ${this.tokenCount.toLocaleString()} tokens` : ''
+      line = `  ${frame} Working (${elapsed}${tokStr} • esc to interrupt)`
+    }
+
+    // Write to stderr to avoid polluting stdout's streamed text
+    const clearLen = Math.max(this.lastLineLen, line.length)
+    process.stderr.write(`\r\x1b[90m${line.padEnd(clearLen)}\x1b[0m`)
+    this.lastLineLen = line.length
+  }
+
+  /** Clear the progress line and stop the timer */
+  stop(): { elapsed: number; tokens: number } {
+    if (this.interval) {
+      clearInterval(this.interval)
+      this.interval = null
+    }
+    if (this.lastLineLen > 0) {
+      process.stderr.write(`\r${' '.repeat(this.lastLineLen)}\r`)
+      this.lastLineLen = 0
+    }
+    return { elapsed: Date.now() - this.startTime, tokens: this.tokenCount }
+  }
 }
 
 // ── Streaming Text ──────────────────────────────────────────────────

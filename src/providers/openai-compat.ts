@@ -2,9 +2,13 @@
  * OpenAI-compatible provider for proxy services (Poe, OpenRouter, etc.)
  *
  * Uses the OpenAI SDK to talk to any OpenAI-compatible endpoint.
- * This is used when the forge CLI targets a proxy provider that speaks
+ * This is used when the orca CLI targets a proxy provider that speaks
  * OpenAI protocol but serves multiple model families (Claude, GPT, Gemini).
  */
+
+import { execSync } from 'node:child_process'
+
+import { logWarning } from '../logger.js'
 
 export interface OpenAICompatOptions {
   apiKey: string
@@ -36,19 +40,54 @@ export interface ToolCallbacks {
  * Yields StreamEvent objects for the CLI to render.
  */
 /**
- * Resolve HTTP proxy from environment.
- * macOS system proxy (Surge/Shadowrocket) detected via scutil, but
- * we rely on users setting HTTPS_PROXY or the CLI auto-detecting it.
+ * Resolve HTTP proxy from environment, with macOS system proxy fallback.
+ *
+ * Resolution order:
+ *   1. HTTPS_PROXY / HTTP_PROXY / ALL_PROXY env vars
+ *   2. macOS system proxy via `scutil --proxy` (Surge, Clash, Shadowrocket etc.)
  */
+let _cachedSystemProxy: string | undefined | null = null // null = not checked yet
+
+function detectMacOSSystemProxy(): string | undefined {
+  if (process.platform !== 'darwin') return undefined
+  try {
+    const output = execSync('scutil --proxy 2>/dev/null', { encoding: 'utf-8', timeout: 2000 })
+    // Check HTTPS proxy first, then HTTP
+    const httpsEnabled = /HTTPSEnable\s*:\s*1/.test(output)
+    if (httpsEnabled) {
+      const hostMatch = output.match(/HTTPSProxy\s*:\s*(\S+)/)
+      const portMatch = output.match(/HTTPSPort\s*:\s*(\d+)/)
+      if (hostMatch && portMatch) {
+        return `http://${hostMatch[1]}:${portMatch[1]}`
+      }
+    }
+    const httpEnabled = /HTTPEnable\s*:\s*1/.test(output)
+    if (httpEnabled) {
+      const hostMatch = output.match(/HTTPProxy\s*:\s*(\S+)/)
+      const portMatch = output.match(/HTTPPort\s*:\s*(\d+)/)
+      if (hostMatch && portMatch) {
+        return `http://${hostMatch[1]}:${portMatch[1]}`
+      }
+    }
+  } catch { /* scutil not available or timed out */ }
+  return undefined
+}
+
 function resolveProxy(): string | undefined {
-  return (
+  // Environment variables take priority
+  const envProxy =
     process.env.HTTPS_PROXY ||
     process.env.https_proxy ||
     process.env.HTTP_PROXY ||
     process.env.http_proxy ||
-    process.env.ALL_PROXY ||
-    undefined
-  )
+    process.env.ALL_PROXY
+  if (envProxy) return envProxy
+
+  // Fallback: macOS system proxy (cached after first check)
+  if (_cachedSystemProxy === null) {
+    _cachedSystemProxy = detectMacOSSystemProxy()
+  }
+  return _cachedSystemProxy
 }
 
 /**
@@ -89,6 +128,7 @@ async function createOpenAIClient(apiKey: string, baseURL: string) {
   if (proxyUrl) {
     if (!proxyWarningShown && proxyUrl.startsWith('http://') && baseURL.startsWith('https://')) {
       console.error('\x1b[33m  warn: using HTTP proxy for HTTPS traffic\x1b[0m')
+      logWarning('using HTTP proxy for HTTPS traffic', { proxyUrl, baseURL })
       proxyWarningShown = true
     }
     // OpenAI SDK v6 uses native fetch; we override with proxy-aware fetch
@@ -118,6 +158,7 @@ async function withRateLimitRetry<T>(fn: () => Promise<T>, label?: string): Prom
 
       const delay = Math.pow(2, attempt + 1) * 1000 // 2s, 4s, 8s
       console.error(`\x1b[33m  rate limited${label ? ` (${label})` : ''} — retrying in ${delay / 1000}s (${attempt + 1}/${MAX_RETRIES})\x1b[0m`)
+      logWarning('rate limited, retrying', { label, attempt: attempt + 1, delayMs: delay })
       await new Promise(r => setTimeout(r, delay))
     }
   }
@@ -267,6 +308,21 @@ export async function* streamChat(
         continue
       }
 
+      // Handle terminated — provider cut the response (e.g., Poe API timeout, proxy disconnect)
+      if (finishReason === 'terminated' || finishReason === 'error') {
+        if (round < 3) { // max 3 auto-retries for terminated responses
+          messages.push({ role: 'assistant', content: textContent || '' })
+          messages.push({ role: 'user', content: 'The response was terminated prematurely. Continue from where you left off and complete the task.' })
+          yield { type: 'text', text: `\n[response terminated, retrying (${round + 1}/3)...]\n` }
+          continue
+        }
+        // Exhausted retries — yield what we have and stop
+        yield { type: 'text', text: '\n[response terminated after 3 retries]\n' }
+        yield { type: 'usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens }
+        yield { type: 'done' }
+        return
+      }
+
       // Handle model hitting max_tokens — auto-continue
       if (finishReason === 'length') {
         messages.push({ role: 'assistant', content: textContent || '' })
@@ -297,6 +353,10 @@ export async function* streamChat(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     yield { type: 'error', error: message }
+    // Still yield usage so the caller can track what was consumed
+    if (totalInputTokens > 0 || totalOutputTokens > 0) {
+      yield { type: 'usage', inputTokens: totalInputTokens, outputTokens: totalOutputTokens }
+    }
   }
 }
 

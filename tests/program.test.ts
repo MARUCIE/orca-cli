@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { createProgram } from '../src/program.js'
 
 describe('program', () => {
-  it('creates a program with forge name', () => {
+  it('creates a program with orca name', () => {
     const program = createProgram()
-    expect(program.name()).toBe('forge')
+    expect(program.name()).toBe('orca')
   })
 
   it('has version set', () => {
@@ -24,10 +24,22 @@ describe('program', () => {
     expect(commands).toContain('chat')
   })
 
+  it('registers doctor command', () => {
+    const program = createProgram()
+    const commands = program.commands.map(c => c.name())
+    expect(commands).toContain('doctor')
+  })
+
   it('registers run command', () => {
     const program = createProgram()
     const commands = program.commands.map(c => c.name())
     expect(commands).toContain('run')
+  })
+
+  it('registers logs command', () => {
+    const program = createProgram()
+    const commands = program.commands.map(c => c.name())
+    expect(commands).toContain('logs')
   })
 
   it('chat command has model option', () => {

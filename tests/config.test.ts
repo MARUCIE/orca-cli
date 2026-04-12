@@ -9,11 +9,11 @@ describe('config', () => {
   let tempDir: string
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'forge-test-'))
+    tempDir = mkdtempSync(join(tmpdir(), 'orca-test-'))
   })
 
   afterEach(() => {
-    const configPath = join(tempDir, '.armature.json')
+    const configPath = join(tempDir, '.orca.json')
     if (existsSync(configPath)) {
       unlinkSync(configPath)
     }
@@ -39,30 +39,30 @@ describe('config', () => {
       expect(config.maxTurns).toBe(10)
     })
 
-    it('reads project config from .armature.json', () => {
+    it('reads project config from .orca.json', () => {
       initProjectConfig(tempDir)
       const config = resolveConfig({ cwd: tempDir })
       expect(config.defaultProvider).toBe('auto')
     })
 
     it('env variables override project config', () => {
-      const originalKey = process.env.ARMATURE_PROVIDER
-      process.env.ARMATURE_PROVIDER = 'openai'
+      const originalKey = process.env.ORCA_PROVIDER
+      process.env.ORCA_PROVIDER = 'openai'
       try {
         const config = resolveConfig({ cwd: tempDir })
         expect(config.defaultProvider).toBe('openai')
       } finally {
         if (originalKey) {
-          process.env.ARMATURE_PROVIDER = originalKey
+          process.env.ORCA_PROVIDER = originalKey
         } else {
-          delete process.env.ARMATURE_PROVIDER
+          delete process.env.ORCA_PROVIDER
         }
       }
     })
 
     it('flags override env variables', () => {
-      const originalKey = process.env.ARMATURE_PROVIDER
-      process.env.ARMATURE_PROVIDER = 'openai'
+      const originalKey = process.env.ORCA_PROVIDER
+      process.env.ORCA_PROVIDER = 'openai'
       try {
         const config = resolveConfig({
           cwd: tempDir,
@@ -71,9 +71,9 @@ describe('config', () => {
         expect(config.defaultProvider).toBe('anthropic')
       } finally {
         if (originalKey) {
-          process.env.ARMATURE_PROVIDER = originalKey
+          process.env.ORCA_PROVIDER = originalKey
         } else {
-          delete process.env.ARMATURE_PROVIDER
+          delete process.env.ORCA_PROVIDER
         }
       }
     })
@@ -111,13 +111,13 @@ describe('config', () => {
     it('throws when no API key available', () => {
       // Clear all potential API keys (including POE)
       const saved = {
-        ARMATURE_API_KEY: process.env.ARMATURE_API_KEY,
+        ORCA_API_KEY: process.env.ORCA_API_KEY,
         POE_API_KEY: process.env.POE_API_KEY,
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
         OPENAI_API_KEY: process.env.OPENAI_API_KEY,
         GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
       }
-      delete process.env.ARMATURE_API_KEY
+      delete process.env.ORCA_API_KEY
       delete process.env.POE_API_KEY
       delete process.env.ANTHROPIC_API_KEY
       delete process.env.OPENAI_API_KEY
@@ -149,7 +149,7 @@ describe('config', () => {
   })
 
   describe('initProjectConfig', () => {
-    it('creates .armature.json in target directory', () => {
+    it('creates .orca.json in target directory', () => {
       const path = initProjectConfig(tempDir)
       expect(existsSync(path)).toBe(true)
     })

@@ -19,7 +19,7 @@ import { execSync } from 'node:child_process'
 // ── Project Context Loader ──────────────────────────────────────
 
 describe('Project context: Node/TypeScript detection', () => {
-  const projDir = join(tmpdir(), `forge-ctx-node-${Date.now()}`)
+  const projDir = join(tmpdir(), `orca-ctx-node-${Date.now()}`)
 
   beforeAll(() => {
     mkdirSync(join(projDir, 'src'), { recursive: true })
@@ -111,7 +111,7 @@ describe('Project context: Node/TypeScript detection', () => {
 // ── Smart Output Truncation ─────────────────────────────────────
 
 describe('Smart output truncation', () => {
-  const truncDir = join(tmpdir(), `forge-trunc-${Date.now()}`)
+  const truncDir = join(tmpdir(), `orca-trunc-${Date.now()}`)
 
   beforeAll(() => {
     mkdirSync(join(truncDir, 'src'), { recursive: true })
@@ -153,7 +153,7 @@ describe('Smart output truncation', () => {
 // ── Error Self-Correction Hints ─────────────────────────────────
 
 describe('Error messages include recovery hints', () => {
-  const errDir = join(tmpdir(), `forge-errhint-${Date.now()}`)
+  const errDir = join(tmpdir(), `orca-errhint-${Date.now()}`)
 
   beforeAll(() => {
     mkdirSync(errDir, { recursive: true })

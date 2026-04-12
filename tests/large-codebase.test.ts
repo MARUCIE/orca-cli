@@ -14,7 +14,7 @@ import { writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const testDir = join(tmpdir(), `forge-large-${Date.now()}`)
+const testDir = join(tmpdir(), `orca-large-${Date.now()}`)
 
 beforeAll(() => {
   // Generate a 50+ file realistic project structure

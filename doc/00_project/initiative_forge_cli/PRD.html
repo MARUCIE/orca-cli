@@ -1,0 +1,121 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Forge CLI PRD</title><style>:root { --primary:#003a70; --accent:#0077c8; --gold:#c4a35a; --bg:#f4f6f9; --card:#ffffff; --text:#172033; --muted:#4b5b73; --border:#d8e1eb; --code-bg:#0f1c2e; --code-text:#e8eef8; --shadow:0 10px 30px rgba(0,58,112,0.08); } * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); line-height:1.7; } header { background:linear-gradient(135deg,#003a70,#001f3f); color:#fff; padding:56px 24px 40px; } header h1 { margin:0 0 10px; font-size:clamp(28px,5vw,44px); } header p { margin:0; color:rgba(255,255,255,0.78); } .shell { max-width:1280px; margin:-24px auto 48px; padding:0 24px; display:grid; grid-template-columns:minmax(0,1fr); gap:20px; } .toc { background:rgba(255,255,255,0.9); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); padding:20px; position:sticky; top:16px; height:fit-content; } .toc-title { font-size:12px; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); margin-bottom:12px; font-weight:700; } .toc a { display:block; color:var(--primary); text-decoration:none; padding:6px 0; font-size:14px; } .content { background:var(--card); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow); padding:32px; min-width:0; } .content h1:first-child { display:none; } .content h2 { color:var(--primary); margin-top:36px; scroll-margin-top:24px; } .content h3 { color:var(--accent); margin-top:28px; scroll-margin-top:24px; } .content p, .content li { color:var(--text); } .content code { background:rgba(15,28,46,0.08); padding:0.1em 0.35em; border-radius:6px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:0.92em; } .content pre { background:var(--code-bg); color:var(--code-text); padding:18px; border-radius:14px; overflow:auto; } .content pre code { background:transparent; color:inherit; padding:0; } .content table { width:100%; border-collapse:collapse; margin:16px 0 24px; display:block; overflow-x:auto; } .content th, .content td { border:1px solid var(--border); padding:10px 12px; text-align:left; vertical-align:top; min-width:120px; } .content th { background:#eef5fb; color:var(--primary); } .content blockquote { margin:16px 0; padding:12px 16px; border-left:4px solid var(--gold); background:#f8fbfe; color:var(--muted); } @media (min-width:1080px) { .shell { grid-template-columns:260px minmax(0,1fr); } } @media (max-width:1079px) { .toc { position:static; } }</style></head><body><header><h1>Forge CLI PRD</h1><p>Canonical Markdown source rendered as a single-file offline HTML companion.</p></header><main class="shell"><aside class="toc"><div class="toc-title">Sections</div><a href="#product-snapshot">Product Snapshot</a><a href="#problem">Problem</a><a href="#goals">Goals</a><a href="#non-goals">Non-Goals</a><a href="#key-user-jobs">Key User Jobs</a><a href="#core-capabilities">Core Capabilities</a><a href="#success-signals">Success Signals</a><a href="#current-risks">Current Risks</a><a href="#immediate-priorities">Immediate Priorities</a></aside><article class="content markdown-body"><h1>Forge CLI PRD</h1>
+<h2 id="product-snapshot">Product Snapshot</h2>
+<ul>
+<li>Product: Forge CLI</li>
+<li>Package: <code>@armature/forge-cli</code></li>
+<li>Domain: provider-neutral coding-agent CLI</li>
+<li>Primary users: developers who need coding-agent workflows across multiple model vendors</li>
+<li>Current repo status: active TypeScript CLI with runtime, multi-model collaboration, session management, PR review, serve mode, benchmark tooling, and Hermes-inspired runtime ergonomics</li>
+</ul>
+<h2 id="problem">Problem</h2>
+<p>Single-vendor coding CLIs force users into one model family per session. Forge CLI exists to give developers a single terminal-native workflow that can route across providers, run agent tasks, and coordinate multiple models when that meaningfully improves quality or speed.</p>
+<h2 id="goals">Goals</h2>
+<ol>
+<li>Provide a production-grade CLI for coding-agent usage with predictable provider/model routing.</li>
+<li>Support multi-model collaboration modes that no single-vendor CLI can offer.</li>
+<li>Preserve strong developer ergonomics: REPL, one-shot execution, saved sessions, PR review, stats, and headless serving.</li>
+<li>Keep runtime behavior testable and inspectable through a large automated suite.</li>
+</ol>
+<h2 id="non-goals">Non-Goals</h2>
+<ul>
+<li>Browser-first UX</li>
+<li>Backward-compatibility shims for outdated command or config formats</li>
+<li>Mock-only validation in place of real CLI/runtime verification</li>
+</ul>
+<h2 id="key-user-jobs">Key User Jobs</h2>
+<table>
+<thead>
+<tr>
+<th>User Job</th>
+<th>Current Surface</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ask the agent a question interactively</td>
+<td><code>forge chat</code>, default no-subcommand entry</td>
+<td><code>src/commands/chat.ts</code>, <code>src/program.ts</code></td>
+</tr>
+<tr>
+<td>Execute a coding task</td>
+<td><code>forge run</code></td>
+<td><code>src/commands/run.ts</code></td>
+</tr>
+<tr>
+<td>Compare or combine models</td>
+<td><code>forge council</code>, <code>forge race</code>, <code>forge pipeline</code></td>
+<td><code>src/commands/multi.ts</code>, <code>src/multi-model.ts</code></td>
+</tr>
+<tr>
+<td>Inspect providers and routing</td>
+<td><code>forge providers</code></td>
+<td><code>src/commands/providers.ts</code></td>
+</tr>
+<tr>
+<td>Review saved state and cost</td>
+<td><code>forge session</code>, <code>forge stats</code></td>
+<td><code>src/commands/session.ts</code>, <code>src/commands/stats.ts</code></td>
+</tr>
+<tr>
+<td>Track detached work</td>
+<td><code>run_background</code>, <code>/jobs</code></td>
+<td><code>src/tools.ts</code>, <code>src/background-jobs.ts</code>, <code>src/commands/chat.ts</code></td>
+</tr>
+<tr>
+<td>Review pull requests</td>
+<td><code>forge pr</code></td>
+<td><code>src/commands/pr.ts</code></td>
+</tr>
+<tr>
+<td>Expose a headless agent server</td>
+<td><code>forge serve</code></td>
+<td><code>src/commands/serve.ts</code></td>
+</tr>
+<tr>
+<td>Benchmark the runtime</td>
+<td><code>forge bench</code></td>
+<td><code>src/commands/bench.ts</code></td>
+</tr>
+</tbody></table>
+<h2 id="core-capabilities">Core Capabilities</h2>
+<ul>
+<li>Provider-neutral config and endpoint resolution</li>
+<li>OpenAI-compatible transport bridge</li>
+<li>Agent tool loop and runtime orchestration</li>
+<li>Multi-model council, race, and pipeline execution</li>
+<li>Hook loading and lifecycle execution</li>
+<li>Session persistence and usage tracking</li>
+<li>CLI output rendering and markdown streaming</li>
+<li>Tool argument coercion for model-emitted string values</li>
+<li>Oversized tool result persistence with artifact paths</li>
+<li>Background job tracking with completion notifications</li>
+<li>Provider-aware model catalog with context/pricing/caution metadata</li>
+<li>Provider command and startup surfaces that expose the same model metadata before a session begins</li>
+<li>Centralized local runtime logging with a CLI log viewer</li>
+<li>A doctor-style diagnostics surface for config/runtime/provider health</li>
+<li>Explicit malformed-config diagnostics for local JSON config files</li>
+<li>Headless server endpoints that surface the same runtime/provider diagnostics as the CLI</li>
+<li>A unified stats dashboard that combines usage, runtime health, and recent error signals</li>
+</ul>
+<h2 id="success-signals">Success Signals</h2>
+<ul>
+<li><code>npm test</code> stays green for runtime, tool, hook, and multi-model suites</li>
+<li><code>README.md</code> matches actual command surface and provider/model claims</li>
+<li>Project docs under <code>doc/00_project/initiative_forge_cli/</code> remain current with source layout</li>
+<li>Future feature work lands without reintroducing single-provider coupling</li>
+</ul>
+<h2 id="current-risks">Current Risks</h2>
+<ul>
+<li>Legacy flat docs in <code>doc/</code> can drift from current project-level canonical docs</li>
+<li>Marketing-style counts in README/docs can become stale as tool/provider inventories evolve</li>
+<li>Provider routing complexity can leak across unrelated modules if not kept centralized</li>
+<li>Some Hermes-inspired ergonomics are currently Forge-local and not yet extracted to the shared SDK</li>
+</ul>
+<h2 id="immediate-priorities">Immediate Priorities</h2>
+<ol>
+<li>Keep the new project-level documentation tree as the canonical operating surface.</li>
+<li>Maintain command/runtime verification discipline (<code>lint</code>, <code>test</code>, <code>build</code>, bench when relevant).</li>
+<li>Consolidate future architecture and UX updates in the initiative docs instead of adding more flat reference files.</li>
+<li>Internalize high-value Hermes runtime behavior where the boundary is clearly CLI/runtime focused.</li>
+</ol>
+</article></main></body></html>

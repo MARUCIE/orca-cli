@@ -252,6 +252,65 @@ function scanLanguages(dir: string, langSet: Set<string>, depth: number): void {
 
 // ── Context Formatter ───────────────────────────────────────────
 
+// ── Skill Loading ──────────────────────────────────────────────
+
+export interface SkillInfo {
+  name: string
+  description: string
+  source: 'claude' | 'codex' | 'orca'
+}
+
+/**
+ * Load skills from .claude/skills/, .codex/skills/, and .orca/skills/.
+ * Reads each skill's SKILL.md for its description (first non-empty, non-heading line).
+ */
+export function loadSkills(cwd: string): SkillInfo[] {
+  const home = process.env.HOME || '/tmp'
+  const skills: SkillInfo[] = []
+
+  const skillDirs: Array<{ path: string; source: SkillInfo['source'] }> = [
+    { path: join(cwd, '.claude', 'skills'), source: 'claude' },
+    { path: join(home, '.claude', 'skills'), source: 'claude' },
+    { path: join(cwd, '.codex', 'skills'), source: 'codex' },
+    { path: join(home, '.codex', 'skills'), source: 'codex' },
+    { path: join(cwd, '.orca', 'skills'), source: 'orca' },
+  ]
+
+  const seen = new Set<string>()
+
+  for (const { path: skillsRoot, source } of skillDirs) {
+    if (!existsSync(skillsRoot)) continue
+    try {
+      const entries = readdirSync(skillsRoot)
+      for (const entry of entries) {
+        if (entry.startsWith('.') || seen.has(entry)) continue
+        const skillMd = join(skillsRoot, entry, 'SKILL.md')
+        if (!existsSync(skillMd)) continue
+
+        seen.add(entry)
+        try {
+          const content = readFileSync(skillMd, 'utf-8')
+          // Extract description: first line after frontmatter that isn't a heading or blank
+          const lines = content.split('\n')
+          let inFrontmatter = false
+          let description = ''
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (trimmed === '---') { inFrontmatter = !inFrontmatter; continue }
+            if (inFrontmatter) continue
+            if (!trimmed || trimmed.startsWith('#')) continue
+            description = trimmed.slice(0, 120)
+            break
+          }
+          skills.push({ name: entry, description: description || entry, source })
+        } catch { /* skip unreadable */ }
+      }
+    } catch { /* skip unreadable dirs */ }
+  }
+
+  return skills
+}
+
 export function formatContextForPrompt(ctx: ProjectContext): string {
   const lines: string[] = []
 

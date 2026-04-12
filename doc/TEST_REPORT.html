@@ -1,0 +1,2384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forge CLI v0.2.0 — Test Report</title>
+<style>
+:root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #e6edf3; --dim: #8b949e; --pass: #22c55e; --fail: #ef4444; --warn: #f59e0b; --accent: #58a6ff; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 40px 20px; }
+.container { max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; }
+h1 span { color: var(--accent); }
+.subtitle { color: var(--dim); font-size: 14px; margin-bottom: 32px; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.metric { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center; }
+.metric .value { font-size: 36px; font-weight: 700; }
+.metric .label { color: var(--dim); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+.metric.pass .value { color: var(--pass); }
+.metric.fail .value { color: var(--fail); }
+.metric.rate .value { color: var(--accent); }
+h2 { font-size: 20px; margin: 32px 0 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+th { background: #1c2128; text-align: left; padding: 12px 16px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--dim); border-bottom: 1px solid var(--border); }
+td { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+tr:last-child td { border-bottom: none; }
+tr:hover { background: #1c2128; }
+.center { text-align: center; }
+.file { color: var(--accent); font-family: monospace; font-size: 13px; white-space: nowrap; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; }
+.badge.pass { background: #16311e; color: var(--pass); }
+.badge.fail { background: #3d1418; color: var(--fail); }
+.badge.skip { background: #2d2000; color: var(--warn); }
+.bar { background: var(--border); border-radius: 4px; height: 8px; overflow: hidden; min-width: 100px; }
+.bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.bar-fill.pass { background: var(--pass); }
+.bar-fill.fail { background: var(--fail); }
+footer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 13px; line-height: 2.2; }
+@media (max-width: 640px) {
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .metric .value { font-size: 28px; }
+    td, th { padding: 8px 10px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Forge CLI <span>v0.2.0</span> — Test Report</h1>
+<p class="subtitle">Generated 2026-04-12 19:52:08 | vitest | Node 3.13.11 | 424 tests across 31 files</p>
+
+<div class="metrics">
+    <div class="metric rate"><div class="value">100.0%</div><div class="label">Pass Rate</div></div>
+    <div class="metric pass"><div class="value">424</div><div class="label">Passed</div></div>
+    <div class="metric fail"><div class="value">0</div><div class="label">Failed</div></div>
+    <div class="metric"><div class="value">31</div><div class="label">Test Files</div></div>
+    <div class="metric"><div class="value">5.3s</div><div class="label">Duration</div></div>
+</div>
+
+<h2>File Summary</h2>
+<table>
+<thead><tr><th>File</th><th class="center">Tests</th><th class="center">Passed</th><th class="center">Failed</th><th>Coverage</th></tr></thead>
+<tbody><tr>
+        <td>tests/adversarial.test.ts</td>
+        <td class="center">18</td>
+        <td class="center" style="color:#22c55e">18</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/agent-intelligence.test.ts</td>
+        <td class="center">22</td>
+        <td class="center" style="color:#22c55e">22</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/agent-loop.test.ts</td>
+        <td class="center">15</td>
+        <td class="center" style="color:#22c55e">15</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/bench.test.ts</td>
+        <td class="center">15</td>
+        <td class="center" style="color:#22c55e">15</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/complex-scenarios.test.ts</td>
+        <td class="center">20</td>
+        <td class="center" style="color:#22c55e">20</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/config.test.ts</td>
+        <td class="center">12</td>
+        <td class="center" style="color:#22c55e">12</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/context-skills.test.ts</td>
+        <td class="center">15</td>
+        <td class="center" style="color:#22c55e">15</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/determinism.test.ts</td>
+        <td class="center">15</td>
+        <td class="center" style="color:#22c55e">15</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/doctor-command.test.ts</td>
+        <td class="center">3</td>
+        <td class="center" style="color:#22c55e">3</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/e2e-workflow.test.ts</td>
+        <td class="center">12</td>
+        <td class="center" style="color:#22c55e">12</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/edge-cases.test.ts</td>
+        <td class="center">24</td>
+        <td class="center" style="color:#22c55e">24</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/hermes-runtime.test.ts</td>
+        <td class="center">3</td>
+        <td class="center" style="color:#22c55e">3</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/hooks-compat.test.ts</td>
+        <td class="center">11</td>
+        <td class="center" style="color:#22c55e">11</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/hooks.test.ts</td>
+        <td class="center">15</td>
+        <td class="center" style="color:#22c55e">15</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/integration.test.ts</td>
+        <td class="center">18</td>
+        <td class="center" style="color:#22c55e">18</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/large-codebase.test.ts</td>
+        <td class="center">12</td>
+        <td class="center" style="color:#22c55e">12</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/logger.test.ts</td>
+        <td class="center">1</td>
+        <td class="center" style="color:#22c55e">1</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/logs-command.test.ts</td>
+        <td class="center">2</td>
+        <td class="center" style="color:#22c55e">2</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/mcp-client.test.ts</td>
+        <td class="center">12</td>
+        <td class="center" style="color:#22c55e">12</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/model-catalog.test.ts</td>
+        <td class="center">5</td>
+        <td class="center" style="color:#22c55e">5</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/multi-model.test.ts</td>
+        <td class="center">11</td>
+        <td class="center" style="color:#22c55e">11</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/output-progress.test.ts</td>
+        <td class="center">25</td>
+        <td class="center" style="color:#22c55e">25</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/output.test.ts</td>
+        <td class="center">2</td>
+        <td class="center" style="color:#22c55e">2</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/program.test.ts</td>
+        <td class="center">10</td>
+        <td class="center" style="color:#22c55e">10</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/protocol.test.ts</td>
+        <td class="center">16</td>
+        <td class="center" style="color:#22c55e">16</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/provider-stream-resilience.test.ts</td>
+        <td class="center">17</td>
+        <td class="center" style="color:#22c55e">17</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/providers-command.test.ts</td>
+        <td class="center">1</td>
+        <td class="center" style="color:#22c55e">1</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/regression.test.ts</td>
+        <td class="center">12</td>
+        <td class="center" style="color:#22c55e">12</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/sota-capabilities.test.ts</td>
+        <td class="center">15</td>
+        <td class="center" style="color:#22c55e">15</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/tools-full.test.ts</td>
+        <td class="center">45</td>
+        <td class="center" style="color:#22c55e">45</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr><tr>
+        <td>tests/tools.test.ts</td>
+        <td class="center">20</td>
+        <td class="center" style="color:#22c55e">20</td>
+        <td class="center" style="color:#ef4444">0</td>
+        <td><div class="bar"><div class="bar-fill pass" style="width:100%"></div></div></td>
+    </tr></tbody>
+</table>
+
+<h2>All Test Cases (424)</h2>
+<table>
+<thead><tr><th>File</th><th>Test</th><th class="center">Status</th><th class="center">Duration</th></tr></thead>
+<tbody><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Path traversal attacks &gt; 11.1 read_file with ../ resolves but does not escape cwd context</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.8027909999999565ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Path traversal attacks &gt; 11.2 write_file with ../ stays within resolved path</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3624580000000037ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Path traversal attacks &gt; 11.3 absolute path in read_file works (no sandbox violation)</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.42512499999998ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Path traversal attacks &gt; 11.4 symlink following — reads through symlink</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.38366700000000264ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Shell injection resistance &gt; 11.5 run_command — command with shell metacharacters executes safely</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">7.4727080000000115ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Shell injection resistance &gt; 11.6 search_files — pattern with single quotes does not break grep</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">12.763958000000002ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Shell injection resistance &gt; 11.7 find_definition — name with regex metacharacters handled</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">13.268084000000044ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Shell injection resistance &gt; 11.8 git_commit — message with special chars does not break shell</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">13.526292000000012ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Null bytes and binary content &gt; 11.9 write_file with null byte in content — file created</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.348165999999992ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Null bytes and binary content &gt; 11.10 edit_file with empty new_string — deletes matched text</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.5219580000000406ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Null bytes and binary content &gt; 11.11 read_file on binary content — returns without crash</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.600750000000005ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Boundary overflows &gt; 11.12 read_file — start_line: 0 (below 1-based minimum)</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.10454200000003766ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Boundary overflows &gt; 11.13 read_file — start_line beyond file length</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.07412500000003774ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Boundary overflows &gt; 11.14 read_file — start_line &gt; end_line</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.09224999999997863ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Boundary overflows &gt; 11.15 notebook_edit — cell_index: -1 (negative)</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.09787500000004457ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Boundary overflows &gt; 11.16 check_port — port 0 and port 65536</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">234.00079199999993ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Boundary overflows &gt; 11.17 list_directory — very deep recursive (depth capped at 3)</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">2.1418750000000273ms</td>
+        </tr><tr>
+            <td class="file">tests/adversarial.test.ts</td>
+            <td>Tool schema validation &gt; 11.18 all 41 tools handle missing required args gracefully</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">383.259459ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Auto-verify: check detection and execution &gt; 15.1 detects TypeScript project and runs typecheck</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1179.180625ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Auto-verify: check detection and execution &gt; 15.2 skips verification for non-code files</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.36241599999993923ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Auto-verify: check detection and execution &gt; 15.3 respects enabled: false config</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.05554200000005949ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Auto-verify: check detection and execution &gt; 15.4 respects custom extension filter</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.056166999999959444ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Auto-verify: check detection and execution &gt; 15.5 custom commands override auto-detect</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">4.724124999999958ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Auto-verify: check detection and execution &gt; 15.6 formatVerifyOutput returns empty for null result</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.09162499999979445ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Auto-verify: check detection and execution &gt; 15.7 formatVerifyOutput formats failed checks</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">4.007792000000109ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Token budget: tracking and compaction &gt; 15.8 getBudget returns correct model context window</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.14333299999998417ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Token budget: tracking and compaction &gt; 15.9 getBudget detects different model windows</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.06791699999985212ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Token budget: tracking and compaction &gt; 15.10 recordUsage accumulates token counts</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.06483300000013514ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Token budget: tracking and compaction &gt; 15.11 utilization increases with history</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.09775000000013279ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Token budget: tracking and compaction &gt; 15.12 high utilization triggers yellow/orange/red risk</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.05075000000010732ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Token budget: tracking and compaction &gt; 15.13 smartCompact drops older messages, keeps recent</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3718750000000455ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Token budget: tracking and compaction &gt; 15.14 smartCompact preserves decision-bearing messages</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.07608299999992596ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Token budget: tracking and compaction &gt; 15.15 smartCompact with few messages does nothing</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.03974999999991269ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Retry intelligence: failure tracking and hints &gt; 15.16 first failure returns no warning</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.0862080000001697ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Retry intelligence: failure tracking and hints &gt; 15.17 second failure of same tool+args triggers warning</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.06579099999999016ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Retry intelligence: failure tracking and hints &gt; 15.18 success clears failure tracking</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.03670899999997346ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Retry intelligence: failure tracking and hints &gt; 15.19 different args are tracked separately</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.04616600000008475ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Retry intelligence: failure tracking and hints &gt; 15.20 getFailureCount returns total per tool</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.0699170000000322ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Retry intelligence: failure tracking and hints &gt; 15.21 reset clears all records</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.038457999999991443ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-intelligence.test.ts</td>
+            <td>Retry intelligence: failure tracking and hints &gt; 15.22 tool-specific suggestions for known tools</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.11929200000008677ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Basic streaming &gt; 4.1 yields text tokens from streaming response</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">31.11416699999998ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Basic streaming &gt; 4.2 yields tool_use and tool_result events</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">6.299333000000047ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Basic streaming &gt; 4.3 auto-continues on finishReason=length</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.342375000000004ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Basic streaming &gt; 4.4 stops on finishReason=stop without continuation</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9580000000000268ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Tool call accumulation &gt; 4.5 accumulates streamed tool call arguments across chunks</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.6479590000000144ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Tool call accumulation &gt; 4.6 handles multiple tool calls in single response</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.623666999999955ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Error handling &gt; 4.7 yields error event on API failure</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.0543749999999932ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Error handling &gt; 4.8 handles empty response gracefully</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.9093330000000037ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Error handling &gt; 4.9 abortSignal interrupts the loop</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.904707999999971ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Usage tracking &gt; 4.10 accumulates usage tokens across rounds</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.940416999999968ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Incomplete text detection &gt; 4.11 auto-continues when text looks incomplete</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.1305419999999913ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Model configuration &gt; 4.12 works with different model names</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.7372089999999503ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Model configuration &gt; 4.13 includes system prompt when no history</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.933667000000014ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Model configuration &gt; 4.14 includes history messages in context</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.3340409999999565ms</td>
+        </tr><tr>
+            <td class="file">tests/agent-loop.test.ts</td>
+            <td>Agent Loop: Model configuration &gt; 4.15 done is the last meaningful event</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">2.9270420000000286ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: scenario registry &gt; 16.1 has exactly 10 built-in scenarios</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.8848330000000146ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: scenario registry &gt; 16.2 all scenarios have required fields</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.754792000000009ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: scenario registry &gt; 16.3 scenario IDs are unique</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.07024999999998727ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: scenario registry &gt; 16.4 covers all difficulty levels</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.07637500000004138ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: individual scenarios pass &gt; 16.5 S1: SQL injection fix passes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">2.8461249999999723ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: individual scenarios pass &gt; 16.6 S2: Pagination feature passes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.0716249999999832ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: individual scenarios pass &gt; 16.7 S3: Extract interface passes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.3570000000000277ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: individual scenarios pass &gt; 16.8 S4: Off-by-one fix passes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9930420000000026ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: individual scenarios pass &gt; 16.9 S5: Large file navigation passes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">46.546583ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: individual scenarios pass &gt; 16.11 S6: Secret removal passes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.0080829999999992ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: individual scenarios pass &gt; 16.12 S7: Error handling passes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.3430829999999787ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: individual scenarios pass &gt; 16.13 S8: Multi-file rename passes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">16.221292000000005ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: individual scenarios pass &gt; 16.14 S9: New module creation passes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.3458330000000274ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: individual scenarios pass &gt; 16.15 S10: Plan + verify passes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">30.56487500000003ms</td>
+        </tr><tr>
+            <td class="file">tests/bench.test.ts</td>
+            <td>Benchmark: suite runner &gt; 16.10 full suite scores 100%</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">105.89104199999997ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario A: SWE-bench — Multi-file auth bug &gt; A.1 Discover project structure</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.304708000000005ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario A: SWE-bench — Multi-file auth bug &gt; A.2 Search for bug symptom — 403 error</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">18.354458000000022ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario A: SWE-bench — Multi-file auth bug &gt; A.3 Read type definition — discover roles is array</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.24866700000006858ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario A: SWE-bench — Multi-file auth bug &gt; A.4 Identify root cause in auth middleware (not route file)</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.18425000000002ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario A: SWE-bench — Multi-file auth bug &gt; A.5 Fix: change role to roles.includes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.34895800000003874ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario B: FeatureBench — Add pagination feature &gt; B.1 Read existing code to understand interface</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.13474999999993997ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario B: FeatureBench — Add pagination feature &gt; B.2 Read types file for pagination interface</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.10524999999995543ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario B: FeatureBench — Add pagination feature &gt; B.3 Add paginated getUsers function</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.2430420000000595ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario B: FeatureBench — Add pagination feature &gt; B.4 Verify pagination returns correct page</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.20079199999997854ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario B: FeatureBench — Add pagination feature &gt; B.5 Create test file for pagination</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3467080000000351ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario C: Extract shared interface from 5 files &gt; C.1 Find all files importing Database</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">19.529333000000065ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario C: Extract shared interface from 5 files &gt; C.2 Find all database method usages</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">18.83624999999995ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario C: Extract shared interface from 5 files &gt; C.3 Create shared Storage interface</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3116660000000593ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario C: Extract shared interface from 5 files &gt; C.4 Update Database to implement interface</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.20441700000003493ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario C: Extract shared interface from 5 files &gt; C.5 Verify no breakage — all services still reference valid types</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.11495800000000145ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario D: Second-chance fix — off-by-one &gt; D.1 Read buggy code</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.09633399999995618ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario D: Second-chance fix — off-by-one &gt; D.2 First attempt: fix paginate off-by-one</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.17145800000002964ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario D: Second-chance fix — off-by-one &gt; D.3 Verify first fix semantically (not just syntactically)</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.06175000000007458ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario D: Second-chance fix — off-by-one &gt; D.4 Second bug in same file: fix getPageCount</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.1458340000000362ms</td>
+        </tr><tr>
+            <td class="file">tests/complex-scenarios.test.ts</td>
+            <td>Scenario D: Second-chance fix — off-by-one &gt; D.5 Both fixes verified — semantic correctness</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">17.055375000000026ms</td>
+        </tr><tr>
+            <td class="file">tests/config.test.ts</td>
+            <td>config &gt; resolveConfig &gt; returns defaults when no config exists</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.9810830000000124ms</td>
+        </tr><tr>
+            <td class="file">tests/config.test.ts</td>
+            <td>config &gt; resolveConfig &gt; flags override defaults</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.41312499999997954ms</td>
+        </tr><tr>
+            <td class="file">tests/config.test.ts</td>
+            <td>config &gt; resolveConfig &gt; reads project config from .armature.json</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.633624999999995ms</td>
+        </tr><tr>
+            <td class="file">tests/config.test.ts</td>
+            <td>config &gt; resolveConfig &gt; env variables override project config</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.28462500000000546ms</td>
+        </tr><tr>
+            <td class="file">tests/config.test.ts</td>
+            <td>config &gt; resolveConfig &gt; flags override env variables</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3075420000000122ms</td>
+        </tr><tr>
+            <td class="file">tests/config.test.ts</td>
+            <td>config &gt; resolveProvider &gt; auto-detects anthropic from model name</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.411042000000009ms</td>
+        </tr><tr>
+            <td class="file">tests/config.test.ts</td>
+            <td>config &gt; resolveProvider &gt; auto-detects openai from model name</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.2717920000000049ms</td>
+        </tr><tr>
+            <td class="file">tests/config.test.ts</td>
+            <td>config &gt; resolveProvider &gt; auto-detects google from model name</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.23804100000000972ms</td>
+        </tr><tr>
+            <td class="file">tests/config.test.ts</td>
+            <td>config &gt; resolveProvider &gt; throws when no API key available</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.2905830000000265ms</td>
+        </tr><tr>
+            <td class="file">tests/config.test.ts</td>
+            <td>config &gt; resolveProvider &gt; uses explicit API key from flags</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.35808399999996254ms</td>
+        </tr><tr>
+            <td class="file">tests/config.test.ts</td>
+            <td>config &gt; initProjectConfig &gt; creates .armature.json in target directory</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3634999999999877ms</td>
+        </tr><tr>
+            <td class="file">tests/config.test.ts</td>
+            <td>config &gt; initProjectConfig &gt; does not overwrite existing config</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.30262500000003456ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; finds skills in .claude/skills/ subdirectories with SKILL.md</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">4.885250000000013ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; finds skills in .codex/skills/ subdirectories</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">3.216625000000022ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; deduplicates duplicate skill names (first source wins)</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">2.1331659999999886ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; extracts description from first non-heading line after frontmatter</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.6157499999999914ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; extracts description from first line when no frontmatter</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.1385000000000218ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; returns empty array for empty skills directory</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.5706670000000145ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; returns name and source for each skill</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.515749999999997ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; silently skips non-existent skills directory</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.7032079999999894ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; truncates description to 120 characters</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.8322079999999801ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; uses skill name as fallback description if extraction fails</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.8246249999999975ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; loads from global HOME/.claude/skills/ for global claude skills</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.355542000000014ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; loads from .armature/skills/ directory</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.7121249999999861ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; handles YAML frontmatter correctly</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.7246249999999748ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; skips skill subdirectories without SKILL.md</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.129542000000015ms</td>
+        </tr><tr>
+            <td class="file">tests/context-skills.test.ts</td>
+            <td>loadSkills() &gt; ignores hidden skill directories starting with dot</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.1164160000000152ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>Idempotency: same operation twice → consistent result &gt; 10.1 write_file same content twice — second call says Updated</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.284791000000041ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>Idempotency: same operation twice → consistent result &gt; 10.2 edit_file second call fails (old_string already replaced)</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9380409999999983ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>Idempotency: same operation twice → consistent result &gt; 10.3 read_file returns identical output on repeated calls</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.210125000000005ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>Idempotency: same operation twice → consistent result &gt; 10.4 git_commit — two sequential commits on same changes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">77.43549999999993ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>Idempotency: same operation twice → consistent result &gt; 10.5 search_files same query twice returns same results</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">31.99741599999993ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>State isolation: operations do not leak side effects &gt; 10.6 write_file to subdir does not affect parent</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.5235830000000306ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>State isolation: operations do not leak side effects &gt; 10.7 edit_file on one file does not corrupt adjacent files</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.44441599999993286ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>State isolation: operations do not leak side effects &gt; 10.8 delete_file does not affect same-name files in other directories</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">14.45395899999994ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>State isolation: operations do not leak side effects &gt; 10.9 task_create IDs always increment (no reset between calls)</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9744999999999209ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>State isolation: operations do not leak side effects &gt; 10.10 task_update on non-existent ID fails consistently</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.14220899999997982ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>Concurrent-style: rapid sequential ops on shared resources &gt; 10.11 rapid sequential writes to same file — last write wins</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.395083999999997ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>Concurrent-style: rapid sequential ops on shared resources &gt; 10.12 sequential edits — each edit sees the result of the previous</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.4615000000000009ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>Concurrent-style: rapid sequential ops on shared resources &gt; 10.13 multi_edit then single edit — file state is coherent</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.633792000000085ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>Concurrent-style: rapid sequential ops on shared resources &gt; 10.14 create_plan IDs are timestamp-based and non-empty</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.4590409999999565ms</td>
+        </tr><tr>
+            <td class="file">tests/determinism.test.ts</td>
+            <td>Concurrent-style: rapid sequential ops on shared resources &gt; 10.15 verify_plan runs checks in order, early failure visible</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">23.893416000000002ms</td>
+        </tr><tr>
+            <td class="file">tests/doctor-command.test.ts</td>
+            <td>doctor command diagnostics &gt; gathers provider, hook, MCP, session, and log diagnostics</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">44.247708999999986ms</td>
+        </tr><tr>
+            <td class="file">tests/doctor-command.test.ts</td>
+            <td>doctor command diagnostics &gt; reports malformed config files in doctor diagnostics</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">40.01416599999999ms</td>
+        </tr><tr>
+            <td class="file">tests/doctor-command.test.ts</td>
+            <td>doctor command diagnostics &gt; prints config issues in human-readable doctor output</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">51.51724999999999ms</td>
+        </tr><tr>
+            <td class="file">tests/e2e-workflow.test.ts</td>
+            <td>StreamMarkdown renderer &gt; 8.1 renders headings with ANSI colors</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.0547500000000127ms</td>
+        </tr><tr>
+            <td class="file">tests/e2e-workflow.test.ts</td>
+            <td>StreamMarkdown renderer &gt; 8.2 renders code blocks with box-drawing borders</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.5702079999999796ms</td>
+        </tr><tr>
+            <td class="file">tests/e2e-workflow.test.ts</td>
+            <td>StreamMarkdown renderer &gt; 8.3 renders inline formatting</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3267919999999549ms</td>
+        </tr><tr>
+            <td class="file">tests/e2e-workflow.test.ts</td>
+            <td>StreamMarkdown renderer &gt; 8.4 JS/TS code highlighting — keywords colored</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.11512499999992087ms</td>
+        </tr><tr>
+            <td class="file">tests/e2e-workflow.test.ts</td>
+            <td>StreamMarkdown renderer &gt; 8.5 Python code highlighting</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.21299999999996544ms</td>
+        </tr><tr>
+            <td class="file">tests/e2e-workflow.test.ts</td>
+            <td>StreamMarkdown renderer &gt; 8.6 Shell highlighting — variables colored</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.18820799999991777ms</td>
+        </tr><tr>
+            <td class="file">tests/e2e-workflow.test.ts</td>
+            <td>StreamMarkdown renderer &gt; 8.7 JSON highlighting — keys and values colored</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.12891700000000128ms</td>
+        </tr><tr>
+            <td class="file">tests/e2e-workflow.test.ts</td>
+            <td>System prompt generation &gt; 8.8 includes all 41 tools</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">53.30195800000001ms</td>
+        </tr><tr>
+            <td class="file">tests/e2e-workflow.test.ts</td>
+            <td>System prompt generation &gt; 8.9 tool signatures match definitions</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">25.455166000000077ms</td>
+        </tr><tr>
+            <td class="file">tests/e2e-workflow.test.ts</td>
+            <td>Batch markdown &gt; 8.10 renderMarkdown handles complete document</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3073749999999791ms</td>
+        </tr><tr>
+            <td class="file">tests/e2e-workflow.test.ts</td>
+            <td>Batch markdown &gt; 8.11 hasMarkdown detection accuracy</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.24083299999995234ms</td>
+        </tr><tr>
+            <td class="file">tests/e2e-workflow.test.ts</td>
+            <td>E2E: understand → plan → code → test → commit &gt; 8.12 Complete agent workflow</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">133.955958ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Empty inputs &gt; read_file — empty path</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.796999999999997ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Empty inputs &gt; write_file — empty content</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3163330000000144ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Empty inputs &gt; edit_file — empty new_string (deletion)</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.39091700000000174ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Empty inputs &gt; search_files — empty pattern</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">14.637333000000012ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Empty inputs &gt; run_command — empty command</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.13041699999999423ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Empty inputs &gt; glob_files — empty pattern</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.11008300000000304ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Empty inputs &gt; task_update — nonexistent task</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.1353330000000028ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Large files &gt; read_file — file with 500 lines truncates at 300</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">3.7135839999999973ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Large files &gt; read_file — line range on large file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.6212500000000034ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Large files &gt; write_file — large content</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.4912080000000003ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Special characters &gt; write_file — unicode content</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.21866699999998218ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Special characters &gt; edit_file — unicode replacement</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.17987500000000978ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Special characters &gt; write_file — file with spaces in name</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.15737500000000182ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Special characters &gt; edit_file — content with regex special chars</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.25499999999999545ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Special characters &gt; edit_file — content with backticks and template literals</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.20258300000000418ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Path handling &gt; read_file — absolute path works</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.19395800000000918ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Path handling &gt; list_directory — deeply nested empty dir</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.6276660000000049ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Path handling &gt; create_directory — already exists is ok</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">13.238292000000001ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Sequential multi-edit &gt; multiple edits to same file in sequence</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.0028750000000173ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Sequential multi-edit &gt; edit then read shows updated content</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.5315830000000119ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Tool search &gt; finds tools for common tasks</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.28520799999998303ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Tool search &gt; no results for nonsense query</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.05299999999999727ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Multi-edit &gt; applies multiple edits in order</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.4014169999999808ms</td>
+        </tr><tr>
+            <td class="file">tests/edge-cases.test.ts</td>
+            <td>Edge: Multi-edit &gt; fails mid-batch and reports progress</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.15466599999999175ms</td>
+        </tr><tr>
+            <td class="file">tests/hermes-runtime.test.ts</td>
+            <td>Hermes runtime: tool arg coercion &gt; coerces string line ranges for read_file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9681250000000432ms</td>
+        </tr><tr>
+            <td class="file">tests/hermes-runtime.test.ts</td>
+            <td>Hermes runtime: oversized tool result persistence &gt; persists oversized read_file output to a tool-results artifact</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.903332999999975ms</td>
+        </tr><tr>
+            <td class="file">tests/hermes-runtime.test.ts</td>
+            <td>Hermes runtime: background completion notifications &gt; tracks background jobs and emits a completion notification once</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">361.792709ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks-compat.test.ts</td>
+            <td>HookManager - Claude Code Compatibility &gt; Claude Code format &gt; loads hooks from .claude/settings.json nested format</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">16.100082999999984ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks-compat.test.ts</td>
+            <td>HookManager - Claude Code Compatibility &gt; Claude Code format &gt; converts Claude Code timeout from milliseconds to seconds</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.7462919999999826ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks-compat.test.ts</td>
+            <td>HookManager - Claude Code Compatibility &gt; Claude Code format &gt; sets both CLAUDE_HOOK_EVENT and FORGE_HOOK_EVENT env vars</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.257458999999983ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks-compat.test.ts</td>
+            <td>HookManager - Claude Code Compatibility &gt; Hook event recognition &gt; recognizes Stop event as valid hook event</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.458041000000037ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks-compat.test.ts</td>
+            <td>HookManager - Claude Code Compatibility &gt; Hook event recognition &gt; recognizes SubagentStop event as valid hook event</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.42816699999997354ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks-compat.test.ts</td>
+            <td>HookManager - Claude Code Compatibility &gt; Config merging &gt; merges hooks from multiple config sources</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.7444580000000087ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks-compat.test.ts</td>
+            <td>HookManager - Claude Code Compatibility &gt; Matcher conversion &gt; converts Claude Code matcher &quot;Bash&quot; to &quot;run_command|Bash&quot;</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.5115000000000123ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks-compat.test.ts</td>
+            <td>HookManager - Claude Code Compatibility &gt; Matcher conversion &gt; converts Claude Code matcher &quot;Edit|Write&quot; to include both Forge and Claude names</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.4427500000000464ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks-compat.test.ts</td>
+            <td>HookManager - Claude Code Compatibility &gt; Event mapping &gt; maps PermissionRequest event to PreToolUse</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.44999999999998863ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks-compat.test.ts</td>
+            <td>HookManager - Claude Code Compatibility &gt; Global config loading &gt; loads hooks from HOME/.claude/settings.json</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.7810829999999669ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks-compat.test.ts</td>
+            <td>HookManager - Claude Code Compatibility &gt; Idempotency &gt; load() can be called multiple times safely</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.6094170000000076ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Hook config loading &gt; 5.1 loads hooks from .armature/hooks.json</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.508624999999995ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Hook config loading &gt; 5.2 loads hooks from .armature.json (nested hooks key)</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.320416000000023ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Hook config loading &gt; 5.3 loads hooks from .claude/hooks.json</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.8098749999999768ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Hook execution &gt; 5.4 PreToolUse receives tool name and input as JSON stdin</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">33.30287500000003ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Hook execution &gt; 5.5 PreToolUse non-zero exit blocks tool execution</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">9.218165999999997ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Hook execution &gt; 5.6 PostToolUse receives tool result</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">31.050125000000037ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Hook execution &gt; 5.7 SessionStart hook fires and returns context</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">6.6159999999999854ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Hook execution &gt; 5.8 SessionEnd hook fires on clean exit</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">6.642416999999966ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Hook matching and env vars &gt; 5.9 Matcher regex filters tool-specific hooks</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9291660000000093ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Hook matching and env vars &gt; 5.10 Env vars FORGE_HOOK_EVENT and FORGE_HOOK_TOOL are set</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">7.906791999999996ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Hook matching and env vars &gt; 5.11 No hooks configured returns continue: true</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.2612500000000182ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Hook matching and env vars &gt; 5.12 Hook returning JSON result is parsed correctly</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">5.438916000000006ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Safety system &gt; 5.13 DANGEROUS_TOOLS has exactly 9 members</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.07329099999998334ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Safety system &gt; 5.14 DANGEROUS_TOOLS contains expected dangerous operations</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.08916700000003175ms</td>
+        </tr><tr>
+            <td class="file">tests/hooks.test.ts</td>
+            <td>Safety system &gt; 5.15 All 8 hook event types are recognized</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.0275420000000395ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Bug investigation workflow &gt; step 1: explore project structure</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.8245000000000005ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Bug investigation workflow &gt; step 2: search for SQL injection pattern</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">15.405333999999982ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Bug investigation workflow &gt; step 3: read the vulnerable file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.41816599999998516ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Bug investigation workflow &gt; step 4: fix SQL injection with parameterized query</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.33199999999999363ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Bug investigation workflow &gt; step 5: verify fix with git diff</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">13.69599999999997ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Multi-file refactoring &gt; step 1: find all db.query usages</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">15.111499999999978ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Multi-file refactoring &gt; step 2: fix createUser SQL injection</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.42379199999999173ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Multi-file refactoring &gt; step 3: fix deleteUser SQL injection</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.22000000000002728ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Multi-file refactoring &gt; step 4: verify all injections fixed</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.16012499999999363ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Multi-file refactoring &gt; step 5: check for hardcoded secrets</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">14.223542000000009ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Multi-file refactoring &gt; step 6: fix hardcoded secret</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.2785000000000082ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: New feature — add middleware &gt; step 1: create new file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3747920000000704ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: New feature — add middleware &gt; step 2: verify file was created</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.15841599999998834ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: New feature — add middleware &gt; step 3: find definition of new function</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">16.099583000000052ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: New feature — add middleware &gt; step 4: get file info</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.0618329999999787ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: New feature — add middleware &gt; step 5: count project lines</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">32.86120800000003ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Task-driven development &gt; create tasks, update progress, verify completion</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.5034580000000233ms</td>
+        </tr><tr>
+            <td class="file">tests/integration.test.ts</td>
+            <td>Scenario: Plan execution and verification &gt; create plan and verify each step</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">35.940124999999966ms</td>
+        </tr><tr>
+            <td class="file">tests/large-codebase.test.ts</td>
+            <td>Large codebase: File discovery &gt; 7.1 glob_files finds TypeScript files across 50+ files</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">15.178458999999975ms</td>
+        </tr><tr>
+            <td class="file">tests/large-codebase.test.ts</td>
+            <td>Large codebase: File discovery &gt; 7.2 search_files finds specific pattern across entire project</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">17.374959000000047ms</td>
+        </tr><tr>
+            <td class="file">tests/large-codebase.test.ts</td>
+            <td>Large codebase: File discovery &gt; 7.3 find_definition accurately locates function in large project</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">18.561750000000018ms</td>
+        </tr><tr>
+            <td class="file">tests/large-codebase.test.ts</td>
+            <td>Large codebase: File discovery &gt; 7.4 find_references is comprehensive across modules</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">17.924000000000035ms</td>
+        </tr><tr>
+            <td class="file">tests/large-codebase.test.ts</td>
+            <td>Large codebase: Navigation &gt; 7.5 directory_tree handles deep nesting</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">13.788874999999962ms</td>
+        </tr><tr>
+            <td class="file">tests/large-codebase.test.ts</td>
+            <td>Large codebase: Navigation &gt; 7.6 count_lines accurate on large project</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">31.92245799999995ms</td>
+        </tr><tr>
+            <td class="file">tests/large-codebase.test.ts</td>
+            <td>Large codebase: Navigation &gt; 7.7 list_directory recursive on wide tree</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">2.0416669999999613ms</td>
+        </tr><tr>
+            <td class="file">tests/large-codebase.test.ts</td>
+            <td>Large codebase: Edit precision &gt; 7.8 edit_file precise in 500+ line file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.113458000000037ms</td>
+        </tr><tr>
+            <td class="file">tests/large-codebase.test.ts</td>
+            <td>Large codebase: Edit precision &gt; 7.9 multi_edit batch on 500+ line file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9089589999999816ms</td>
+        </tr><tr>
+            <td class="file">tests/large-codebase.test.ts</td>
+            <td>Large codebase: Edit precision &gt; 7.10 search_files with regex in large corpus</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">15.719542000000047ms</td>
+        </tr><tr>
+            <td class="file">tests/large-codebase.test.ts</td>
+            <td>Large codebase: Cross-directory operations &gt; 7.11 Cross-directory file discovery works</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">19.341541000000007ms</td>
+        </tr><tr>
+            <td class="file">tests/large-codebase.test.ts</td>
+            <td>Large codebase: Cross-directory operations &gt; 7.12 Performance: glob completes quickly on large project</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">11.847750000000019ms</td>
+        </tr><tr>
+            <td class="file">tests/logger.test.ts</td>
+            <td>logger &gt; writes info/warn/error to agent log and warn/error to errors log</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">4.161209000000014ms</td>
+        </tr><tr>
+            <td class="file">tests/logs-command.test.ts</td>
+            <td>logs command &gt; shows agent log entries by default</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">3.7307500000000005ms</td>
+        </tr><tr>
+            <td class="file">tests/logs-command.test.ts</td>
+            <td>logs command &gt; shows errors log when requested</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.3996659999999963ms</td>
+        </tr><tr>
+            <td class="file">tests/mcp-client.test.ts</td>
+            <td>MCPClient &gt; loadConfigs() &gt; reads native .mcp.json format</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.8315829999999949ms</td>
+        </tr><tr>
+            <td class="file">tests/mcp-client.test.ts</td>
+            <td>MCPClient &gt; loadConfigs() &gt; reads .armature.json with mcpServers key</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.7459999999999809ms</td>
+        </tr><tr>
+            <td class="file">tests/mcp-client.test.ts</td>
+            <td>MCPClient &gt; loadConfigs() &gt; reads .claude/settings.json with mcpServers key</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.8142920000000231ms</td>
+        </tr><tr>
+            <td class="file">tests/mcp-client.test.ts</td>
+            <td>MCPClient &gt; loadConfigs() &gt; reads Codex TOML from HOME/.codex/config.toml</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.8953750000000014ms</td>
+        </tr><tr>
+            <td class="file">tests/mcp-client.test.ts</td>
+            <td>MCPClient &gt; loadConfigs() &gt; native configs take priority over Claude Code configs</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.369624999999985ms</td>
+        </tr><tr>
+            <td class="file">tests/mcp-client.test.ts</td>
+            <td>MCPClient &gt; loadConfigs() &gt; skips disabled Codex servers</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.320666999999986ms</td>
+        </tr><tr>
+            <td class="file">tests/mcp-client.test.ts</td>
+            <td>MCPClient &gt; loadConfigs() &gt; handles malformed JSON gracefully without crashing</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9852080000000001ms</td>
+        </tr><tr>
+            <td class="file">tests/mcp-client.test.ts</td>
+            <td>MCPClient &gt; loadConfigs() &gt; returns correct configuredCount after merge</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.5920830000000024ms</td>
+        </tr><tr>
+            <td class="file">tests/mcp-client.test.ts</td>
+            <td>MCPClient &gt; loadConfigs() &gt; parses Claude Code format with command, args, and env</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.6049999999999898ms</td>
+        </tr><tr>
+            <td class="file">tests/mcp-client.test.ts</td>
+            <td>MCPClient &gt; loadConfigs() &gt; produces zero configs when all files missing</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.3420419999999922ms</td>
+        </tr><tr>
+            <td class="file">tests/mcp-client.test.ts</td>
+            <td>MCPClient &gt; connectedCount &gt; returns 0 when no servers connected</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.10312500000000568ms</td>
+        </tr><tr>
+            <td class="file">tests/mcp-client.test.ts</td>
+            <td>MCPClient &gt; listServers() &gt; lists configured but unconnected servers</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.8487080000000162ms</td>
+        </tr><tr>
+            <td class="file">tests/model-catalog.test.ts</td>
+            <td>model catalog &gt; lists configured provider models first</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9215000000000089ms</td>
+        </tr><tr>
+            <td class="file">tests/model-catalog.test.ts</td>
+            <td>model catalog &gt; injects current model if not present in config</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.16145800000001032ms</td>
+        </tr><tr>
+            <td class="file">tests/model-catalog.test.ts</td>
+            <td>model catalog &gt; marks flash-lite as cautionary for agentic workflows</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.19462500000000205ms</td>
+        </tr><tr>
+            <td class="file">tests/model-catalog.test.ts</td>
+            <td>model catalog &gt; formats context windows and pricing for display</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.11395799999999667ms</td>
+        </tr><tr>
+            <td class="file">tests/model-catalog.test.ts</td>
+            <td>model catalog &gt; recognizes gemini 2.5 metadata</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9524999999999864ms</td>
+        </tr><tr>
+            <td class="file">tests/multi-model.test.ts</td>
+            <td>Multi-model: Diversity selection &gt; 9.1 pickDiverseModels returns models from different vendors</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.0851670000000126ms</td>
+        </tr><tr>
+            <td class="file">tests/multi-model.test.ts</td>
+            <td>Multi-model: Diversity selection &gt; 9.2 pickDiverseModels covers max vendor diversity</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.11958299999997735ms</td>
+        </tr><tr>
+            <td class="file">tests/multi-model.test.ts</td>
+            <td>Multi-model: Diversity selection &gt; 9.3 pickDiverseModels respects count limit</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.11895800000002055ms</td>
+        </tr><tr>
+            <td class="file">tests/multi-model.test.ts</td>
+            <td>Multi-model: Council &gt; 9.4 Council queries all models and produces judge verdict</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">21.799125000000004ms</td>
+        </tr><tr>
+            <td class="file">tests/multi-model.test.ts</td>
+            <td>Multi-model: Council &gt; 9.5 Council handles model error gracefully</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">22.88520900000003ms</td>
+        </tr><tr>
+            <td class="file">tests/multi-model.test.ts</td>
+            <td>Multi-model: Race &gt; 9.6 Race returns first successful response</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">12.098000000000013ms</td>
+        </tr><tr>
+            <td class="file">tests/multi-model.test.ts</td>
+            <td>Multi-model: Race &gt; 9.7 Race cancels remaining after winner</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">10.691374999999994ms</td>
+        </tr><tr>
+            <td class="file">tests/multi-model.test.ts</td>
+            <td>Multi-model: Pipeline &gt; 9.8 Pipeline executes 3 stages sequentially</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">32.398167ms</td>
+        </tr><tr>
+            <td class="file">tests/multi-model.test.ts</td>
+            <td>Multi-model: Pipeline &gt; 9.9 Pipeline 5-stage: plan→code→review→fix→verify</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">55.64074999999997ms</td>
+        </tr><tr>
+            <td class="file">tests/multi-model.test.ts</td>
+            <td>Multi-model: Pipeline &gt; 9.10 Pipeline stops on stage error</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">11.42554199999995ms</td>
+        </tr><tr>
+            <td class="file">tests/multi-model.test.ts</td>
+            <td>Multi-model: Pipeline &gt; 9.11 Pipeline feeds output of each stage to next</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">32.44749999999999ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; start() &gt; initializes with thinking phase</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">2.174749999999989ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; start() &gt; starts timer and sets phase to thinking</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3731249999999875ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; markWorking() &gt; transitions from thinking to working phase</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.21120799999999917ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; addTokens() &gt; accumulates token count correctly</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.20691700000000424ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; addTokens() &gt; starts at zero tokens</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.16054099999999494ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; addTokens() &gt; accumulates tokens with zero additions</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.16845800000001532ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; stop() &gt; returns elapsed time in milliseconds</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.2062090000000012ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; stop() &gt; returns token count</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.1355829999999969ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; stop() &gt; clears interval and can be called multiple times safely</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.19770800000000577ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; stop() &gt; clears the progress line from stderr</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.20166699999998627ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; rendering with tokens &gt; shows token count when working and tokens present</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">10.584541000000002ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; rendering with tokens &gt; does not show token count when working but zero tokens</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.1937080000000151ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; timing display &gt; shows elapsed time less than 60s in seconds</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.5185000000000173ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; timing display &gt; shows elapsed time &gt;= 60s in minutes and seconds</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9789590000000032ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; timing display &gt; shows exactly 1 minute correctly</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3611669999999947ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; spinner animation &gt; cycles through spinner frames</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.1834169999999915ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>ProgressIndicator &gt; spinner animation &gt; shows interrupt message</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.11341699999999832ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>printError with error classification &gt; prints error message and suggests API key fix for 401</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">3.6087090000000046ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>printError with error classification &gt; prints rate limit suggestion for 429 errors</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.33250000000001023ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>printError with error classification &gt; prints model not found suggestion for 404 errors</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.20154199999998923ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>printError with error classification &gt; prints timeout suggestion for timeout errors</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.1647920000000056ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>printRichBanner with path abbreviation &gt; abbreviates HOME directory path with ~</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.19616700000000264ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>integration: full progress cycle &gt; complete cycle: start, work, accumulate tokens, stop</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.656125000000003ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>integration: full progress cycle &gt; quick operation: start and stop quickly</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.11912499999999682ms</td>
+        </tr><tr>
+            <td class="file">tests/output-progress.test.ts</td>
+            <td>integration: full progress cycle &gt; long operation with multiple token batches</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.17729200000002265ms</td>
+        </tr><tr>
+            <td class="file">tests/output.test.ts</td>
+            <td>output &gt; streamToken writes to stdout</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">33.257082999999994ms</td>
+        </tr><tr>
+            <td class="file">tests/output.test.ts</td>
+            <td>output &gt; emitJson outputs valid JSON</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9545830000000137ms</td>
+        </tr><tr>
+            <td class="file">tests/program.test.ts</td>
+            <td>program &gt; creates a program with forge name</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">2.153583000000026ms</td>
+        </tr><tr>
+            <td class="file">tests/program.test.ts</td>
+            <td>program &gt; has version set</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.20416700000004084ms</td>
+        </tr><tr>
+            <td class="file">tests/program.test.ts</td>
+            <td>program &gt; registers init command</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.42966700000005176ms</td>
+        </tr><tr>
+            <td class="file">tests/program.test.ts</td>
+            <td>program &gt; registers chat command</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.18966699999998582ms</td>
+        </tr><tr>
+            <td class="file">tests/program.test.ts</td>
+            <td>program &gt; registers doctor command</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.15770800000001373ms</td>
+        </tr><tr>
+            <td class="file">tests/program.test.ts</td>
+            <td>program &gt; registers run command</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.16662500000001046ms</td>
+        </tr><tr>
+            <td class="file">tests/program.test.ts</td>
+            <td>program &gt; registers logs command</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.1676249999999868ms</td>
+        </tr><tr>
+            <td class="file">tests/program.test.ts</td>
+            <td>program &gt; chat command has model option</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.23087500000002592ms</td>
+        </tr><tr>
+            <td class="file">tests/program.test.ts</td>
+            <td>program &gt; run command has dangerously option</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.2275420000000281ms</td>
+        </tr><tr>
+            <td class="file">tests/program.test.ts</td>
+            <td>program &gt; run command defaults max-turns to 50</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.19937500000003183ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Protocol: Unknown finishReason handling &gt; 12.1 content_filter finishReason — treated as stop</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">25.727999999999952ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Protocol: Unknown finishReason handling &gt; 12.2 empty finishReason — loop terminates normally</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.2833330000000274ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Protocol: Unknown finishReason handling &gt; 12.3 tool_calls finishReason but empty toolCalls array</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9044590000000312ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Protocol: Malformed tool responses &gt; 12.4 malformed JSON in tool arguments — falls back to empty args</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">2.3787079999999605ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Protocol: Malformed tool responses &gt; 12.5 missing tool_call ID — generates fallback ID</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.7485420000000431ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Protocol: Malformed tool responses &gt; 12.6 tool execution throws — yields error in tool_result</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9069999999999823ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Untested tools: patch_file &gt; 12.7 patch_file applies a simple unified diff</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">13.78370799999999ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Untested tools: notebook_edit edge cases &gt; 12.8 notebook_edit — append cell beyond length</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.5465419999999881ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Untested tools: notebook_edit edge cases &gt; 12.9 notebook_edit — invalid JSON notebook</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.1496249999999577ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Untested tools: notebook_edit edge cases &gt; 12.10 notebook_edit — notebook missing cells array</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.12487499999997453ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Untested tools: git in non-repo directory &gt; 12.11 git_status in non-repo directory fails gracefully</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">13.47441699999996ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Untested tools: git in non-repo directory &gt; 12.12 git_log in non-repo directory fails gracefully</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">12.722958000000006ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Untested tools: git in non-repo directory &gt; 12.13 git_diff in non-repo directory fails gracefully</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">16.595083000000045ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Untested tools: git in non-repo directory &gt; 12.13b git_commit in non-repo directory fails gracefully</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">13.627875000000017ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Error cascade: one failure does not corrupt next operation &gt; 12.14 failed edit does not corrupt file content</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3802090000000362ms</td>
+        </tr><tr>
+            <td class="file">tests/protocol.test.ts</td>
+            <td>Error cascade: one failure does not corrupt next operation &gt; 12.15 failed multi_edit preserves partial changes on disk</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.289291999999989ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Text Streaming &gt; yields text content in chunks</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">35.045041999999995ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Text Streaming &gt; accumulates usage tokens in final event</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">4.20433300000002ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Finish Reason Handling &gt; auto-retries on terminated finish_reason</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">3.3487499999999955ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Finish Reason Handling &gt; terminated after 3 retries yields final message and done</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.291249999999991ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Finish Reason Handling &gt; length finish_reason triggers auto-continue</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">5.907792000000001ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Finish Reason Handling &gt; stop with complete text does not auto-continue</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">3.180082999999996ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Finish Reason Handling &gt; stop with incomplete text (colon ending) triggers auto-continue</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.2510409999999865ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Finish Reason Handling &gt; stop with incomplete text (Let me) on round 0 does NOT auto-continue</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.602833000000004ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Rate Limit Retry &gt; retries on 429 rate limit error</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">7.738207999999986ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Error Handling &gt; yields error event on exception</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">2.87824999999998ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Error Handling &gt; yields usage even when error occurs after tokens consumed</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.7413329999999974ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Usage Accumulation &gt; accumulates usage across multiple rounds</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">2.927750000000003ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Abort Signal &gt; yields interrupted message when aborted between rounds</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.758624999999995ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Edge Cases &gt; handles empty stream gracefully</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.8260409999999752ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Edge Cases &gt; handles chunks with missing delta field</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.2864999999999895ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Edge Cases &gt; handles missing usage in stream</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9494589999999903ms</td>
+        </tr><tr>
+            <td class="file">tests/provider-stream-resilience.test.ts</td>
+            <td>streamChat - Edge Cases &gt; handles chunks with no choices field</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">2.8125ms</td>
+        </tr><tr>
+            <td class="file">tests/providers-command.test.ts</td>
+            <td>providers command &gt; lists provider metadata including context and pricing</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">6.578332999999986ms</td>
+        </tr><tr>
+            <td class="file">tests/regression.test.ts</td>
+            <td>Regression: Shell injection hardening &gt; R.1 search_files — single quote in pattern does not break grep</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">14.921041000000002ms</td>
+        </tr><tr>
+            <td class="file">tests/regression.test.ts</td>
+            <td>Regression: Shell injection hardening &gt; R.2 search_files — semicolon in pattern does not execute commands</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">14.162874999999985ms</td>
+        </tr><tr>
+            <td class="file">tests/regression.test.ts</td>
+            <td>Regression: Shell injection hardening &gt; R.3 find_definition — single quote in name does not break grep</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">16.248625000000004ms</td>
+        </tr><tr>
+            <td class="file">tests/regression.test.ts</td>
+            <td>Regression: Shell injection hardening &gt; R.4 find_references — special chars in name are escaped</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">10.350833999999992ms</td>
+        </tr><tr>
+            <td class="file">tests/regression.test.ts</td>
+            <td>Regression: Shell injection hardening &gt; R.5 glob_files — path with single quote does not break shell</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">17.799957999999975ms</td>
+        </tr><tr>
+            <td class="file">tests/regression.test.ts</td>
+            <td>Regression: Boundary condition fixes &gt; R.6 read_file — start_line: 0 now clamps to line 1</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.2388339999999971ms</td>
+        </tr><tr>
+            <td class="file">tests/regression.test.ts</td>
+            <td>Regression: Boundary condition fixes &gt; R.7 read_file — negative start_line clamps to 0</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.09954199999998536ms</td>
+        </tr><tr>
+            <td class="file">tests/regression.test.ts</td>
+            <td>Regression: Boundary condition fixes &gt; R.8 notebook_edit — negative cell_index now rejected</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.11258300000002919ms</td>
+        </tr><tr>
+            <td class="file">tests/regression.test.ts</td>
+            <td>Regression: Boundary condition fixes &gt; R.9 notebook_edit — negative cell_index: -999 also rejected</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.06295800000003737ms</td>
+        </tr><tr>
+            <td class="file">tests/regression.test.ts</td>
+            <td>Regression: Plan ID uniqueness &gt; R.10 create_plan — rapid calls produce unique IDs (counter-based)</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">2.083250000000021ms</td>
+        </tr><tr>
+            <td class="file">tests/regression.test.ts</td>
+            <td>Regression: Plan ID uniqueness &gt; R.11 create_plan — IDs are monotonically increasing</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.36499999999995225ms</td>
+        </tr><tr>
+            <td class="file">tests/regression.test.ts</td>
+            <td>Regression: multi_edit atomicity &gt; R.12 failed multi_edit does not write partial results to disk</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.28154200000000174ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Project context: Node/TypeScript detection &gt; 14.1 detects node-typescript project type</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">41.82462499999997ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Project context: Node/TypeScript detection &gt; 14.2 reads project name from package.json</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">38.213374999999985ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Project context: Node/TypeScript detection &gt; 14.3 counts dependencies correctly</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">42.8163330000001ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Project context: Node/TypeScript detection &gt; 14.4 detects framework from dependencies</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">54.44987500000002ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Project context: Node/TypeScript detection &gt; 14.5 detects test runner</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">48.9580830000001ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Project context: Node/TypeScript detection &gt; 14.6 detects multiple languages</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">57.86450000000002ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Project context: Node/TypeScript detection &gt; 14.7 detects entry points</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">44.87537499999996ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Project context: Node/TypeScript detection &gt; 14.8 includes git info</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">43.608167000000094ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Project context: Node/TypeScript detection &gt; 14.9 formatContextForPrompt produces readable summary</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">47.61562500000002ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Project context: Node/TypeScript detection &gt; 14.10 buildSystemPrompt includes project context</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">83.33520800000008ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Smart output truncation &gt; 14.11 large search output includes summary header</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">30.98599999999999ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Smart output truncation &gt; 14.12 short output is not truncated</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">17.301165999999967ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Error messages include recovery hints &gt; 14.13 read_file &quot;not found&quot; suggests list_directory</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.15866699999992306ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Error messages include recovery hints &gt; 14.14 edit_file &quot;not found&quot; suggests read_file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.15637500000002547ms</td>
+        </tr><tr>
+            <td class="file">tests/sota-capabilities.test.ts</td>
+            <td>Error messages include recovery hints &gt; 14.15 edit_file &quot;multiple matches&quot; suggests more context</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.16183300000000145ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Tool Registry &gt; has exactly 41 tools</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.8287920000000213ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Tool Registry &gt; all tools have valid function calling schema</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">1.6259580000000255ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Tool Registry &gt; no duplicate names</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.07504199999999628ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Tool Registry &gt; DANGEROUS_TOOLS are valid tool names</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.11920899999995527ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Tool Registry &gt; has exactly 9 dangerous tools</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.034874999999999545ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: File I/O &gt; read_file — full file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.38700000000000045ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: File I/O &gt; read_file — line range</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.14070800000001782ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: File I/O &gt; write_file — create new</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.4662500000000023ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: File I/O &gt; write_file — overwrite existing shows delta</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.6250410000000102ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: File I/O &gt; edit_file — precise replacement</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3427090000000135ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: File I/O &gt; edit_file — fails on non-unique match</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.1887909999999806ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: File I/O &gt; delete_file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">8.155417ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: File I/O &gt; move_file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">7.824541000000011ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: File I/O &gt; copy_file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">11.508417000000009ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: File I/O &gt; create_directory</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">10.327457999999979ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: File I/O &gt; file_info</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9775000000000205ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Search &amp; Navigation &gt; list_directory</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.44375000000002274ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Search &amp; Navigation &gt; list_directory — recursive</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.5119159999999852ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Search &amp; Navigation &gt; glob_files — *.ts</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">13.147290999999996ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Search &amp; Navigation &gt; search_files — pattern match</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">17.456833999999958ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Search &amp; Navigation &gt; find_definition — function</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">13.176582999999937ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Search &amp; Navigation &gt; find_definition — class</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">17.358541999999943ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Search &amp; Navigation &gt; find_references — symbol usage</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">19.025333000000046ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Search &amp; Navigation &gt; directory_tree</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">22.978124999999977ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Search &amp; Navigation &gt; count_lines</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">34.624582999999916ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Search &amp; Navigation &gt; tool_search — finds git tools</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.16541700000004766ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Search &amp; Navigation &gt; tool_search — finds file tools</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.06583299999999781ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Git &gt; git_status</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">16.678291999999942ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Git &gt; git_log</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">18.810416000000032ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Git &gt; git_diff</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">20.673958999999968ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Execution &gt; run_command — echo</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">7.711084000000028ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Execution &gt; run_command — cwd override</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">7.695959000000016ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Execution &gt; run_command — timeout on long command</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">115.89441699999998ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Execution &gt; check_port — reports an occupied port</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">120.52545800000007ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Task Management &gt; full lifecycle: create → update → list</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3182920000000422ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Planning &gt; create_plan</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.4963749999999436ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Planning &gt; verify_plan — check passes</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">14.083583999999973ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Planning &gt; verify_plan — check fails</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">8.314041999999972ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Interaction &gt; notify_user</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.577541999999994ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: MCP &gt; mcp_list_servers — no config</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.13287500000001273ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Error Handling &gt; unknown tool returns error</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.04150000000004184ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Error Handling &gt; read_file — missing file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.04587500000002365ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Error Handling &gt; edit_file — missing file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.04179099999998925ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Error Handling &gt; edit_file — empty old_string</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.03745800000001509ms</td>
+        </tr><tr>
+            <td class="file">tests/tools-full.test.ts</td>
+            <td>Round 1: Error Handling &gt; run_command — invalid command</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">15.251540999999975ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>TOOL_DEFINITIONS &gt; has 41 tools registered</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.8223330000000146ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>TOOL_DEFINITIONS &gt; every tool has name, description, and parameters</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.9712920000000054ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>TOOL_DEFINITIONS &gt; has no duplicate tool names</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.06258399999998687ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>TOOL_DEFINITIONS &gt; DANGEROUS_TOOLS is a subset of defined tools</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.11566600000000449ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>read_file &gt; reads an existing file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.35650000000001114ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>read_file &gt; reads with line range</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.13170800000000327ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>read_file &gt; fails for missing file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.06329099999999244ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>edit_file &gt; replaces a unique string</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.37220800000000054ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>edit_file &gt; fails when old_string not found</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.08395799999999554ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>edit_file &gt; fails when old_string matches multiple locations</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.16629199999999855ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>glob_files &gt; finds TypeScript files</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">15.282250000000005ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>glob_files &gt; returns no matches for missing pattern</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">16.180166999999983ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>write_file &gt; creates a new file</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.45654100000001563ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>write_file &gt; overwrites existing file with line delta</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3241250000000093ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>list_directory &gt; lists directory entries</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.3677500000000009ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>search_files &gt; finds pattern in files</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">15.50645800000001ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>file_info &gt; returns file metadata</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.8293749999999989ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>task management &gt; create → update → list lifecycle</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.2587919999999997ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>tool_search &gt; finds tools by keyword</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.24766599999998107ms</td>
+        </tr><tr>
+            <td class="file">tests/tools.test.ts</td>
+            <td>unknown tool &gt; returns error for unknown tool</td>
+            <td class="center"><span class="badge pass">PASS</span></td>
+            <td class="center">0.0822080000000085ms</td>
+        </tr></tbody>
+</table>
+</div>
+
+<footer>
+    <p>Forge CLI v0.2.0 — Comprehensive Test Report</p>
+    <p>Maurice | maurice_wen@proton.me</p>
+    <p style="font-size:12px; margin-top:8px;">Generated 2026-04-12 19:52:08 | vitest + Node.js | 31 suites, 424 cases, 100.0% pass rate</p>
+</footer>
+</body>
+</html>

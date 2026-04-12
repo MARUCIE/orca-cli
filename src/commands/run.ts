@@ -1,5 +1,5 @@
 /**
- * `forge run` — Execute an agent task in the current directory.
+ * `orca run` — Execute an agent task in the current directory.
  *
  * Unlike `chat`, `run` is designed for task execution:
  *   - Defaults to acceptEdits permission mode
@@ -7,13 +7,13 @@
  *   - Outputs structured result summary
  *
  * Usage:
- *   forge run "fix the failing tests"
- *   forge run "add error handling to api.ts" --model claude-opus-4-20250514
- *   forge run "refactor to TypeScript" --max-turns 50
+ *   orca run "fix the failing tests"
+ *   orca run "add error handling to api.ts" --model claude-opus-4-20250514
+ *   orca run "refactor to TypeScript" --max-turns 50
  */
 
 import { Command } from 'commander'
-import type { ForgeConfig } from '../config.js'
+import type { OrcaConfig } from '../config.js'
 import { resolveConfig, resolveProvider } from '../config.js'
 import {
   printBanner, printProviderInfo, printError,
@@ -94,7 +94,7 @@ interface ExecuteTaskOptions {
   apiKey: string
   model: string
   baseURL?: string
-  config: ForgeConfig
+  config: OrcaConfig
   outputMode: OutputMode
   cwd: string
   dangerously: boolean
@@ -105,10 +105,10 @@ async function executeTask(options: ExecuteTaskOptions): Promise<void> {
 
   let sdk: { createAgent: (opts: Record<string, unknown>) => { query: (p: string) => AsyncIterable<unknown> } }
   try {
-    // @ts-ignore — @armature/sdk is an optional dependency for native provider path
-    sdk = await import('@armature/sdk')
+    // @ts-ignore — @orca/sdk is an optional dependency for native provider path
+    sdk = await import('@orca/sdk')
   } catch {
-    throw new Error('@armature/sdk not installed. Use --provider poe for proxy mode, or npm install @armature/sdk for native mode.')
+    throw new Error('@orca/sdk not installed. Use --provider poe for proxy mode, or npm install @orca/sdk for native mode.')
   }
 
   if (dangerously) {
@@ -198,10 +198,10 @@ async function executeTask(options: ExecuteTaskOptions): Promise<void> {
   })
 }
 
-function buildFlags(opts: RunOptions): Partial<ForgeConfig> {
-  const flags: Partial<ForgeConfig> = {}
+function buildFlags(opts: RunOptions): Partial<OrcaConfig> {
+  const flags: Partial<OrcaConfig> = {}
   if (opts.model) flags.model = opts.model
-  if (opts.provider) flags.provider = opts.provider as ForgeConfig['provider']
+  if (opts.provider) flags.provider = opts.provider as OrcaConfig['provider']
   if (opts.apiKey) flags.apiKey = opts.apiKey
   if (opts.maxTurns) flags.maxTurns = parseInt(opts.maxTurns, 10)
   if (opts.systemPrompt) flags.systemPrompt = opts.systemPrompt

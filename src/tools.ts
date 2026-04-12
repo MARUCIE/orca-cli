@@ -1,5 +1,5 @@
 /**
- * Forge CLI built-in tools for function calling.
+ * Orca CLI built-in tools for function calling.
  *
  * These tools are passed to the OpenAI-compatible chat completions API
  * as function definitions, enabling the model to autonomously read files,
@@ -8,7 +8,11 @@
 
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { basename } from 'node:path'
+import { homedir } from 'node:os'
+import { createHash } from 'node:crypto'
 import { execSync } from 'node:child_process'
+import { startBackgroundJob } from './background-jobs.js'
 
 // ── Tool Definitions (OpenAI function calling format) ───────────
 
@@ -171,7 +175,7 @@ export const TOOL_DEFINITIONS = [
   { type: 'function' as const, function: { name: 'multi_edit', description: 'Apply multiple edits to the same file in one operation. Each edit is an old_string→new_string replacement.', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File to edit' }, edits: { type: 'array', items: { type: 'object', properties: { old_string: { type: 'string' }, new_string: { type: 'string' } }, required: ['old_string', 'new_string'] }, description: 'Array of {old_string, new_string} pairs' } }, required: ['path', 'edits'] } } },
   { type: 'function' as const, function: { name: 'patch_file', description: 'Apply a unified diff patch to a file.', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File to patch' }, patch: { type: 'string', description: 'Unified diff content' } }, required: ['path', 'patch'] } } },
   // ── Process ─────────────────────────────────────────
-  { type: 'function' as const, function: { name: 'run_background', description: 'Start a long-running command in the background. Returns a process ID.', parameters: { type: 'object', properties: { command: { type: 'string', description: 'Command to run' }, cwd: { type: 'string', description: 'Working directory' } }, required: ['command'] } } },
+  { type: 'function' as const, function: { name: 'run_background', description: 'Start a long-running command in the background. Returns a tracked job record and can notify the REPL when the job finishes.', parameters: { type: 'object', properties: { command: { type: 'string', description: 'Command to run' }, cwd: { type: 'string', description: 'Working directory' }, notify_on_complete: { type: 'boolean', description: 'If true (default), surface a completion notification when the job finishes' } }, required: ['command'] } } },
   { type: 'function' as const, function: { name: 'check_port', description: 'Check if a network port is in use and what process is using it.', parameters: { type: 'object', properties: { port: { type: 'number', description: 'Port number to check' } }, required: ['port'] } } },
   // ── Agent & Delegation ─────────────────────────────
   { type: 'function' as const, function: { name: 'spawn_agent', description: 'Spawn a sub-agent to handle a task in parallel. The sub-agent has its own conversation and tool access. Returns the result when done.', parameters: { type: 'object', properties: { task: { type: 'string', description: 'Task description for the sub-agent' }, type: { type: 'string', description: 'Agent type: general (default), explore (fast search), plan (design only)' } }, required: ['task'] } } },
@@ -212,64 +216,69 @@ export const DANGEROUS_TOOLS = new Set([
   'delete_file', 'move_file', 'run_command', 'run_background', 'git_commit',
 ])
 
+const TOOL_SCHEMA_BY_NAME = new Map(
+  TOOL_DEFINITIONS.map((tool) => [tool.function.name, tool.function.parameters] as const),
+)
+
 export function executeTool(name: string, args: Record<string, unknown>, cwd: string): ToolResult {
   try {
+    const normalizedArgs = normalizeToolArgs(name, args)
     switch (name) {
-      case 'read_file': return executeReadFile(args, cwd)
-      case 'list_directory': return executeListDirectory(args, cwd)
-      case 'run_command': return executeRunCommand(args, cwd)
-      case 'search_files': return executeSearchFiles(args, cwd)
-      case 'write_file': return executeWriteFile(args, cwd)
-      case 'edit_file': return executeEditFile(args, cwd)
-      case 'glob_files': return executeGlobFiles(args, cwd)
-      case 'delete_file': return execShellTool(`rm '${resolve(cwd, String(args.path || ''))}'`, cwd)
-      case 'move_file': return execShellTool(`mv '${resolve(cwd, String(args.source || ''))}' '${resolve(cwd, String(args.destination || ''))}'`, cwd)
-      case 'copy_file': return execShellTool(`cp '${resolve(cwd, String(args.source || ''))}' '${resolve(cwd, String(args.destination || ''))}'`, cwd)
-      case 'create_directory': return execShellTool(`mkdir -p '${resolve(cwd, String(args.path || ''))}'`, cwd)
-      case 'file_info': return executeFileInfo(args, cwd)
-      case 'find_definition': return executeFindDefinition(args, cwd)
+      case 'read_file': return executeReadFile(normalizedArgs, cwd)
+      case 'list_directory': return executeListDirectory(normalizedArgs, cwd)
+      case 'run_command': return executeRunCommand(normalizedArgs, cwd)
+      case 'search_files': return executeSearchFiles(normalizedArgs, cwd)
+      case 'write_file': return executeWriteFile(normalizedArgs, cwd)
+      case 'edit_file': return executeEditFile(normalizedArgs, cwd)
+      case 'glob_files': return executeGlobFiles(normalizedArgs, cwd)
+      case 'delete_file': return execShellTool(`rm '${resolve(cwd, String(normalizedArgs.path || ''))}'`, cwd)
+      case 'move_file': return execShellTool(`mv '${resolve(cwd, String(normalizedArgs.source || ''))}' '${resolve(cwd, String(normalizedArgs.destination || ''))}'`, cwd)
+      case 'copy_file': return execShellTool(`cp '${resolve(cwd, String(normalizedArgs.source || ''))}' '${resolve(cwd, String(normalizedArgs.destination || ''))}'`, cwd)
+      case 'create_directory': return execShellTool(`mkdir -p '${resolve(cwd, String(normalizedArgs.path || ''))}'`, cwd)
+      case 'file_info': return executeFileInfo(normalizedArgs, cwd)
+      case 'find_definition': return executeFindDefinition(normalizedArgs, cwd)
       case 'find_references': {
-        const refName = shellEscape(String(args.name || ''))
-        const refPath = shellEscape(resolve(cwd, String(args.path || '.')))
+        const refName = shellEscape(String(normalizedArgs.name || ''))
+        const refPath = shellEscape(resolve(cwd, String(normalizedArgs.path || '.')))
         const refIncludes = ['ts','js','py','go','rs','java','c','cpp','h','rb'].map(e => `--include='*.${e}'`).join(' ')
         return execShellTool(`grep -rn '\\b${refName}\\b' '${refPath}' ${refIncludes} 2>/dev/null | head -30`, cwd)
       }
-      case 'directory_tree': return execShellTool(`find '${shellEscape(resolve(cwd, String(args.path || '.')))}' -maxdepth ${Number(args.depth) || 3} -not -path '*/\\.*' -not -path '*/node_modules/*' 2>/dev/null | head -200 | sort`, cwd)
-      case 'count_lines': return execShellTool(`find '${shellEscape(resolve(cwd, String(args.path || '.')))}' -type f -not -path '*/\\.*' -not -path '*/node_modules/*' -not -path '*/dist/*' | xargs wc -l 2>/dev/null | sort -rn | head -30`, cwd)
+      case 'directory_tree': return execShellTool(`find '${shellEscape(resolve(cwd, String(normalizedArgs.path || '.')))}' -maxdepth ${Number(normalizedArgs.depth) || 3} -not -path '*/\\.*' -not -path '*/node_modules/*' 2>/dev/null | head -200 | sort`, cwd)
+      case 'count_lines': return execShellTool(`find '${shellEscape(resolve(cwd, String(normalizedArgs.path || '.')))}' -type f -not -path '*/\\.*' -not -path '*/node_modules/*' -not -path '*/dist/*' | xargs wc -l 2>/dev/null | sort -rn | head -30`, cwd)
       case 'git_status': return execShellTool('git status --short', cwd)
-      case 'git_diff': return execShellTool(`git diff ${args.staged ? '--staged' : ''} ${args.path ? `'${shellEscape(String(args.path))}'` : ''} 2>/dev/null`, cwd)
-      case 'git_log': return execShellTool(`git log --oneline -${Number(args.count) || 10} ${args.path ? `-- '${shellEscape(String(args.path))}'` : ''}`, cwd)
-      case 'git_commit': return executeGitCommit(args, cwd)
-      case 'fetch_url': return executeFetchUrl(args)
-      case 'multi_edit': return executeMultiEdit(args, cwd)
-      case 'patch_file': return execShellTool(`echo '${String(args.patch || '').replace(/'/g, "'\\''")}' | patch '${resolve(cwd, String(args.path || ''))}'`, cwd)
-      case 'run_background': return execShellTool(`nohup ${String(args.command || '')} > /dev/null 2>&1 & echo "PID: $!"`, args.cwd ? resolve(cwd, String(args.cwd)) : cwd)
-      case 'check_port': return execShellTool(`lsof -i :${Number(args.port) || 0} 2>/dev/null || echo "Port ${args.port} is free"`, cwd)
+      case 'git_diff': return execShellTool(`git diff ${normalizedArgs.staged ? '--staged' : ''} ${normalizedArgs.path ? `'${shellEscape(String(normalizedArgs.path))}'` : ''} 2>/dev/null`, cwd)
+      case 'git_log': return execShellTool(`git log --oneline -${Number(normalizedArgs.count) || 10} ${normalizedArgs.path ? `-- '${shellEscape(String(normalizedArgs.path))}'` : ''}`, cwd)
+      case 'git_commit': return executeGitCommit(normalizedArgs, cwd)
+      case 'fetch_url': return executeFetchUrl(normalizedArgs)
+      case 'multi_edit': return executeMultiEdit(normalizedArgs, cwd)
+      case 'patch_file': return execShellTool(`echo '${String(normalizedArgs.patch || '').replace(/'/g, "'\\''")}' | patch '${resolve(cwd, String(normalizedArgs.path || ''))}'`, cwd)
+      case 'run_background': return executeRunBackground(normalizedArgs, cwd)
+      case 'check_port': return execShellTool(`lsof -i :${Number(normalizedArgs.port) || 0} 2>/dev/null || echo "Port ${normalizedArgs.port} is free"`, cwd)
       // Agent & delegation (handled at caller level for async — return stub here)
       case 'spawn_agent': return { success: true, output: '[spawn_agent requires async handling — see chat.ts onToolCall]' }
       case 'delegate_task': return { success: true, output: '[delegate_task requires async handling — see chat.ts onToolCall]' }
       // Task management
-      case 'task_create': return executeTaskCreate(args, cwd)
-      case 'task_update': return executeTaskUpdate(args, cwd)
+      case 'task_create': return executeTaskCreate(normalizedArgs, cwd)
+      case 'task_update': return executeTaskUpdate(normalizedArgs, cwd)
       case 'task_list': return executeTaskList(cwd)
       // User interaction (handled at caller level)
-      case 'ask_user': return { success: true, output: `[ask_user: ${String(args.question || '')}]` }
-      case 'notify_user': return executeNotifyUser(args)
+      case 'ask_user': return { success: true, output: `[ask_user: ${String(normalizedArgs.question || '')}]` }
+      case 'notify_user': return executeNotifyUser(normalizedArgs)
       // Planning
-      case 'create_plan': return executeCreatePlan(args, cwd)
-      case 'verify_plan': return executeVerifyPlan(args, cwd)
+      case 'create_plan': return executeCreatePlan(normalizedArgs, cwd)
+      case 'verify_plan': return executeVerifyPlan(normalizedArgs, cwd)
       // Web
-      case 'web_search': return executeWebSearch(args)
+      case 'web_search': return executeWebSearch(normalizedArgs)
       // MCP (async — handled in chat.ts onToolCall for live connections)
       case 'mcp_list_servers': return executeMcpListServers(cwd)
       case 'mcp_list_resources': return { success: true, output: '[mcp_list_resources: async — handled in chat.ts]' }
       case 'mcp_read_resource': return { success: true, output: '[mcp_read_resource: async — handled in chat.ts]' }
       // Scheduling
-      case 'sleep': return { success: true, output: `Waiting ${Number(args.seconds) || 1}s... ${String(args.reason || '')}` }
+      case 'sleep': return { success: true, output: `Waiting ${Number(normalizedArgs.seconds) || 1}s... ${String(normalizedArgs.reason || '')}` }
       // Notebook
-      case 'notebook_edit': return executeNotebookEdit(args, cwd)
+      case 'notebook_edit': return executeNotebookEdit(normalizedArgs, cwd)
       // Tool discovery
-      case 'tool_search': return executeToolSearch(args)
+      case 'tool_search': return executeToolSearch(normalizedArgs)
       default: return { success: false, output: `Unknown tool: ${name}` }
     }
   } catch (err) {
@@ -280,6 +289,97 @@ export function executeTool(name: string, args: Record<string, unknown>, cwd: st
 /** Escape a string for safe use inside single-quoted shell arguments. */
 function shellEscape(s: string): string {
   return s.replace(/'/g, "'\\''")
+}
+
+function normalizeToolArgs(name: string, args: Record<string, unknown>): Record<string, unknown> {
+  const schema = TOOL_SCHEMA_BY_NAME.get(name)
+  if (!schema || typeof schema !== 'object') return args
+
+  const properties = (schema as unknown as { properties?: Record<string, Record<string, unknown> | undefined> }).properties
+  if (!properties) return args
+
+  const normalized: Record<string, unknown> = { ...args }
+  for (const [key, propertySchema] of Object.entries(properties)) {
+    if (!propertySchema) continue
+    normalized[key] = coerceValue(normalized[key], propertySchema)
+  }
+  return normalized
+}
+
+function coerceValue(value: unknown, schema: Record<string, unknown>): unknown {
+  if (value === undefined || value === null) return value
+
+  const type = schema.type
+  if (type === 'number') {
+    if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) {
+      return Number(value)
+    }
+    return value
+  }
+
+  if (type === 'boolean') {
+    if (typeof value === 'string') {
+      const lower = value.trim().toLowerCase()
+      if (lower === 'true') return true
+      if (lower === 'false') return false
+    }
+    return value
+  }
+
+  if (type === 'array') {
+    const itemSchema = (schema.items || {}) as Record<string, unknown>
+    if (Array.isArray(value)) {
+      return value.map((item) => coerceValue(item, itemSchema))
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed)
+          if (Array.isArray(parsed)) {
+            return parsed.map((item) => coerceValue(item, itemSchema))
+          }
+        } catch { /* fall through */ }
+      }
+      if (itemSchema.type === 'string') {
+        return trimmed
+          .split(/\s*,\s*|\n+/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+      }
+    }
+    return value
+  }
+
+  if (type === 'object' && typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      if (parsed && typeof parsed === 'object') return parsed
+    } catch { /* ignore invalid JSON */ }
+  }
+
+  return value
+}
+
+function getToolResultsDir(): string {
+  const orcaHome = process.env.ORCA_HOME || join(process.env.HOME || homedir(), '.orca')
+  const dir = join(orcaHome, 'tool-results')
+  mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+function persistOversizedToolOutput(label: string, output: string): string {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const safeLabel = label.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'tool-output'
+  const hash = createHash('sha1').update(output).digest('hex').slice(0, 8)
+  const filePath = join(getToolResultsDir(), `${timestamp}-${safeLabel}-${hash}.txt`)
+  writeFileSync(filePath, output, 'utf-8')
+  return filePath
+}
+
+function formatPersistedOutput(fullOutput: string, preview: string, summary: string, label: string): string {
+  const artifactPath = persistOversizedToolOutput(label, fullOutput)
+  return `${summary}\nSaved full output to ${artifactPath}\n${preview}\n... (truncated, ${fullOutput.split('\n').length} total lines)`
 }
 
 /**
@@ -297,8 +397,9 @@ function smartTruncate(output: string, limit = 8_000): string {
     const match = line.match(/^([^:]+\.[a-zA-Z]+):\d+/)
     if (match) fileSet.add(match[1]!)
   }
-  const summary = `[${totalLines} lines total, ${fileSet.size > 0 ? `${fileSet.size} files: ${[...fileSet].slice(0, 5).join(', ')}${fileSet.size > 5 ? '...' : ''}` : 'truncated'}]\n`
-  return summary + output.slice(0, limit - summary.length) + `\n... (truncated, ${totalLines} total lines)`
+  const summary = `[${totalLines} lines total, ${fileSet.size > 0 ? `${fileSet.size} files: ${[...fileSet].slice(0, 5).join(', ')}${fileSet.size > 5 ? '...' : ''}` : 'truncated'}]`
+  const preview = output.slice(0, Math.max(0, limit - 400))
+  return formatPersistedOutput(output, preview, summary, 'tool-output')
 }
 
 /** Shell helper for simple tools */
@@ -329,7 +430,12 @@ function executeReadFile(args: Record<string, unknown>, cwd: string): ToolResult
   if (selected.length > 300) {
     return {
       success: true,
-      output: selected.slice(0, 300).join('\n') + `\n\n... (truncated, ${lines.length} total lines)`,
+      output: formatPersistedOutput(
+        selected.join('\n'),
+        selected.slice(0, 300).join('\n'),
+        `[${selected.length} lines requested from ${basename(filePath)}]`,
+        basename(filePath),
+      ),
     }
   }
   return { success: true, output: selected.join('\n') }
@@ -349,7 +455,7 @@ function executeListDirectory(args: Record<string, unknown>, cwd: string): ToolR
     try {
       const items = readdirSync(dir)
       for (const item of items) {
-        if (item.startsWith('.') && item !== '.armature.json') continue
+        if (item.startsWith('.') && item !== '.orca.json') continue
         const fullPath = join(dir, item)
         try {
           const stat = statSync(fullPath)
@@ -366,7 +472,15 @@ function executeListDirectory(args: Record<string, unknown>, cwd: string): ToolR
   listDir(dirPath, '', 0)
 
   if (entries.length >= 200) {
-    return { success: true, output: entries.join('\n') + '\n... (truncated at 200 entries)' }
+    return {
+      success: true,
+      output: formatPersistedOutput(
+        entries.join('\n'),
+        entries.slice(0, 200).join('\n'),
+        `[${entries.length} directory entries total]`,
+        `list-${basename(dirPath) || 'root'}`,
+      ),
+    }
   }
   return { success: true, output: entries.join('\n') || '(empty directory)' }
 }
@@ -385,11 +499,34 @@ function executeRunCommand(args: Record<string, unknown>, cwd: string): ToolResu
       maxBuffer: 1024 * 1024,
       stdio: ['pipe', 'pipe', 'pipe'],
     })
-    return { success: true, output: output.slice(0, 10_000) }
+    return { success: true, output: smartTruncate(output, 10_000) }
   } catch (err) {
     const execErr = err as { stdout?: string; stderr?: string; message: string }
     const output = (execErr.stdout || '') + (execErr.stderr || '') || execErr.message
     return { success: false, output: output.slice(0, 5_000) }
+  }
+}
+
+function executeRunBackground(args: Record<string, unknown>, cwd: string): ToolResult {
+  const command = String(args.command || '')
+  if (!command) return { success: false, output: 'command is required.' }
+
+  const execCwd = args.cwd ? resolve(cwd, String(args.cwd)) : cwd
+  const notifyOnComplete = args.notify_on_complete !== false
+
+  try {
+    const job = startBackgroundJob(command, execCwd, notifyOnComplete)
+    return {
+      success: true,
+      output: [
+        `Started background job ${job.id}`,
+        `cwd: ${job.cwd}`,
+        `log: ${job.logPath}`,
+        `notify_on_complete: ${job.notifyOnComplete ? 'true' : 'false'}`,
+      ].join('\n'),
+    }
+  } catch (err) {
+    return { success: false, output: err instanceof Error ? err.message : String(err) }
   }
 }
 
@@ -561,11 +698,26 @@ function executeGitCommit(args: Record<string, unknown>, cwd: string): ToolResul
   try {
     const files = args.files as string[] | undefined
     if (files && files.length > 0) {
-      execSync(`git add ${files.map(f => `'${f}'`).join(' ')}`, { cwd, encoding: 'utf-8', timeout: 10_000 })
+      execSync(`git add ${files.map(f => `'${f}'`).join(' ')}`, {
+        cwd,
+        encoding: 'utf-8',
+        timeout: 10_000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
     } else {
-      execSync('git add -A', { cwd, encoding: 'utf-8', timeout: 10_000 })
+      execSync('git add -A', {
+        cwd,
+        encoding: 'utf-8',
+        timeout: 10_000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
     }
-    const output = execSync(`git commit -m '${message.replace(/'/g, "'\\''")}'`, { cwd, encoding: 'utf-8', timeout: 10_000 })
+    const output = execSync(`git commit -m '${message.replace(/'/g, "'\\''")}'`, {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 10_000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
     return { success: true, output }
   } catch (err) {
     const e = err as { stdout?: string; stderr?: string; message: string }
@@ -584,7 +736,7 @@ function executeFetchUrl(args: Record<string, unknown>): ToolResult {
       ? `curl -sI '${safeUrl}' 2>/dev/null | head -30`
       : `curl -sL '${safeUrl}' 2>/dev/null | head -500`
     const output = execSync(cmd, { encoding: 'utf-8', timeout: 15_000, maxBuffer: 2 * 1024 * 1024 })
-    return { success: true, output: output.slice(0, 20_000) }
+    return { success: true, output: smartTruncate(output, 20_000) }
   } catch (err) {
     return { success: false, output: err instanceof Error ? err.message : String(err) }
   }
@@ -681,9 +833,9 @@ function executeCreatePlan(args: Record<string, unknown>, cwd: string): ToolResu
     steps: steps.map((s, i) => `${i + 1}. ${s}`),
     createdAt: new Date().toISOString(),
   }
-  // Save plan to .armature/plans/
+  // Save plan to .orca/plans/
   try {
-    const planDir = join(cwd, '.armature', 'plans')
+    const planDir = join(cwd, '.orca', 'plans')
     mkdirSync(planDir, { recursive: true })
     writeFileSync(join(planDir, `${plan.id}.json`), JSON.stringify(plan, null, 2), 'utf-8')
   } catch { /* ignore */ }
@@ -724,8 +876,8 @@ function executeWebSearch(args: Record<string, unknown>): ToolResult {
 function executeMcpListServers(cwd: string): ToolResult {
   const configPaths = [
     join(cwd, '.mcp.json'),
-    join(cwd, '.armature', 'mcp.json'),
-    join(process.env.HOME || '/tmp', '.armature', 'mcp.json'),
+    join(cwd, '.orca', 'mcp.json'),
+    join(process.env.HOME || '/tmp', '.orca', 'mcp.json'),
   ]
   const servers: string[] = []
   for (const p of configPaths) {
@@ -741,7 +893,7 @@ function executeMcpListServers(cwd: string): ToolResult {
     }
   }
   if (servers.length === 0) {
-    return { success: true, output: 'No MCP servers configured. Add servers to .mcp.json or .armature/mcp.json.' }
+    return { success: true, output: 'No MCP servers configured. Add servers to .mcp.json or .orca/mcp.json.' }
   }
   return { success: true, output: `MCP Servers:\n${servers.join('\n')}` }
 }

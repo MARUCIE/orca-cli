@@ -1,12 +1,12 @@
 {
-  "name": "@armature/forge-cli",
+  "name": "orca-cli",
   "version": "0.2.0",
-  "description": "Forge CLI — provider-neutral agent runtime with Claude Code depth",
+  "description": "Orca CLI — provider-neutral agent runtime with Claude Code depth",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "forge": "./dist/bin/forge.js"
+    "orca": "./dist/bin/orca.js"
   },
   "exports": {
     ".": {
@@ -19,7 +19,7 @@
     "test": "node --experimental-vm-modules node_modules/.bin/vitest run",
     "lint": "tsc --noEmit",
     "dev": "tsc --watch",
-    "bench": "node dist/bin/forge.js bench",
+    "bench": "node dist/bin/orca.js bench",
     "prepublishOnly": "npm run build && npm test && npm run bench"
   },
   "dependencies": {
@@ -44,9 +44,8 @@
     "cli",
     "agent",
     "coding-agent",
-    "forge",
+    "orca",
     "multi-model",
-    "poe",
     "openai",
     "claude",
     "gemini",
@@ -60,9 +59,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/MARUCIE/forge-cli.git"
+    "url": "https://github.com/MARUCIE/orca-cli.git"
   },
-  "homepage": "https://github.com/MARUCIE/forge-cli",
+  "homepage": "https://github.com/MARUCIE/orca-cli",
   "license": "MIT",
   "author": {
     "name": "Maurice",

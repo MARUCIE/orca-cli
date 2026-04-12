@@ -13,7 +13,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { execSync } from 'node:child_process'
 
-const testDir = join(tmpdir(), `forge-complex-${Date.now()}`)
+const testDir = join(tmpdir(), `orca-complex-${Date.now()}`)
 
 beforeAll(() => {
   // ── SWE-bench Style: Multi-file Express app with auth bug ──

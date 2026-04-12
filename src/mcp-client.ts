@@ -1,7 +1,7 @@
 /**
  * MCP (Model Context Protocol) stdio client.
  *
- * Spawns child processes for MCP servers defined in .mcp.json / .armature.json,
+ * Spawns child processes for MCP servers defined in .mcp.json / .orca.json,
  * communicates via JSON-RPC 2.0 over stdin/stdout.
  *
  * Capabilities:
@@ -67,16 +67,21 @@ export class MCPClient {
   private connections = new Map<string, MCPConnection>()
   private configs = new Map<string, MCPServerConfig>()
 
-  /** Load server configs from project/global config files */
+  /** Load server configs from project/global config files.
+   *  Supports native .orca, Claude Code (.claude/settings.json), and Codex (.codex/config.toml).
+   */
   loadConfigs(cwd: string): void {
-    const configPaths = [
+    const home = process.env.HOME || '/tmp'
+
+    // Native Orca configs
+    const jsonPaths = [
       join(cwd, '.mcp.json'),
-      join(cwd, '.armature.json'),
-      join(cwd, '.armature', 'mcp.json'),
-      join(process.env.HOME || '/tmp', '.armature', 'mcp.json'),
+      join(cwd, '.orca.json'),
+      join(cwd, '.orca', 'mcp.json'),
+      join(home, '.orca', 'mcp.json'),
     ]
 
-    for (const configPath of configPaths) {
+    for (const configPath of jsonPaths) {
       if (!existsSync(configPath)) continue
       try {
         const raw = JSON.parse(readFileSync(configPath, 'utf-8'))
@@ -87,6 +92,64 @@ export class MCPClient {
               this.configs.set(name, config as MCPServerConfig)
             }
           }
+        }
+      } catch { /* ignore parse errors */ }
+    }
+
+    // Claude Code: .claude/settings.json (project + global)
+    const claudeSettingsPaths = [
+      join(cwd, '.claude', 'settings.json'),
+      join(home, '.claude', 'settings.json'),
+    ]
+    for (const settingsPath of claudeSettingsPaths) {
+      if (!existsSync(settingsPath)) continue
+      try {
+        const raw = JSON.parse(readFileSync(settingsPath, 'utf-8'))
+        const servers = raw.mcpServers
+        if (typeof servers === 'object' && servers !== null && !Array.isArray(servers)) {
+          for (const [name, config] of Object.entries(servers)) {
+            if (this.configs.has(name)) continue // don't override native configs
+            if (typeof config === 'object' && config !== null) {
+              const cc = config as Record<string, unknown>
+              // Claude Code uses { command, args, env } — same as MCP standard
+              if (cc.command) {
+                this.configs.set(name, {
+                  command: String(cc.command),
+                  args: Array.isArray(cc.args) ? cc.args.map(String) : undefined,
+                  env: cc.env && typeof cc.env === 'object' ? cc.env as Record<string, string> : undefined,
+                })
+              }
+            }
+          }
+        }
+      } catch { /* ignore parse errors */ }
+    }
+
+    // Codex: .codex/config.toml [mcp_servers.*] sections
+    const codexConfigPath = join(home, '.codex', 'config.toml')
+    if (existsSync(codexConfigPath)) {
+      try {
+        const toml = readFileSync(codexConfigPath, 'utf-8')
+        // Simple TOML parser for [mcp_servers.name] sections
+        const serverRegex = /\[mcp_servers\.(\w+)\]\s*\n((?:[^\[]*\n)*)/g
+        let match
+        while ((match = serverRegex.exec(toml)) !== null) {
+          const name = match[1]!
+          const body = match[2]!
+          if (this.configs.has(name)) continue
+
+          const command = body.match(/^command\s*=\s*"([^"]+)"/m)?.[1]
+          const argsMatch = body.match(/^args\s*=\s*\[([^\]]*)\]/m)
+          const enabled = body.match(/^enabled\s*=\s*(true|false)/m)?.[1]
+
+          if (enabled === 'false') continue
+          if (!command) continue
+
+          const args = argsMatch
+            ? argsMatch[1]!.split(',').map(s => s.trim().replace(/^"|"$/g, '')).filter(Boolean)
+            : undefined
+
+          this.configs.set(name, { command, args })
         }
       } catch { /* ignore parse errors */ }
     }
@@ -154,7 +217,7 @@ export class MCPClient {
       const initResult = await this.request(name, 'initialize', {
         protocolVersion: '2024-11-05',
         capabilities: {},
-        clientInfo: { name: 'forge-cli', version: '0.1.0' },
+        clientInfo: { name: 'orca-cli', version: '0.1.0' },
       })
 
       if (initResult) {

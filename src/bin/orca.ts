@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * Forge CLI binary entry point.
+ * Orca CLI binary entry point.
  *
- * This is the file that runs when a user types `forge` in their terminal.
+ * This is the file that runs when a user types `orca` in their terminal.
  */
 
 import { run } from '../program.js'
