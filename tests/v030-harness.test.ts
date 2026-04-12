@@ -24,7 +24,7 @@ import { gatherDoctorReport } from '../src/doctor.js'
 describe('version consistency', () => {
   it('16.1 package.json version matches 0.3.0', () => {
     const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'))
-    expect(pkg.version).toBe('0.4.0')
+    expect(pkg.version).toBe('0.6.0')
   })
 
   it('16.2 Commander program version matches package.json', () => {
@@ -100,13 +100,18 @@ describe('shell injection protection via tool execution', () => {
 
 describe('tool argument coercion extended', () => {
   const coerceDir = join(tmpdir(), `orca-coerce-${Date.now()}`)
+  const origOrcaHome = process.env.ORCA_HOME
 
   beforeAll(() => {
     mkdirSync(join(coerceDir, 'src'), { recursive: true })
     writeFileSync(join(coerceDir, 'src', 'example.ts'), 'line1\nline2\nline3\nline4\nline5\n')
+    // Isolate background jobs to temp dir so tests don't pollute ~/.orca/
+    process.env.ORCA_HOME = join(coerceDir, '.orca-test')
   })
 
   afterAll(() => {
+    process.env.ORCA_HOME = origOrcaHome || ''
+    if (!origOrcaHome) delete process.env.ORCA_HOME
     try { rmSync(coerceDir, { recursive: true, force: true }) } catch { /* */ }
   })
 

@@ -69,8 +69,9 @@ function getContextWindow(model: string): number {
 
 export class TokenBudgetManager {
   private model: string
-  private inputUsed = 0
-  private outputUsed = 0
+  private cumulativeInput = 0
+  private cumulativeOutput = 0
+  private lastInputTokens = 0
 
   constructor(model: string) {
     this.model = model
@@ -78,8 +79,9 @@ export class TokenBudgetManager {
 
   /** Update token counts from API response usage data */
   recordUsage(inputTokens: number, outputTokens: number): void {
-    this.inputUsed += inputTokens
-    this.outputUsed += outputTokens
+    this.lastInputTokens = inputTokens // latest turn = current context fill
+    this.cumulativeInput += inputTokens
+    this.cumulativeOutput += outputTokens
   }
 
   /** Get current budget status */
@@ -87,11 +89,13 @@ export class TokenBudgetManager {
     const contextWindow = getContextWindow(this.model)
     const maxOutput = Math.min(contextWindow / 4, 64_000)
 
-    // Estimate history tokens: ~4 chars per token
+    // Prefer API-reported inputTokens (exact), fall back to chars/4 estimate
     const historyChars = history.reduce((sum, m) => sum + m.content.length, 0)
-    const historyTokensEst = Math.ceil(historyChars / 4)
+    const historyTokensEst = this.lastInputTokens > 0
+      ? this.lastInputTokens
+      : Math.ceil(historyChars / 4)
 
-    // Total usage = history estimate (most accurate for current state)
+    // Context utilization = current context fill / window
     const totalUsed = historyTokensEst
     const utilizationPct = Math.round((totalUsed / contextWindow) * 100)
 
@@ -104,8 +108,8 @@ export class TokenBudgetManager {
     return {
       contextWindow,
       maxOutput,
-      inputTokensUsed: this.inputUsed,
-      outputTokensUsed: this.outputUsed,
+      inputTokensUsed: this.cumulativeInput,
+      outputTokensUsed: this.cumulativeOutput,
       historyTokensEst,
       utilizationPct,
       risk,
@@ -114,7 +118,7 @@ export class TokenBudgetManager {
 
   /** Get total tokens used across all API calls */
   get totalTokens(): number {
-    return this.inputUsed + this.outputUsed
+    return this.cumulativeInput + this.cumulativeOutput
   }
 
   /**

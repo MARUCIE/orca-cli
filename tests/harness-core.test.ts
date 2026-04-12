@@ -92,20 +92,21 @@ describe('ContextMonitor: 4-tier risk levels', () => {
 
   it('18.11 yellow at 40% utilization', () => {
     const monitor = new ContextMonitor(100_000)
-    monitor.recordUsage(20_000, 20_000) // 40%
+    // Utilization = lastInputTokens / modelWindow (output does not count)
+    monitor.recordUsage(40_000, 5_000) // 40% context fill
     expect(monitor.getRiskLevel()).toBe('yellow')
     expect(monitor.shouldCompact()).toBe(true)
   })
 
   it('18.12 orange at 50% utilization', () => {
     const monitor = new ContextMonitor(100_000)
-    monitor.recordUsage(30_000, 20_000) // 50%
+    monitor.recordUsage(50_000, 5_000) // 50% context fill
     expect(monitor.getRiskLevel()).toBe('orange')
   })
 
   it('18.13 red at 60% utilization', () => {
     const monitor = new ContextMonitor(100_000)
-    monitor.recordUsage(40_000, 20_000) // 60%
+    monitor.recordUsage(60_000, 5_000) // 60% context fill
     expect(monitor.getRiskLevel()).toBe('red')
     expect(monitor.shouldClear()).toBe(true)
   })
@@ -122,11 +123,12 @@ describe('ContextMonitor: 4-tier risk levels', () => {
     const monitor = new ContextMonitor(200_000)
     monitor.recordUsage(10_000, 5_000)
     const snap = monitor.getSnapshot()
-    expect(snap.inputTokens).toBe(10_000)
+    expect(snap.inputTokens).toBe(10_000) // last input tokens
     expect(snap.outputTokens).toBe(5_000)
-    expect(snap.totalTokens).toBe(15_000)
+    expect(snap.totalTokens).toBe(15_000) // cumulative
     expect(snap.modelWindow).toBe(200_000)
-    expect(snap.utilization).toBeCloseTo(0.075)
+    // Utilization = lastInputTokens / modelWindow = 10K/200K = 0.05
+    expect(snap.utilization).toBeCloseTo(0.05)
   })
 
   it('18.16 getStatusString is human-readable', () => {

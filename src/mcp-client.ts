@@ -66,6 +66,7 @@ interface MCPConnection {
 export class MCPClient {
   private connections = new Map<string, MCPConnection>()
   private configs = new Map<string, MCPServerConfig>()
+  private disabled = new Set<string>()
 
   /** Load server configs from project/global config files.
    *  Supports native .orca, Claude Code (.claude/settings.json), and Codex (.codex/config.toml).
@@ -232,14 +233,35 @@ export class MCPClient {
     }
   }
 
-  /** Connect to all configured servers */
+  /** Connect to all configured servers (skips disabled) */
   async connectAll(): Promise<string[]> {
     const connected: string[] = []
     for (const name of this.configs.keys()) {
+      if (this.disabled.has(name)) continue
       const ok = await this.connect(name)
       if (ok) connected.push(name)
     }
     return connected
+  }
+
+  /** Disable a server (disconnect if connected) */
+  disableServer(name: string): boolean {
+    if (!this.configs.has(name)) return false
+    this.disabled.add(name)
+    this.disconnect(name)
+    return true
+  }
+
+  /** Enable a previously disabled server */
+  enableServer(name: string): boolean {
+    if (!this.configs.has(name)) return false
+    this.disabled.delete(name)
+    return true
+  }
+
+  /** Check if a server is disabled */
+  isDisabled(name: string): boolean {
+    return this.disabled.has(name)
   }
 
   /** Disconnect from a server */
@@ -260,15 +282,15 @@ export class MCPClient {
   }
 
   /** List connected servers */
-  listServers(): Array<{ name: string; initialized: boolean; pid: number }> {
-    const result: Array<{ name: string; initialized: boolean; pid: number }> = []
+  listServers(): Array<{ name: string; initialized: boolean; pid: number; disabled: boolean }> {
+    const result: Array<{ name: string; initialized: boolean; pid: number; disabled: boolean }> = []
     for (const [name, conn] of this.connections) {
-      result.push({ name, initialized: conn.initialized, pid: conn.process.pid || 0 })
+      result.push({ name, initialized: conn.initialized, pid: conn.process.pid || 0, disabled: false })
     }
     // Also list configured but not connected
     for (const name of this.configs.keys()) {
       if (!this.connections.has(name)) {
-        result.push({ name, initialized: false, pid: 0 })
+        result.push({ name, initialized: false, pid: 0, disabled: this.disabled.has(name) })
       }
     }
     return result

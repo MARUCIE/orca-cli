@@ -13,7 +13,7 @@ export type OutputMode = 'streaming' | 'json'
 
 // ── Banner ──────────────────────────────────────────────────────────
 
-const VERSION = '0.4.0'
+const VERSION = '0.6.0'
 
 // Orca — cute killer whale with dorsal fin, eye patch, body, belly, and iconic tail flukes
 // Tail section: body narrows → peduncle → flukes fork up/down (whale signature)
@@ -95,16 +95,17 @@ export async function printRichBanner(opts: {
   const endPad = 2
   const amplitude = Math.min(Math.floor(maxPad / 4), 12)
 
-  // Only animate if terminal is wide enough and interactive
-  const canAnimate = process.stdout.isTTY && amplitude > 2 && cols > maxVisWidth + 10
+  // Only animate if terminal is wide enough and interactive (skip with ORCA_NO_ANIMATION=1)
+  const canAnimate = process.stdout.isTTY && amplitude > 2 && cols > maxVisWidth + 10 && !process.env.ORCA_NO_ANIMATION
 
   if (!canAnimate) {
     // Static fallback
     console.log()
     for (const line of ORCA_ART) console.log(`  ${line}`)
   } else {
-    // Hide cursor during animation
+    // Hide cursor during animation (restored in finally block)
     process.stdout.write('\x1b[?25l')
+    try {
     console.log()
 
     // Print initial frame (start from right side)
@@ -116,8 +117,8 @@ export async function printRichBanner(opts: {
     // Swimming animation: body-wave undulation + drift from right to left
     // Each line gets a phase-shifted sine offset — simulates the S-curve
     // of a whale's swimming stroke (head leads, wave propagates to tail)
-    const totalFrames = 54
-    const frameDuration = 75
+    const totalFrames = 20
+    const frameDuration = 60
     const bodyWaveAmp = 3  // how far each line can deviate from its neighbors
     const phaseSpread = 0.45  // phase difference between adjacent lines (wave tightness)
 
@@ -148,7 +149,7 @@ export async function printRichBanner(opts: {
     }
 
     // Final settle: ease into left position with one last gentle wave
-    const settleFrames = 8
+    const settleFrames = 3
     for (let f = 0; f < settleFrames; f++) {
       const sp = f / settleFrames
       process.stdout.write(`\x1b[${artHeight}A`)
@@ -168,8 +169,10 @@ export async function printRichBanner(opts: {
       process.stdout.write(`\x1b[2K${pad}${line}\n`)
     }
 
-    // Show cursor
-    process.stdout.write('\x1b[?25h')
+    } finally {
+      // Always restore cursor, even if animation errors out
+      process.stdout.write('\x1b[?25h')
+    }
   }
 
   // Info below the art — aligned, clean layout
@@ -398,8 +401,8 @@ function truncateLine(s: string, max: number): string {
  */
 export function printSeparator(): void {
   const cols = process.stdout.columns || 80
-  const width = Math.min(cols - 2, 80)
-  console.log(`\x1b[90m${'─'.repeat(width)}\x1b[0m`)
+  const width = cols - 2
+  console.log(`\x1b[90m${'·'.repeat(width)}\x1b[0m`)
 }
 
 export type ThinkingEffort = 'low' | 'medium' | 'high' | 'max'
@@ -451,12 +454,12 @@ export function printStatusLine(info: StatusLineInfo): void {
     ? '\x1b[33m▸▸ yolo\x1b[0m'
     : '\x1b[32m▸▸ safe\x1b[0m'
 
-  // Thinking effort indicator
+  // Thinking effort indicator — compact single symbol
   const effortDisplay: Record<ThinkingEffort, string> = {
-    low:    '\x1b[90m⚡low\x1b[0m',
-    medium: '\x1b[33m⚡⚡med\x1b[0m',
-    high:   '\x1b[36m⚡⚡⚡high\x1b[0m',
-    max:    '\x1b[35m⚡⚡⚡⚡max\x1b[0m',
+    low:    '\x1b[90mlow\x1b[0m',
+    medium: '\x1b[33mmed\x1b[0m',
+    high:   '\x1b[36mhigh\x1b[0m',
+    max:    '\x1b[35mmax\x1b[0m',
   }
   const effort = info.effort || 'high'
   const effortTag = effortDisplay[effort]
@@ -471,12 +474,17 @@ export function printStatusLine(info: StatusLineInfo): void {
   // Cumulative total tokens right-aligned
   const tokenStr = `\x1b[90mtotal\x1b[0m ${info.totalTokens.toLocaleString()}`
 
-  // Line 1: ◇ ORCA │ model │ ████░░░░ 15% (12K/200K) │ project git:(branch)
-  const left = `\x1b[36m◇\x1b[0m \x1b[1;37mORCA\x1b[0m \x1b[90m│\x1b[0m ${modelShort} \x1b[90m│\x1b[0m ${bar} ${pct}% \x1b[90m(${ctxStr})\x1b[0m \x1b[90m│\x1b[0m \x1b[36m${project}\x1b[0m${gitPart}`
+  // Line 1: ◇ ORCA | model | ████░░░░ 15% (12K/200K) | project git:(branch)
+  const left1 = `\x1b[36m◇\x1b[0m \x1b[1;37mORCA\x1b[0m \x1b[90m|\x1b[0m ${modelShort} \x1b[90m|\x1b[0m ${bar} ${pct}% \x1b[90m(${ctxStr})\x1b[0m \x1b[90m|\x1b[0m \x1b[36m${project}\x1b[0m${gitPart}`
+  console.log(`${left1}`)
 
-  // Line 2: ▸▸ yolo │ ⚡⚡⚡high                    total 1,618,413
-  console.log(`${left}`)
-  console.log(`${modeTag} \x1b[90m│\x1b[0m ${effortTag}${' '.repeat(Math.max(0, cols - 45 - tokenStr.length))}${tokenStr}`)
+  // Line 2: ▸▸ yolo | high                                    total 1,618,413
+  const left2 = `${modeTag} \x1b[90m|\x1b[0m ${effortTag}`
+  // Strip ANSI for width calculation
+  const plainLeft2 = left2.replace(/\x1b\[[0-9;]*m/g, '')
+  const plainToken = tokenStr.replace(/\x1b\[[0-9;]*m/g, '')
+  const pad = Math.max(1, cols - plainLeft2.length - plainToken.length - 1)
+  console.log(`${left2}${' '.repeat(pad)}${tokenStr}`)
 }
 
 // ── Progress Indicator ──────────────────────────────────────────────
@@ -501,6 +509,7 @@ export class ProgressIndicator {
   private phase: 'thinking' | 'working' = 'thinking'
   private spinIdx: number = 0
   private readonly thinkFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+  private readonly workFrames = ['◐', '◓', '◑', '◒']
   private lastLineLen: number = 0
 
   start(): void {
@@ -517,20 +526,24 @@ export class ProgressIndicator {
     this.phase = 'working'
   }
 
-  addTokens(n: number): void {
+  /** Add streamed characters (will be converted to estimated tokens at ~4 chars/token) */
+  addChars(n: number): void {
     this.tokenCount += n
   }
 
   private render(): void {
     const elapsed = formatElapsed(Date.now() - this.startTime)
-    const frame = this.thinkFrames[this.spinIdx % this.thinkFrames.length]!
+    const frames = this.phase === 'thinking' ? this.thinkFrames : this.workFrames
+    const frame = frames[this.spinIdx % frames.length]!
     this.spinIdx++
 
     let line: string
     if (this.phase === 'thinking') {
       line = `  ${frame} Thinking... (${elapsed} • esc to interrupt)`
     } else {
-      const tokStr = this.tokenCount > 0 ? ` · ↓ ${this.tokenCount.toLocaleString()} tokens` : ''
+      // Estimate tokens from character count (~4 chars per token)
+      const estTokens = Math.ceil(this.tokenCount / 4)
+      const tokStr = estTokens > 0 ? ` · ↓ ${estTokens.toLocaleString()} tokens` : ''
       line = `  ${frame} Working (${elapsed}${tokStr} • esc to interrupt)`
     }
 
@@ -606,17 +619,19 @@ export function printToolUse(toolName: string, input?: string): void {
 export function printToolResult(toolName: string, success: boolean, output?: string): void {
   const timerKey = [...toolTimers.keys()].find(k => k.startsWith(toolName + '_'))
   const startTime = timerKey ? toolTimers.get(timerKey) : undefined
-  const duration = startTime ? ((Date.now() - startTime) / 1000).toFixed(1) : '0.0'
+  const durationMs = startTime ? Date.now() - startTime : 0
+  const durationStr = durationMs < 1000 ? `${durationMs}ms` : `${(durationMs / 1000).toFixed(1)}s`
   if (timerKey) toolTimers.delete(timerKey)
 
   const icon = success ? chalk.green('  ✓') : chalk.red('  ✗')
-  const timeStr = chalk.gray(` ${duration}s`)
+  const timeStr = chalk.gray(` ${durationStr}`)
 
-  // Show result preview for read operations
-  if (output && success) {
+  // Show result preview
+  if (output) {
     const preview = getResultPreview(toolName, output)
     if (preview) {
-      console.log(chalk.gray(`  │ ${preview}`))
+      const previewColor = success ? chalk.gray : chalk.yellow
+      console.log(previewColor(`  │ ${preview}`))
     }
   }
 
@@ -653,7 +668,7 @@ function formatToolArgs(toolName: string, args: Record<string, unknown>): string
       return args.recursive ? `${path}, recursive` : path
     }
     case 'run_command':
-      return truncate(String(args.command || ''), 60)
+      return truncate(String(args.command || ''), 100)
     case 'search_files': {
       const pattern = String(args.pattern || '')
       const path = String(args.path || '.')
@@ -687,7 +702,7 @@ function getResultPreview(toolName: string, output: string): string {
     }
     case 'run_command': {
       const firstLine = output.split('\n')[0] || ''
-      return truncate(firstLine, 60)
+      return truncate(firstLine, 100)
     }
     case 'search_files': {
       const matches = output.split('\n').filter(Boolean)
@@ -696,8 +711,9 @@ function getResultPreview(toolName: string, output: string): string {
         : 'no matches'
     }
     case 'write_file':
+      return truncate(output, 80)
     case 'edit_file':
-      return output
+      return truncate(output, 80)
     case 'glob_files': {
       const files = output.split('\n').filter(Boolean)
       return `${files.length} files`
@@ -744,7 +760,7 @@ export function printUsageSummary(usage: UsageSummary): void {
     parts.push(`${tokPerSec} tok/s`)
   }
   if (cost > 0) {
-    parts.push(`$${cost.toFixed(4)}`)
+    parts.push(formatCost(cost))
   }
 
   // Context usage bar (if context chars provided)
@@ -863,4 +879,12 @@ function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return String(n)
+}
+
+function formatCost(usd: number): string {
+  if (usd >= 1) return `$${usd.toFixed(2)}`
+  if (usd >= 0.01) return `$${usd.toFixed(2)}`
+  // Sub-cent: show in cents for readability
+  const cents = usd * 100
+  return `${cents.toFixed(1)}c`
 }

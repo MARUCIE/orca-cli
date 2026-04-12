@@ -26,8 +26,9 @@ const ORANGE_THRESHOLD = 0.50
 const RED_THRESHOLD = 0.60
 
 export class ContextMonitor {
-  private inputTokens = 0
-  private outputTokens = 0
+  private lastInputTokens = 0
+  private cumulativeInput = 0
+  private cumulativeOutput = 0
   private modelWindow: number
 
   constructor(modelWindow: number = 200_000) {
@@ -36,18 +37,26 @@ export class ContextMonitor {
 
   /**
    * Record token usage from a turn.
+   *
+   * For context utilization, only the LATEST turn's inputTokens matters —
+   * it represents how much of the context window the API actually consumed
+   * (system prompt + history + tool defs). Cumulative totals are tracked
+   * separately for cost/stats purposes.
    */
   recordUsage(inputTokens: number, outputTokens: number): void {
-    this.inputTokens += inputTokens
-    this.outputTokens += outputTokens
+    this.lastInputTokens = inputTokens // replaces, not accumulates
+    this.cumulativeInput += inputTokens
+    this.cumulativeOutput += outputTokens
   }
 
   /**
    * Get current utilization as a fraction (0.0 - 1.0).
+   *
+   * Uses the last turn's inputTokens as the authoritative context window fill,
+   * because the API reports exactly how many tokens were in the prompt.
    */
   getUtilization(): number {
-    const total = this.inputTokens + this.outputTokens
-    return Math.min(total / this.modelWindow, 1.0)
+    return Math.min(this.lastInputTokens / this.modelWindow, 1.0)
   }
 
   /**
@@ -76,13 +85,24 @@ export class ContextMonitor {
   }
 
   /**
+   * Get cumulative token totals (for cost/stats, NOT for utilization).
+   */
+  getCumulativeTokens(): { input: number; output: number; total: number } {
+    return {
+      input: this.cumulativeInput,
+      output: this.cumulativeOutput,
+      total: this.cumulativeInput + this.cumulativeOutput,
+    }
+  }
+
+  /**
    * Get a full snapshot of current context state.
    */
   getSnapshot(): ContextSnapshot {
     return {
-      inputTokens: this.inputTokens,
-      outputTokens: this.outputTokens,
-      totalTokens: this.inputTokens + this.outputTokens,
+      inputTokens: this.lastInputTokens,
+      outputTokens: this.cumulativeOutput,
+      totalTokens: this.cumulativeInput + this.cumulativeOutput,
       utilization: this.getUtilization(),
       risk: this.getRiskLevel(),
       modelWindow: this.modelWindow,
@@ -96,7 +116,7 @@ export class ContextMonitor {
     const snap = this.getSnapshot()
     const pct = (snap.utilization * 100).toFixed(1)
     const risk = snap.risk.toUpperCase()
-    return `${pct}% (${risk}) — ${snap.totalTokens.toLocaleString()} / ${snap.modelWindow.toLocaleString()} tokens`
+    return `${pct}% (${risk}) — ${this.lastInputTokens.toLocaleString()} / ${snap.modelWindow.toLocaleString()} tokens`
   }
 
   /**
@@ -110,7 +130,8 @@ export class ContextMonitor {
    * Reset after compaction or clear.
    */
   reset(): void {
-    this.inputTokens = 0
-    this.outputTokens = 0
+    this.lastInputTokens = 0
+    this.cumulativeInput = 0
+    this.cumulativeOutput = 0
   }
 }

@@ -42,6 +42,8 @@ import { consumeCompletedBackgroundJobs, listBackgroundJobs, readBackgroundJobLo
 import { formatContextWindow, formatPricing, getAgenticWarning, getContextWindowForModel, getPricingForModel, listModelChoices, type ModelChoice } from '../model-catalog.js'
 import { logInfo, logWarning } from '../logger.js'
 import { ContextMonitor, LoopDetector, classifyError } from '../harness/index.js'
+import { ModeRegistry } from '../modes/index.js'
+import { ThreadManager } from '../memory/threads.js'
 
 interface ChatOptions {
   model?: string
@@ -201,7 +203,7 @@ async function runREPL(
     // Multi-model
     '/council', '/race', '/pipeline',
     // System
-    '/config', '/init', '/hooks', '/mcp', '/jobs', '/cwd',
+    '/config', '/init', '/hooks', '/mcp', '/jobs', '/cwd', '/mode', '/thread', '/threads',
     // Exit
     '/exit', '/quit', '/retry',
   ]
@@ -314,6 +316,17 @@ async function runREPL(
   const retryTracker = new RetryTracker(2)
   const contextMonitor = new ContextMonitor(getContextWindowForModel(currentModel) || 200_000)
   const loopDetector = new LoopDetector()
+  const modeRegistry = new ModeRegistry()
+
+  // Load custom modes from .orca/modes.json if present
+  const customModesPath = join(cwd, '.orca', 'modes.json')
+  if (existsSync(customModesPath)) {
+    try {
+      modeRegistry.loadFromFile(customModesPath)
+    } catch { /* ignore malformed modes file */ }
+  }
+
+  const threadManager = new ThreadManager()
 
   const shortModel = (m: string) => m.length > 24 ? m.slice(0, 22) + '..' : m
   const getChoices = (): ModelChoice[] => listModelChoices(config, currentModel)
@@ -486,6 +499,44 @@ async function runREPL(
         continue
       }
 
+      // Handle /mode: switch behavioral profiles
+      if (input.startsWith('/mode')) {
+        const modeArg = input.replace('/mode', '').trim().toLowerCase()
+        if (!modeArg) {
+          const active = modeRegistry.getActive()
+          const modes = modeRegistry.listModes()
+          console.log(`\x1b[90m  Active mode: \x1b[36m${active.id}\x1b[0m\x1b[90m (${active.name})\x1b[0m`)
+          console.log('\x1b[90m  Available modes:\x1b[0m')
+          for (const mode of modes) {
+            const marker = mode.id === active.id ? ' \x1b[36m<-\x1b[0m' : ''
+            console.log(`\x1b[90m    ${mode.id.padEnd(14)} ${mode.description}${marker}\x1b[0m`)
+          }
+          continue
+        }
+        if (modeRegistry.switchTo(modeArg)) {
+          const mode = modeRegistry.getActive()
+          // Rebuild system prompt with mode prefix
+          const sysIdx = history.findIndex(m => m.role === 'system')
+          if (sysIdx >= 0) {
+            const basePrompt = history[sysIdx]!.content
+              .replace(/^You are in \w+ mode\.[^\n]*\n*/m, '') // strip old mode prefix
+            history[sysIdx] = {
+              role: 'system',
+              content: mode.systemPromptPrefix
+                ? mode.systemPromptPrefix + '\n\n' + basePrompt
+                : basePrompt,
+            }
+          }
+          console.log(`\x1b[90m  mode: \x1b[36m${mode.id}\x1b[0m\x1b[90m (${mode.name})\x1b[0m`)
+          if (mode.tools) {
+            console.log(`\x1b[90m  tools restricted to: ${mode.tools.join(', ')}\x1b[0m`)
+          }
+        } else {
+          console.log(`\x1b[33m  unknown mode: ${modeArg}. Use /mode to list.\x1b[0m`)
+        }
+        continue
+      }
+
       // Handle /retry specially
       if (input === '/retry' || input === '/r') {
         if (!lastPrompt) {
@@ -521,7 +572,7 @@ async function runREPL(
           },
           getProvider: () => resolved.provider,
           getChoices,
-        }, { lastWrite }, { tokenBudget, contextMonitor })
+        }, { lastWrite }, { tokenBudget, contextMonitor }, modeRegistry, threadManager)
         if (handled === 'exit') {
           saveInputHistory(historyFile, inputHistory)
           mcpClient.disconnectAll()
@@ -712,7 +763,7 @@ async function runREPL(
             progress.markWorking()
           },
           onStreamToken: (text: string) => {
-            progress.addTokens(text.length)
+            progress.addChars(text.length)
           },
           onFileWrite: (path, oldContent) => { lastWrite = { path, oldContent } },
           safeMode: opts.safe || false,
@@ -843,6 +894,8 @@ function handleSlashCommand(
   mc: ModelControl,
   undo?: UndoState,
   harness?: { tokenBudget: TokenBudgetManager; contextMonitor: ContextMonitor },
+  modeRegistry?: ModeRegistry,
+  threadManager?: ThreadManager,
 ): 'exit' | 'handled' | 'pick_model' | 'not_command' {
   const parts = input.split(/\s+/)
   const cmd = parts[0]!.toLowerCase()
@@ -871,6 +924,7 @@ function handleSlashCommand(
       console.log('  /models                List available models')
       console.log('  /providers             List all providers')
       console.log('  /effort <lvl>          Thinking: low/medium/high/max')
+      console.log('  /mode [id]             Switch behavioral mode')
       console.log('')
       console.log('  \x1b[1mContext\x1b[0m\x1b[90m')
       console.log('  /history               Message counts')
@@ -883,6 +937,7 @@ function handleSlashCommand(
       console.log('  /load [name]           Load session')
       console.log('  /sessions              List saved sessions')
       console.log('  /continue              Resume last session')
+      console.log('  /thread [sub]          Thread memory (list/save/load/search/delete)')
       console.log('')
       console.log('  \x1b[1mGit Workflow\x1b[0m\x1b[90m')
       console.log('  /diff                  Show git diff')
@@ -1241,15 +1296,20 @@ function handleSlashCommand(
     // ── CC/Codex compatible commands ──────────────────────────────
 
     case '/cost': {
-      // Simple cost estimation: ~$3/M input, ~$15/M output (Poe/Claude average)
-      const cost = (stats.totalInputTokens * 3 + stats.totalOutputTokens * 15) / 1_000_000
+      const pricing = getPricingForModel(mc.getModel())
+      const cost = pricing
+        ? (stats.totalInputTokens * pricing[0] + stats.totalOutputTokens * pricing[1]) / 1_000_000
+        : 0
+      const pricingLabel = pricing ? `$${pricing[0]}/$${pricing[1]} per 1M in/out` : 'pricing unavailable'
       console.log('\x1b[90m  Cost breakdown:\x1b[0m')
-      console.log(`\x1b[90m    input:  ${stats.totalInputTokens.toLocaleString()} tokens\x1b[0m`)
-      console.log(`\x1b[90m    output: ${stats.totalOutputTokens.toLocaleString()} tokens\x1b[0m`)
-      console.log(`\x1b[90m    total:  ${(stats.totalInputTokens + stats.totalOutputTokens).toLocaleString()} tokens\x1b[0m`)
-      console.log(`\x1b[90m    est:    \x1b[36m$${cost.toFixed(4)}\x1b[0m`)
-      console.log(`\x1b[90m    turns:  ${stats.turns}\x1b[0m`)
-      console.log(`\x1b[90m    time:   ${((Date.now() - stats.startTime) / 1000 / 60).toFixed(1)} min\x1b[0m`)
+      console.log(`\x1b[90m    model:   ${mc.getModel()} (${pricingLabel})\x1b[0m`)
+      console.log(`\x1b[90m    input:   ${stats.totalInputTokens.toLocaleString()} tokens\x1b[0m`)
+      console.log(`\x1b[90m    output:  ${stats.totalOutputTokens.toLocaleString()} tokens\x1b[0m`)
+      console.log(`\x1b[90m    total:   ${(stats.totalInputTokens + stats.totalOutputTokens).toLocaleString()} tokens\x1b[0m`)
+      const costDisplay = cost >= 0.01 ? `$${cost.toFixed(2)}` : cost > 0 ? `${(cost * 100).toFixed(1)}c` : '$0'
+      console.log(`\x1b[90m    cost:    \x1b[36m${costDisplay}\x1b[0m`)
+      console.log(`\x1b[90m    turns:   ${stats.turns}\x1b[0m`)
+      console.log(`\x1b[90m    time:    ${((Date.now() - stats.startTime) / 1000 / 60).toFixed(1)} min\x1b[0m`)
       return 'handled'
     }
 
@@ -1356,19 +1416,126 @@ function handleSlashCommand(
     }
 
     case '/mcp': {
+      // Subcommands: enable <name>, disable <name>, connect <name>
+      if (arg.startsWith('disable ')) {
+        const serverName = arg.slice(8).trim()
+        if (mcpClient.disableServer(serverName)) {
+          console.log(`\x1b[90m  disabled: ${serverName}\x1b[0m`)
+        } else {
+          console.log(`\x1b[31m  server not found: ${serverName}\x1b[0m`)
+        }
+        return 'handled'
+      }
+      if (arg.startsWith('enable ')) {
+        const serverName = arg.slice(7).trim()
+        if (mcpClient.enableServer(serverName)) {
+          console.log(`\x1b[90m  enabled: ${serverName}\x1b[0m`)
+          // Auto-connect after enable
+          mcpClient.connect(serverName).then(ok => {
+            if (ok) console.log(`\x1b[32m  connected: ${serverName}\x1b[0m`)
+            else console.log(`\x1b[33m  enabled but failed to connect: ${serverName}\x1b[0m`)
+          }).catch(() => {})
+        } else {
+          console.log(`\x1b[31m  server not found: ${serverName}\x1b[0m`)
+        }
+        return 'handled'
+      }
+      if (arg.startsWith('connect ')) {
+        const serverName = arg.slice(8).trim()
+        mcpClient.connect(serverName).then(ok => {
+          if (ok) console.log(`\x1b[32m  connected: ${serverName}\x1b[0m`)
+          else console.log(`\x1b[31m  failed to connect: ${serverName}\x1b[0m`)
+        }).catch(() => {})
+        return 'handled'
+      }
+
       const servers = mcpClient.listServers()
       if (servers.length === 0) {
         console.log('\x1b[90m  no MCP servers configured.\x1b[0m')
       } else {
         console.log(`\x1b[90m  MCP servers: ${servers.length} configured, ${mcpClient.connectedCount} connected\x1b[0m`)
         for (const s of servers) {
-          const status = s.initialized
-            ? `\x1b[32mconnected\x1b[0m (pid ${s.pid})`
-            : s.pid > 0
-              ? '\x1b[33mstarting\x1b[0m'
-              : '\x1b[90mnot connected\x1b[0m'
+          const status = s.disabled
+            ? '\x1b[90mdisabled\x1b[0m'
+            : s.initialized
+              ? `\x1b[32mconnected\x1b[0m (pid ${s.pid})`
+              : s.pid > 0
+                ? '\x1b[33mstarting\x1b[0m'
+                : '\x1b[90mnot connected\x1b[0m'
           console.log(`    ${s.name}  ${status}`)
         }
+        console.log('\x1b[90m  commands: /mcp enable <name> | disable <name> | connect <name>\x1b[0m')
+      }
+      return 'handled'
+    }
+
+    case '/thread':
+    case '/threads': {
+      if (!threadManager) {
+        console.log('\x1b[90m  thread manager not available.\x1b[0m')
+        return 'handled'
+      }
+      const subcmd = arg.split(/\s+/)[0] || ''
+      const subarg = arg.slice(subcmd.length).trim()
+
+      if (!subcmd || subcmd === 'list') {
+        const threads = threadManager.list(10)
+        if (threads.length === 0) {
+          console.log('\x1b[90m  no threads saved.\x1b[0m')
+        } else {
+          console.log('\x1b[90m  Threads:\x1b[0m')
+          for (const t of threads) {
+            const msgs = t.messages.length
+            const date = new Date(t.updatedAt).toLocaleString()
+            console.log(`\x1b[90m    ${t.id}  ${t.title.slice(0, 40)}  (${msgs} msgs · ${date})\x1b[0m`)
+          }
+        }
+      } else if (subcmd === 'save') {
+        const title = subarg || `Chat ${new Date().toLocaleString()}`
+        const convMsgs = history.filter(m => m.role !== 'system')
+        const thread = threadManager.create(title, convMsgs.map(m => ({ role: m.role, content: m.content })))
+        console.log(`\x1b[90m  thread saved: ${thread.id} (${thread.title})\x1b[0m`)
+      } else if (subcmd === 'load') {
+        if (!subarg) {
+          console.log('\x1b[33m  usage: /thread load <id>\x1b[0m')
+        } else {
+          const thread = threadManager.load(subarg)
+          if (!thread) {
+            console.log(`\x1b[31m  thread not found: ${subarg}\x1b[0m`)
+          } else {
+            const sysMsg = history.find(m => m.role === 'system')
+            history.length = 0
+            if (sysMsg) history.push(sysMsg)
+            for (const m of thread.messages) {
+              history.push({ role: m.role as 'user' | 'assistant', content: m.content })
+            }
+            console.log(`\x1b[90m  loaded thread: ${thread.title} (${thread.messages.length} messages)\x1b[0m`)
+          }
+        }
+      } else if (subcmd === 'search') {
+        if (!subarg) {
+          console.log('\x1b[33m  usage: /thread search <query>\x1b[0m')
+        } else {
+          const results = threadManager.search(subarg, 5)
+          if (results.length === 0) {
+            console.log(`\x1b[90m  no threads matching "${subarg}".\x1b[0m`)
+          } else {
+            console.log(`\x1b[90m  Found ${results.length} thread(s):\x1b[0m`)
+            for (const t of results) {
+              console.log(`\x1b[90m    ${t.id}  ${t.title.slice(0, 40)}\x1b[0m`)
+            }
+          }
+        }
+      } else if (subcmd === 'delete') {
+        if (!subarg) {
+          console.log('\x1b[33m  usage: /thread delete <id>\x1b[0m')
+        } else if (threadManager.delete(subarg)) {
+          console.log(`\x1b[90m  deleted thread: ${subarg}\x1b[0m`)
+        } else {
+          console.log(`\x1b[31m  thread not found: ${subarg}\x1b[0m`)
+        }
+      } else {
+        console.log('\x1b[33m  usage: /thread [list|save|load|search|delete]\x1b[0m')
       }
       return 'handled'
     }

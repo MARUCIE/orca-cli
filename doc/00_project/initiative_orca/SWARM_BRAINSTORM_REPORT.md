@@ -285,14 +285,83 @@ Versions:   0.4.0 aligned across 5 files
 Slash cmds: 37 implemented, 0 stubs
 ```
 
-### Remaining (v0.5.0 Scope)
+### Remaining (v0.5.0 Scope) — CLOSED
 
 | Feature | Status | Notes |
 |---|---|---|
-| MCP server hosting | Not implemented | Orca is client-only; exposing tools as MCP server deferred |
-| Mode system (KiloCode-style) | Not implemented | Behavioral profiles mid-session |
-| Thread-based memory (Amp-style) | Not implemented | Version-controlled conversation records |
-| AGENTS.md auto-discovery | Not implemented | Hierarchical guidance from parent dirs |
+| MCP server hosting | DONE (v0.5.0) | MCPServer class, `orca serve --mcp`, JSON-RPC 2.0 over stdio |
+| Mode system (KiloCode-style) | DONE (v0.5.0) | ModeRegistry, 5 builtin modes, custom modes via .orca/modes.json |
+| AGENTS.md auto-discovery | DONE (v0.5.0) | discoverGuidance() scans cwd + parents for AGENTS.md/CLAUDE.md/CODEX.md/.orca/rules/ |
+| Thread-based memory (Amp-style) | Deferred (v0.6.0) | Version-controlled conversation records |
+
+---
+
+## v0.5.0 Closure Report (Post-Execution Update)
+
+> Updated 2026-04-12 after completing 3 of 4 v0.5.0 features.
+
+### v0.5.0 Metrics
+
+| Metric | v0.4.0 | v0.5.0 | Delta |
+|---|---|---|---|
+| Source files | 58 | 62 | +4 |
+| Source LOC | 12,234 | 12,500+ | +300 |
+| Test files | 42 | 43 | +1 |
+| Tests | 598 | 640 | +42 |
+| New modules | 0 | 3 (mcp-server, modes, agents-discovery) | +3 |
+
+### v0.5.0 Audit Result
+
+```
+Build:      0 errors
+TypeCheck:  0 errors
+Tests:      640/640 passed (43 files)
+Versions:   0.5.0 aligned across 5 files
+```
+
+### Remaining (v0.6.0 Scope) — CLOSED
+
+| Feature | Status | Notes |
+|---|---|---|
+| Thread-based memory (Amp-style) | DONE (v0.6.0) | ThreadManager: create/list/load/append/search/delete + /thread slash command |
+| /mode slash command wiring | DONE (v0.6.0) | /mode [id] in REPL, injects systemPromptPrefix, shows tool restrictions |
+| Guidance injection in system prompt | DONE (v0.6.0) | discoverGuidance() called in buildSystemPrompt(), auto-injects AGENTS.md/CLAUDE.md/CODEX.md/.orca/rules/ |
+
+---
+
+## v0.6.0 Closure Report (Post-Execution Update)
+
+> Updated 2026-04-13 after completing all 3 v0.6.0 features.
+
+### v0.6.0 Metrics
+
+| Metric | v0.5.0 | v0.6.0 | Delta |
+|---|---|---|---|
+| Source files | 62 | 63 | +1 |
+| Source LOC | 12,500+ | 13,000+ | +500 |
+| Test files | 43 | 44 | +1 |
+| Tests | 640 | 668 | +28 |
+| New modules | 0 | 1 (threads.ts) | +1 |
+| REPL commands wired | 0 | 3 (/mode, /thread, guidance auto-inject) | +3 |
+
+### v0.6.0 Audit Result
+
+```
+Build:      0 errors
+TypeCheck:  0 errors
+Tests:      668/668 passed (44 files)
+Versions:   0.6.0 aligned across 5 files
+```
+
+### Cumulative Progress (v0.3.0 → v0.6.0)
+
+| Metric | v0.3.0 | v0.6.0 | Delta |
+|---|---|---|---|
+| Source files | 37 | 63 | +26 |
+| Source LOC | 7,200 | 13,000+ | +5,800 |
+| Test files | 36 | 44 | +8 |
+| Tests | 493 | 668 | +175 |
+| SOTA gaps | 6 open | 0 open | ALL CLOSED |
 
 ---
 

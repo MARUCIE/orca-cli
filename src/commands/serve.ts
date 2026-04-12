@@ -16,9 +16,10 @@ import { streamChat, chatOnce } from '../providers/openai-compat.js'
 import { buildSystemPrompt } from '../system-prompt.js'
 import { recordUsage } from '../usage-db.js'
 import type { OrcaConfig } from '../config.js'
-import { getModelChoice, formatContextWindow, formatPricing } from '../model-catalog.js'
+import { getModelChoice, formatContextWindow, formatPricing, getPricingForModel } from '../model-catalog.js'
 import { gatherDoctorReport } from '../doctor.js'
 import { logInfo, logWarning } from '../logger.js'
+import { MCPServer } from '../mcp-server.js'
 
 export interface ServerState {
   config: OrcaConfig
@@ -94,7 +95,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse, state: Serv
         model,
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
-        costUsd: 0,
+        costUsd: (() => { const p = getPricingForModel(model); return p ? (result.inputTokens * p[0] + result.outputTokens * p[1]) / 1_000_000 : 0 })(),
         durationMs: Date.now() - startTime,
         command: 'serve',
         cwd: state.cwd,
@@ -149,7 +150,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse, state: Serv
     model,
     inputTokens: totalInput,
     outputTokens: totalOutput,
-    costUsd: 0,
+    costUsd: (() => { const p = getPricingForModel(model); return p ? (totalInput * p[0] + totalOutput * p[1]) / 1_000_000 : 0 })(),
     durationMs: Date.now() - startTime,
     command: 'serve',
     cwd: state.cwd,
@@ -209,9 +210,10 @@ export function createServeCommand(): Command {
     .description('Start headless agent server (HTTP + SSE)')
     .option('--port <port>', 'Port to listen on', '0')
     .option('--host <host>', 'Hostname to bind', '127.0.0.1')
+    .option('--mcp', 'Start as MCP server over stdio instead of HTTP')
     .option('-m, --model <model>', 'Default model')
     .option('-p, --provider <provider>', 'Provider')
-    .action(async (opts: { port: string; host: string; model?: string; provider?: string }) => {
+    .action(async (opts: { port: string; host: string; mcp?: boolean; model?: string; provider?: string }) => {
       const flags: Record<string, unknown> = {}
       if (opts.model) flags.model = opts.model
       if (opts.provider) flags.provider = opts.provider
@@ -219,6 +221,14 @@ export function createServeCommand(): Command {
       const config = resolveConfig({ cwd: process.cwd(), flags })
       const resolved = resolveProvider(config)
       const cwd = process.cwd()
+
+      if (opts.mcp) {
+        const mcp = new MCPServer(cwd)
+        process.stderr.write('Orca MCP server started (stdio mode)\n')
+        mcp.start()
+        return
+      }
+
       const state: ServerState = { config, resolved, cwd }
       const server = createOrcaHttpServer(state)
 

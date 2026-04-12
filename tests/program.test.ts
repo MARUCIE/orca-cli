@@ -9,7 +9,7 @@ describe('program', () => {
 
   it('has version set', () => {
     const program = createProgram()
-    expect(program.version()).toBe('0.4.0')
+    expect(program.version()).toBe('0.6.0')
   })
 
   it('registers init command', () => {

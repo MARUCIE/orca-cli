@@ -6,6 +6,7 @@
 
 import { TOOL_DEFINITIONS } from './tools.js'
 import { loadProjectContext, formatContextForPrompt, loadSkills } from './context.js'
+import { discoverGuidance, formatGuidanceForPrompt } from './agents-discovery.js'
 
 export function buildSystemPrompt(cwd: string): string {
   // Generate tool list from actual definitions
@@ -63,6 +64,15 @@ ${(() => {
       ? `\n\n${rest.length} more skills available: ${rest.map(s => s.name).join(', ')}`
       : ''
     return `## Available Skills (${skills.length})\n\n${topList}${restNames}\n\nTo use a skill, read its SKILL.md: \`.claude/skills/<name>/SKILL.md\` or \`.codex/skills/<name>/SKILL.md\``
+  } catch {
+    return ''
+  }
+})()}
+
+${(() => {
+  try {
+    const guidance = discoverGuidance(cwd)
+    return formatGuidanceForPrompt(guidance)
   } catch {
     return ''
   }

@@ -69,14 +69,14 @@ describe('ProgressIndicator', () => {
     })
   })
 
-  describe('addTokens()', () => {
+  describe('addChars()', () => {
     it('accumulates token count correctly', () => {
       const indicator = new ProgressIndicator()
       indicator.start()
 
-      indicator.addTokens(10)
-      indicator.addTokens(5)
-      indicator.addTokens(3)
+      indicator.addChars(10)
+      indicator.addChars(5)
+      indicator.addChars(3)
 
       vi.advanceTimersByTime(100)
 
@@ -98,7 +98,7 @@ describe('ProgressIndicator', () => {
       const indicator = new ProgressIndicator()
       indicator.start()
 
-      indicator.addTokens(0)
+      indicator.addChars(0)
       vi.advanceTimersByTime(100)
 
       const result = indicator.stop()
@@ -121,7 +121,7 @@ describe('ProgressIndicator', () => {
     it('returns token count', () => {
       const indicator = new ProgressIndicator()
       indicator.start()
-      indicator.addTokens(42)
+      indicator.addChars(42)
 
       const result = indicator.stop()
       expect(result.tokens).toBe(42)
@@ -169,7 +169,7 @@ describe('ProgressIndicator', () => {
       const indicator = new ProgressIndicator()
       indicator.start()
       indicator.markWorking()
-      indicator.addTokens(25)
+      indicator.addChars(100) // 100 chars ≈ 25 tokens
 
       mockStderr = []
       vi.advanceTimersByTime(100)
@@ -177,7 +177,7 @@ describe('ProgressIndicator', () => {
       const output = mockStderr.join('')
       expect(output).toContain('Working')
       expect(output).toContain('↓')
-      expect(output).toContain('25')
+      expect(output).toContain('25') // 100 chars / 4 = 25 tokens
     })
 
     it('does not show token count when working but zero tokens', () => {
@@ -365,8 +365,8 @@ describe('integration: full progress cycle', () => {
     vi.advanceTimersByTime(100)
 
     // Accumulate tokens
-    indicator.addTokens(10)
-    indicator.addTokens(20)
+    indicator.addChars(10)
+    indicator.addChars(20)
     vi.advanceTimersByTime(1000)
 
     // Stop
@@ -396,7 +396,7 @@ describe('integration: full progress cycle', () => {
 
     // Simulate token stream
     for (let i = 0; i < 5; i++) {
-      indicator.addTokens(15)
+      indicator.addChars(15)
       vi.advanceTimersByTime(500)
     }
 

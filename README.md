@@ -1,12 +1,12 @@
 # Orca CLI
 
-**Provider-neutral coding agent — 9 providers · 41 tools · 8 hooks · multi-model collaboration.**
+**Provider-neutral coding agent — 9 providers · 41 tools · MCP server · 5 modes · multi-model collaboration.**
 
 The one CLI that can do what no single-vendor CLI can: ask Claude, GPT, and Gemini the same question simultaneously, race them, or chain them as specialists. Works with any OpenAI-compatible provider.
 
 ```
        ..:::....
-    .::------::::..          Orca  v0.4.0
+    .::------::::..          Orca  v0.6.0
   .::--========----::::..    provider-neutral agent runtime
 .:--==+++*****+++===---::::..
 .:-=++**#########**++==---::..
@@ -49,6 +49,7 @@ orca doctor                                 # runtime/config diagnostics
 orca logs errors                             # tail warning/error log
 orca pr 123                                  # checkout + review PR
 orca serve --port 9100                       # headless HTTP server
+orca serve --mcp                             # MCP server over stdio
 orca providers                               # list configured providers
 ```
 
@@ -275,16 +276,23 @@ Features that close the gap between "tool" and "agent":
 | Multi-edit Atomicity | Failed batch edits leave file unchanged | No partial corruption on error |
 | Background Completion Notifications | `run_background` jobs notify the REPL when they finish, and `/jobs` shows tracked state | Agent can keep working without manual PID polling |
 
-Tested: 598 tests across 42 files, 10/10 SOTA benchmark.
+Tested: 668 tests across 44 files, 10/10 SOTA benchmark.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Orca CLI  v0.4.0                                   │
-│  10,300+ LOC · 52 source files · 598 tests          │
+│  Orca CLI  v0.6.0                                   │
+│  13,000+ LOC · 63 source files · 668 tests          │
 ├─────────────────────────────────────────────────────┤
-│  New in v0.4.0 — SOTA Gap Closure                   │
+│  New in v0.6.0 — Mode Wiring + Threads + Guidance   │
+│  /mode command · thread memory · guidance injection  │
+├─────────────────────────────────────────────────────┤
+│  v0.5.0 — MCP Server + Modes + Discovery            │
+│  MCP server hosting · 5 behavioral modes             │
+│  AGENTS.md auto-discovery · hierarchical guidance    │
+├─────────────────────────────────────────────────────┤
+│  v0.4.0 — SOTA Gap Closure                          │
 │  harness layer · sub-agent isolation · sandbox       │
 │  skills engine · webhook gateway · DNA capsules      │
 ├─────────────────────────────────────────────────────┤

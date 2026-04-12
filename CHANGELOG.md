@@ -2,6 +2,63 @@
 
 This file is a historical release log. Version-specific counts and examples reflect the release date they were recorded, not the current repo head.
 
+## v0.6.0 — Mode Wiring + Guidance Injection + Thread Memory (2026-04-13)
+
+Completes full integration: /mode slash command, AGENTS.md guidance in system prompt,
+thread-based conversation persistence. 1 new module, 3 REPL integrations, 28 new tests.
+
+### /mode Slash Command (REPL Integration)
+- `/mode` lists all modes + shows active
+- `/mode <id>` switches mode, injects systemPromptPrefix into system prompt
+- Mode tool restrictions displayed on switch
+- Custom modes loaded from `.orca/modes.json` at startup
+
+### Guidance Auto-Injection (System Prompt)
+- `discoverGuidance()` called in `buildSystemPrompt()` — automatic, zero config
+- Scans cwd + 3 parent dirs for AGENTS.md, CLAUDE.md, CODEX.md, .orca/rules/*.md
+- Discovered guidance appended to system prompt with truncation (2000 chars/file)
+
+### Thread-based Memory (Conversation Persistence)
+- **ThreadManager** — create/list/load/append/search/delete threads
+- Threads saved as JSON in `~/.orca/threads/`
+- `/thread` slash command: list, save, load, search, delete subcommands
+- Keyword search across thread titles and message content
+
+### Test Coverage
+- 44 test files, 668 tests (28 new for v0.6.0)
+- All pass: 0 failures, 0 errors
+
+---
+
+## v0.5.0 — MCP Server + Mode System + AGENTS.md Discovery (2026-04-12)
+
+Completes v0.5.0 scope: Orca as both MCP client AND server, behavioral mode system,
+and hierarchical guidance discovery. 3 new source modules, 42 new tests.
+
+### MCP Server Hosting
+- **MCPServer** — stdio-based JSON-RPC 2.0 server exposing all Orca tools
+- `orca serve --mcp` starts MCP mode over stdio (initialize, tools/list, tools/call)
+- Full error handling: -32700 (parse error), -32601 (method not found)
+- Notifications (no id) handled silently per MCP spec
+
+### Mode System (Behavioral Profiles)
+- **ModeRegistry** — 5 builtin modes: default, code-review, debug, architect, docs
+- Each mode bundles: systemPromptPrefix, tool whitelist, instructions
+- `loadFromFile()` for custom modes from .orca/modes.json
+- Modes shape agent behavior without changing the underlying model
+
+### AGENTS.md Auto-Discovery
+- **discoverGuidance()** — scans cwd + parent dirs for AGENTS.md, CLAUDE.md, CODEX.md, .orca/rules/*.md
+- **formatGuidanceForPrompt()** — formats discovered files into system prompt with truncation
+- Depth-first ordering: closest files appear first
+- Configurable maxDepth (default 3) and maxCharsPerFile (default 2000)
+
+### Test Coverage
+- 43 test files, 640 tests (42 new for v0.5.0 modules)
+- All pass: 0 failures, 0 errors
+
+---
+
 ## v0.4.0 — SOTA Gap Closure (2026-04-12)
 
 Complete closure of all 6 SOTA gap dimensions identified by 3-agent parallel research.

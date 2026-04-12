@@ -13,6 +13,7 @@
  */
 
 import { Command } from 'commander'
+import { getPricingForModel } from '../model-catalog.js'
 import type { OrcaConfig } from '../config.js'
 import { resolveConfig, resolveProvider } from '../config.js'
 import {
@@ -190,7 +191,7 @@ async function executeTask(options: ExecuteTaskOptions): Promise<void> {
     model,
     inputTokens,
     outputTokens,
-    costUsd: 0,
+    costUsd: (() => { const p = getPricingForModel(model); return p ? (inputTokens * p[0] + outputTokens * p[1]) / 1_000_000 : 0 })(),
     durationMs: Date.now() - startTime,
     turns,
     command: 'run',
