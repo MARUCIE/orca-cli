@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Forge CLI v0.2.0 — Test Report</title>
+<title>Orca CLI v0.2.0 — Test Report</title>
 <style>
 :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #e6edf3; --dim: #8b949e; --pass: #22c55e; --fail: #ef4444; --warn: #f59e0b; --accent: #58a6ff; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -45,7 +45,7 @@ footer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 1
 </head>
 <body>
 <div class="container">
-<h1>Forge CLI <span>v0.2.0</span> — Test Report</h1>
+<h1>Orca CLI <span>v0.2.0</span> — Test Report</h1>
 <p class="subtitle">Generated 2026-04-12 19:52:08 | vitest | Node 3.13.11 | 424 tests across 31 files</p>
 
 <div class="metrics">
@@ -713,7 +713,7 @@ footer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 1
             <td class="center">0.41312499999997954ms</td>
         </tr><tr>
             <td class="file">tests/config.test.ts</td>
-            <td>config &gt; resolveConfig &gt; reads project config from .armature.json</td>
+            <td>config &gt; resolveConfig &gt; reads project config from .orca.json</td>
             <td class="center"><span class="badge pass">PASS</span></td>
             <td class="center">0.633624999999995ms</td>
         </tr><tr>
@@ -753,7 +753,7 @@ footer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 1
             <td class="center">0.35808399999996254ms</td>
         </tr><tr>
             <td class="file">tests/config.test.ts</td>
-            <td>config &gt; initProjectConfig &gt; creates .armature.json in target directory</td>
+            <td>config &gt; initProjectConfig &gt; creates .orca.json in target directory</td>
             <td class="center"><span class="badge pass">PASS</span></td>
             <td class="center">0.3634999999999877ms</td>
         </tr><tr>
@@ -818,7 +818,7 @@ footer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 1
             <td class="center">1.355542000000014ms</td>
         </tr><tr>
             <td class="file">tests/context-skills.test.ts</td>
-            <td>loadSkills() &gt; loads from .armature/skills/ directory</td>
+            <td>loadSkills() &gt; loads from .orca/skills/ directory</td>
             <td class="center"><span class="badge pass">PASS</span></td>
             <td class="center">0.7121249999999861ms</td>
         </tr><tr>
@@ -1133,7 +1133,7 @@ footer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 1
             <td class="center">0.7462919999999826ms</td>
         </tr><tr>
             <td class="file">tests/hooks-compat.test.ts</td>
-            <td>HookManager - Claude Code Compatibility &gt; Claude Code format &gt; sets both CLAUDE_HOOK_EVENT and FORGE_HOOK_EVENT env vars</td>
+            <td>HookManager - Claude Code Compatibility &gt; Claude Code format &gt; sets both CLAUDE_HOOK_EVENT and ORCA_HOOK_EVENT env vars</td>
             <td class="center"><span class="badge pass">PASS</span></td>
             <td class="center">0.257458999999983ms</td>
         </tr><tr>
@@ -1158,7 +1158,7 @@ footer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 1
             <td class="center">0.5115000000000123ms</td>
         </tr><tr>
             <td class="file">tests/hooks-compat.test.ts</td>
-            <td>HookManager - Claude Code Compatibility &gt; Matcher conversion &gt; converts Claude Code matcher &quot;Edit|Write&quot; to include both Forge and Claude names</td>
+            <td>HookManager - Claude Code Compatibility &gt; Matcher conversion &gt; converts Claude Code matcher &quot;Edit|Write&quot; to include both Orca and Claude names</td>
             <td class="center"><span class="badge pass">PASS</span></td>
             <td class="center">0.4427500000000464ms</td>
         </tr><tr>
@@ -1178,12 +1178,12 @@ footer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 1
             <td class="center">0.6094170000000076ms</td>
         </tr><tr>
             <td class="file">tests/hooks.test.ts</td>
-            <td>Hook config loading &gt; 5.1 loads hooks from .armature/hooks.json</td>
+            <td>Hook config loading &gt; 5.1 loads hooks from .orca/hooks.json</td>
             <td class="center"><span class="badge pass">PASS</span></td>
             <td class="center">1.508624999999995ms</td>
         </tr><tr>
             <td class="file">tests/hooks.test.ts</td>
-            <td>Hook config loading &gt; 5.2 loads hooks from .armature.json (nested hooks key)</td>
+            <td>Hook config loading &gt; 5.2 loads hooks from .orca.json (nested hooks key)</td>
             <td class="center"><span class="badge pass">PASS</span></td>
             <td class="center">1.320416000000023ms</td>
         </tr><tr>
@@ -1223,7 +1223,7 @@ footer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 1
             <td class="center">0.9291660000000093ms</td>
         </tr><tr>
             <td class="file">tests/hooks.test.ts</td>
-            <td>Hook matching and env vars &gt; 5.10 Env vars FORGE_HOOK_EVENT and FORGE_HOOK_TOOL are set</td>
+            <td>Hook matching and env vars &gt; 5.10 Env vars ORCA_HOOK_EVENT and ORCA_HOOK_TOOL are set</td>
             <td class="center"><span class="badge pass">PASS</span></td>
             <td class="center">7.906791999999996ms</td>
         </tr><tr>
@@ -1423,7 +1423,7 @@ footer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 1
             <td class="center">1.8315829999999949ms</td>
         </tr><tr>
             <td class="file">tests/mcp-client.test.ts</td>
-            <td>MCPClient &gt; loadConfigs() &gt; reads .armature.json with mcpServers key</td>
+            <td>MCPClient &gt; loadConfigs() &gt; reads .orca.json with mcpServers key</td>
             <td class="center"><span class="badge pass">PASS</span></td>
             <td class="center">0.7459999999999809ms</td>
         </tr><tr>
@@ -1693,7 +1693,7 @@ footer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 1
             <td class="center">0.9545830000000137ms</td>
         </tr><tr>
             <td class="file">tests/program.test.ts</td>
-            <td>program &gt; creates a program with forge name</td>
+            <td>program &gt; creates a program with orca name</td>
             <td class="center"><span class="badge pass">PASS</span></td>
             <td class="center">2.153583000000026ms</td>
         </tr><tr>
@@ -2376,7 +2376,7 @@ footer { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 1
 </div>
 
 <footer>
-    <p>Forge CLI v0.2.0 — Comprehensive Test Report</p>
+    <p>Orca CLI v0.2.0 — Comprehensive Test Report</p>
     <p>Maurice | maurice_wen@proton.me</p>
     <p style="font-size:12px; margin-top:8px;">Generated 2026-04-12 19:52:08 | vitest + Node.js | 31 suites, 424 cases, 100.0% pass rate</p>
 </footer>

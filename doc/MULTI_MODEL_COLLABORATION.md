@@ -5,7 +5,7 @@
 ## Problem
 
 Claude Code only uses Claude. Codex only uses GPT. Gemini Code only uses Gemini.
-Forge CLI has access to 11 models from 7 vendors through Poe. This is an untapped
+Orca CLI has access to 11 models from 7 vendors through Poe. This is an untapped
 superpower — currently, the user picks ONE model per session.
 
 ## Insight
@@ -31,8 +31,8 @@ models collaboratively — like a team of specialists, not a single generalist.*
 **Use case**: Decisions, code review, architecture, debugging tough issues.
 
 ```
-forge council "should we use SQL or NoSQL for this?" --models 3
-forge council "review this PR for security issues"
+orca council "should we use SQL or NoSQL for this?" --models 3
+orca council "review this PR for security issues"
 ```
 
 **Flow**:
@@ -57,7 +57,7 @@ User Prompt ───────├─── Model B ──→ Answer B ──�
 **Use case**: Speed-critical tasks where any good answer will do.
 
 ```
-forge race "write a function to parse CSV" --models 5
+orca race "write a function to parse CSV" --models 5
 ```
 
 **Flow**:
@@ -78,7 +78,7 @@ User Prompt ───────├─── Model B ──→ ... (still runni
 **Use case**: Complex tasks that benefit from specialized roles.
 
 ```
-forge pipeline "build a REST API for user management" \
+orca pipeline "build a REST API for user management" \
   --plan claude-opus-4.6 \
   --code gpt-5.4 \
   --review gemini-3.1-pro
@@ -127,7 +127,7 @@ interface PipelineOptions {
 ### Integration Points
 
 1. **Slash commands**: `/council`, `/race`, `/pipeline` in REPL
-2. **CLI commands**: `forge council "prompt"`, `forge race "prompt"`
+2. **CLI commands**: `orca council "prompt"`, `orca race "prompt"`
 3. **Tool**: `multi_model_council` available to the agent itself
 
 ### Model Selection Strategy
@@ -185,7 +185,7 @@ const DIVERSITY_GROUPS = [
 
 ### Competitive Advantage
 
-| Feature | Claude Code | Codex | Forge CLI |
+| Feature | Claude Code | Codex | Orca CLI |
 |---------|------------|-------|-----------|
 | Single model | ✓ Claude only | ✓ GPT only | ✓ Any of 11 |
 | Multi-model parallel | ✗ | ✗ | ✓ Council |

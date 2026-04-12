@@ -42,7 +42,7 @@ self-evaluation benchmark, and 7-layer SOTA capability stack.
 - **YOLO mode default** — auto-approve all tools, --safe for permission prompts
 
 ### Self-Evaluation
-- **`forge bench`** — 10 standardized coding scenarios, reports pass/fail + score
+- **`orca bench`** — 10 standardized coding scenarios, reports pass/fail + score
 - **326 automated tests** across 20 files, 16 rounds
 - **CI pipeline** — GitHub Actions, Node 20+22 matrix, bench as quality gate
 
@@ -62,7 +62,7 @@ self-evaluation benchmark, and 7-layer SOTA capability stack.
 
 ### Architecture
 ```
-L0  Benchmark    forge bench (10 scenarios)
+L0  Benchmark    orca bench (10 scenarios)
 L1  Tools        41 tools + shellEscape
 L2  Context      Project auto-detection
 L3  Intelligence Auto-verify + Retry + Error hints

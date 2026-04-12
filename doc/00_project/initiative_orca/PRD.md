@@ -1,16 +1,16 @@
-# Forge CLI PRD
+# Orca CLI PRD
 
 ## Product Snapshot
 
-- Product: Forge CLI
-- Package: `@armature/forge-cli`
+- Product: Orca CLI
+- Package: `orca-cli`
 - Domain: provider-neutral coding-agent CLI
 - Primary users: developers who need coding-agent workflows across multiple model vendors
 - Current repo status: active TypeScript CLI with runtime, multi-model collaboration, session management, PR review, serve mode, benchmark tooling, and Hermes-inspired runtime ergonomics
 
 ## Problem
 
-Single-vendor coding CLIs force users into one model family per session. Forge CLI exists to give developers a single terminal-native workflow that can route across providers, run agent tasks, and coordinate multiple models when that meaningfully improves quality or speed.
+Single-vendor coding CLIs force users into one model family per session. Orca CLI exists to give developers a single terminal-native workflow that can route across providers, run agent tasks, and coordinate multiple models when that meaningfully improves quality or speed.
 
 ## Goals
 
@@ -29,15 +29,15 @@ Single-vendor coding CLIs force users into one model family per session. Forge C
 
 | User Job | Current Surface | Source |
 | --- | --- | --- |
-| Ask the agent a question interactively | `forge chat`, default no-subcommand entry | `src/commands/chat.ts`, `src/program.ts` |
-| Execute a coding task | `forge run` | `src/commands/run.ts` |
-| Compare or combine models | `forge council`, `forge race`, `forge pipeline` | `src/commands/multi.ts`, `src/multi-model.ts` |
-| Inspect providers and routing | `forge providers` | `src/commands/providers.ts` |
-| Review saved state and cost | `forge session`, `forge stats` | `src/commands/session.ts`, `src/commands/stats.ts` |
+| Ask the agent a question interactively | `orca chat`, default no-subcommand entry | `src/commands/chat.ts`, `src/program.ts` |
+| Execute a coding task | `orca run` | `src/commands/run.ts` |
+| Compare or combine models | `orca council`, `orca race`, `orca pipeline` | `src/commands/multi.ts`, `src/multi-model.ts` |
+| Inspect providers and routing | `orca providers` | `src/commands/providers.ts` |
+| Review saved state and cost | `orca session`, `orca stats` | `src/commands/session.ts`, `src/commands/stats.ts` |
 | Track detached work | `run_background`, `/jobs` | `src/tools.ts`, `src/background-jobs.ts`, `src/commands/chat.ts` |
-| Review pull requests | `forge pr` | `src/commands/pr.ts` |
-| Expose a headless agent server | `forge serve` | `src/commands/serve.ts` |
-| Benchmark the runtime | `forge bench` | `src/commands/bench.ts` |
+| Review pull requests | `orca pr` | `src/commands/pr.ts` |
+| Expose a headless agent server | `orca serve` | `src/commands/serve.ts` |
+| Benchmark the runtime | `orca bench` | `src/commands/bench.ts` |
 
 ## Core Capabilities
 
@@ -63,7 +63,7 @@ Single-vendor coding CLIs force users into one model family per session. Forge C
 
 - `npm test` stays green for runtime, tool, hook, and multi-model suites
 - `README.md` matches actual command surface and provider/model claims
-- Project docs under `doc/00_project/initiative_forge_cli/` remain current with source layout
+- Project docs under `doc/00_project/initiative_orca/` remain current with source layout
 - Future feature work lands without reintroducing single-provider coupling
 
 ## Current Risks
@@ -71,7 +71,7 @@ Single-vendor coding CLIs force users into one model family per session. Forge C
 - Legacy flat docs in `doc/` can drift from current project-level canonical docs
 - Marketing-style counts in README/docs can become stale as tool/provider inventories evolve
 - Provider routing complexity can leak across unrelated modules if not kept centralized
-- Some Hermes-inspired ergonomics are currently Forge-local and not yet extracted to the shared SDK
+- Some Hermes-inspired ergonomics are currently Orca-local and not yet extracted to the shared SDK
 
 ## Immediate Priorities
 

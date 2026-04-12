@@ -1,4 +1,4 @@
-# Three-Tier Architecture — Armature Ecosystem
+# Three-Tier Architecture — Orca Ecosystem
 
 **Date**: 2026-04-04
 **Version**: 1.0
@@ -10,15 +10,15 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Layer 3: AI-Fleet (AI-OS)                     │
+│                    Layer 3: OrcaOS (AI-OS)                     │
 │  Launcher · 112 Skills · 38 Core Modules · 16 Harness Modules   │
 │  53 Start Functions · Skill Groups · DNA Capsules · Cron Jobs    │
 ├─────────────────────────────────────────────────────────────────┤
-│                    Layer 2: Forge CLI (Product)                   │
+│                    Layer 2: Orca CLI (Product)                   │
 │  REPL · 3 Commands · 13 Slash Commands · 5 Agent Tools          │
 │  Multi-Model · Poe/OpenRouter Proxy · Streaming · Cost Tracking  │
 ├─────────────────────────────────────────────────────────────────┤
-│                  Layer 1: Armature SDK (Foundation)               │
+│                  Layer 1: Orca Agent SDK (Foundation)               │
 │  Agent Engine · 51 Built-in Tools · 12 Core Contracts           │
 │  2 Provider Adapters · Eval Framework · MCP Client (7 transports)│
 └─────────────────────────────────────────────────────────────────┘
@@ -27,7 +27,7 @@
 ### Dependency Direction
 
 ```
-AI-Fleet ──depends-on──→ Forge CLI ──optional-dep──→ Armature SDK
+OrcaOS ──depends-on──→ Orca CLI ──optional-dep──→ Orca Agent SDK
                               │
                               └──direct-dep──→ OpenAI SDK (Poe proxy)
 ```
@@ -36,23 +36,23 @@ AI-Fleet ──depends-on──→ Forge CLI ──optional-dep──→ Armatur
 
 | Layer | Repo | URL | Language | Tests |
 |-------|------|-----|----------|-------|
-| L1: SDK | `armature-agent-sdk` | github.com/MARUCIE/armature-agent-sdk | TypeScript | 170 / 27 files |
-| L2: CLI | `forge-cli` | github.com/MARUCIE/forge-cli | TypeScript | 22 / 3 files |
+| L1: SDK | `orca-agent-sdk` | github.com/MARUCIE/orca-agent-sdk | TypeScript | 170 / 27 files |
+| L2: CLI | `orca-cli` | github.com/MARUCIE/orca-cli | TypeScript | 22 / 3 files |
 | L3: AI-OS | `00-AI-Fleet` | local (private) | Python + Bash | Harness-gated |
 
 ---
 
-## 2. Layer 1: Armature SDK (Foundation)
+## 2. Layer 1: Orca Agent SDK (Foundation)
 
 ### 2.1 Package Structure
 
 | Package | Purpose | Files | Exports |
 |---------|---------|-------|---------|
-| `@armature/sdk` | Agent engine entry point | 2000+ src files | `createAgent`, `Agent`, `query`, 50+ tools |
-| `@armature/core` | Provider-neutral IR | 13 modules | 12 contracts + types |
-| `@armature/provider-anthropic` | Anthropic codec | 2 modules | Adapter factory + codec |
-| `@armature/provider-openai` | OpenAI codec | 2 modules | Adapter factory + codec |
-| `@armature/eval` | Quality evaluation | 6 modules | Trajectory + tool validation + golden |
+| `@orca/sdk` | Agent engine entry point | 2000+ src files | `createAgent`, `Agent`, `query`, 50+ tools |
+| `@orca/core` | Provider-neutral IR | 13 modules | 12 contracts + types |
+| `@orca/provider-anthropic` | Anthropic codec | 2 modules | Adapter factory + codec |
+| `@orca/provider-openai` | OpenAI codec | 2 modules | Adapter factory + codec |
+| `@orca/eval` | Quality evaluation | 6 modules | Trajectory + tool validation + golden |
 
 ### 2.2 Core Contracts (packages/core — 12 modules)
 
@@ -239,15 +239,15 @@ AI-Fleet ──depends-on──→ Forge CLI ──optional-dep──→ Armatur
 
 ---
 
-## 3. Layer 2: Forge CLI (Product)
+## 3. Layer 2: Orca CLI (Product)
 
 ### 3.1 Module Structure
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `bin/forge.ts` | 23 | Entry point with SIGINT/SIGTERM handlers |
+| `bin/orca.ts` | 23 | Entry point with SIGINT/SIGTERM handlers |
 | `commands/chat.ts` | 780+ | REPL + one-shot chat + multi-turn + slash commands |
-| `commands/init.ts` | 40 | Initialize .armature/ config |
+| `commands/init.ts` | 40 | Initialize .orca/ config |
 | `commands/run.ts` | 170 | Task execution with acceptEdits default |
 | `config.ts` | 240 | 3-tier config resolver + Zod schema + provider auto-detect |
 | `output.ts` | 260 | Streaming output + tool display + cost + errors + session summary |
@@ -262,9 +262,9 @@ AI-Fleet ──depends-on──→ Forge CLI ──optional-dep──→ Armatur
 
 | Command | Description | Modes |
 |---------|-------------|-------|
-| `forge chat [prompt]` | Interactive REPL or one-shot query | Streaming, JSON |
-| `forge run <task>` | Execute task with agent tools | acceptEdits default |
-| `forge init` | Create ~/.armature/ + .armature.json | Global + project |
+| `orca chat [prompt]` | Interactive REPL or one-shot query | Streaming, JSON |
+| `orca run <task>` | Execute task with agent tools | acceptEdits default |
+| `orca init` | Create ~/.orca/ + .orca.json | Global + project |
 
 ### 3.3 Slash Commands (13)
 
@@ -327,9 +327,9 @@ AI-Fleet ──depends-on──→ Forge CLI ──optional-dep──→ Armatur
 | Tier | Source | Format | Scope |
 |------|--------|--------|-------|
 | 1 (highest) | CLI flags | `--provider poe --model GPT-4o` | Runtime |
-| 2 | Environment | `POE_API_KEY`, `ARMATURE_PROVIDER`, `ARMATURE_MODEL` | Process |
-| 3 | Project | `.armature.json` | Per-directory |
-| 4 (lowest) | Global | `~/.armature/config.json` | User-wide |
+| 2 | Environment | `POE_API_KEY`, `ORCA_PROVIDER`, `ORCA_MODEL` | Process |
+| 3 | Project | `.orca.json` | Per-directory |
+| 4 (lowest) | Global | `~/.orca/config.json` | User-wide |
 
 ### 3.8 Cost Estimation (12 pricing tiers)
 
@@ -349,7 +349,7 @@ AI-Fleet ──depends-on──→ Forge CLI ──optional-dep──→ Armatur
 
 ---
 
-## 4. Layer 3: AI-Fleet (AI-OS)
+## 4. Layer 3: OrcaOS (AI-OS)
 
 ### 4.1 Core Statistics
 
@@ -372,7 +372,7 @@ AI-Fleet ──depends-on──→ Forge CLI ──optional-dep──→ Armatur
 | Gemini CLI | `ai gemini` or `ai` → `3` | `start_gemini` |
 | Amp CLI | `ai amp` or `ai` → `4` | `start_amp` |
 | Droid | `ai droid` or `ai` → `5` | `start_droid` |
-| **Forge CLI** | **`ai forge` or `ai` → `6`** | **Inline (node dist/bin/forge.js)** |
+| **Orca CLI** | **`ai orca` or `ai` → `6`** | **Inline (node dist/bin/orca.js)** |
 
 ### 4.3 Harness Engineering Layer (16 modules)
 
@@ -395,19 +395,19 @@ AI-Fleet ──depends-on──→ Forge CLI ──optional-dep──→ Armatur
 | `goal_loop_cron.py` | Cron-scheduled goal loop execution |
 | `__init__.py` | Package initialization |
 
-### 4.4 Forge CLI Integration in AI-Fleet
+### 4.4 Orca CLI Integration in AI-Fleet
 
 ```bash
 # Direct command
-ai forge chat -p poe -m GPT-4o "analyze this project"
+ai orca chat -p poe -m GPT-4o "analyze this project"
 
 # Interactive menu → 6
 ai
 > 6
-启动 Forge CLI (Armature SDK)...
+启动 Orca CLI (Orca Agent SDK)...
 
 # Inline from menu
-> forge what is this project about?
+> orca what is this project about?
 ```
 
 Features:
@@ -443,7 +443,7 @@ Features:
 
 ## 6. Data Flow
 
-### 6.1 Poe Proxy Path (forge chat -p poe)
+### 6.1 Poe Proxy Path (orca chat -p poe)
 
 ```
 User Input
@@ -476,7 +476,7 @@ History Update (user + assistant messages appended)
 Next Prompt
 ```
 
-### 6.2 SDK Native Path (forge chat --provider anthropic)
+### 6.2 SDK Native Path (orca chat --provider anthropic)
 
 ```
 User Input
@@ -485,7 +485,7 @@ User Input
 REPL → Config → Provider Router
     │
     ▼
-@armature/sdk createAgent()
+@orca/sdk createAgent()
     │
     ▼
 QueryEngine → styleRouter → providerSelection
@@ -512,8 +512,8 @@ Result
 | 2026-04-03 | SDK extracted from Claude Code engine | Phase 1-2 complete |
 | 2026-04-03 | 5-way swarm audit: 14 SOTA gaps identified | Architecture direction |
 | 2026-04-03 | SOTA Sprint 1-4: all 14 gaps closed | 170 tests, 12 contracts |
-| 2026-04-03 | Renamed to Armature; repo: armature-agent-sdk | Brand established |
-| 2026-04-04 | Forge CLI created (Sprint A-F) | REPL + tools + multi-model |
+| 2026-04-03 | Renamed to Orca; repo: orca-agent-sdk | Brand established |
+| 2026-04-04 | Orca CLI created (Sprint A-F) | REPL + tools + multi-model |
 | 2026-04-04 | Poe API integration verified | Claude + GPT + Gemini E2E |
 | 2026-04-04 | 3-round code audit passed | Security + arch + DX |
 | 2026-04-04 | User journey E2E: 6 scenarios passed | All tools verified |

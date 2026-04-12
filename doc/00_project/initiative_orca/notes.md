@@ -2,9 +2,9 @@
 
 ## 2026-04-12
 
-- User provided explicit `PROJECT_DIR`: `/Users/mauricewen/Projects/MARUCIE-forge-cli`
+- User provided explicit `PROJECT_DIR`: `/Users/mauricewen/Projects/MARUCIE-orca-cli`
 - Project root initially lacked repo-level `AGENTS.md` / `CLAUDE.md` / mirror files
-- Existing docs were flat under `doc/` and did not include the required `doc/00_project/initiative_forge_cli/` tree
+- Existing docs were flat under `doc/` and did not include the required `doc/00_project/initiative_orca/` tree
 - `.omx/tmux-hook.json` existed as untracked runtime state; `.gitignore` was updated to ignore `.omx/`
 - Command surface was verified from `src/program.ts`, not inferred solely from README
 - Verification completed:
@@ -22,61 +22,64 @@
 - Additional verification completed:
   - `npm run build` passed
   - `npm run bench` passed (`10/10`, `100%`)
-  - `node dist/bin/forge.js --help` rendered expected command help
+  - `node dist/bin/orca.js --help` rendered expected command help
   - Full `npm test` rerun passed (`327/327`) with the stray git warning removed
   - Targeted regression run passed: `tests/adversarial.test.ts` + `tests/protocol.test.ts` (`34/34`)
 - New feature branch note:
-  - User requested Hermes-agent capability internalization into Forge CLI, with SDK updates only if the boundary requires it
+  - User requested Hermes-agent capability internalization into Orca CLI, with SDK updates only if the boundary requires it
   - Hermes local fact source: `00-AI-Fleet/state/services/hermes-agent/src/hermes-agent/RELEASE_v0.8.0.md`
-  - Initial capability bundle selected for Forge: tool arg coercion, oversized tool result persistence, background completion notifications
-  - Current SDK conclusion: `MARUCIE-open-agent-sdk` is the canonical SDK repo, but this first capability bundle is likely Forge-local unless a reusable runtime seam emerges during implementation
+  - Initial capability bundle selected for Orca: tool arg coercion, oversized tool result persistence, background completion notifications
+  - Current SDK conclusion: `MARUCIE-open-agent-sdk` is the canonical SDK repo, but this first capability bundle is likely Orca-local unless a reusable runtime seam emerges during implementation
 - Implementation outcome:
   - Added `src/background-jobs.ts` for detached job tracking and REPL completion notifications
   - `src/tools.ts` now coerces model-sent stringified tool arguments to schema-compatible runtime values
-  - Oversized tool outputs now persist to `~/.armature/tool-results/` (or `$ARMATURE_HOME/tool-results/`) and return an artifact path instead of destructive truncation
+  - Oversized tool outputs now persist to `~/.orca/tool-results/` (or `$ORCA_HOME/tool-results/`) and return an artifact path instead of destructive truncation
   - REPL gained `/jobs` for tracked background work visibility
 - SDK boundary decision:
   - No SDK code change in `MARUCIE-open-agent-sdk`
-  - Reason: this capability bundle is currently Forge-local shell/runtime ergonomics, not a shared provider-neutral agent-loop seam yet
+  - Reason: this capability bundle is currently Orca-local shell/runtime ergonomics, not a shared provider-neutral agent-loop seam yet
 - Follow-up capability slice:
   - Added `src/model-catalog.ts` to centralize known model/provider metadata
   - `/model` and `/models` now surface provider, context window, approximate pricing, and caution metadata
   - Hard-coded Poe-only picker behavior was removed from REPL flows
 - Provider/output follow-up:
-  - `forge providers` now reuses the same catalog metadata and prints context/pricing/caution lines
-  - One-shot `forge chat "..."` startup now emits the same model caution used by the REPL when applicable
+  - `orca providers` now reuses the same catalog metadata and prints context/pricing/caution lines
+  - One-shot `orca chat "..."` startup now emits the same model caution used by the REPL when applicable
 - Logging follow-up:
   - Added `src/logger.ts` for local `agent.log` / `errors.log`
-  - Added `forge logs` via `src/commands/logs.ts`
+  - Added `orca logs` via `src/commands/logs.ts`
   - Routed core warning/error paths plus selected chat/provider runtime events into the local logger
 - Doctor follow-up:
-  - Added `src/doctor.ts` plus top-level `forge doctor`
+  - Added `src/doctor.ts` plus top-level `orca doctor`
   - Doctor now reports provider/config/hook/MCP/session/background-job/log status in one place
   - Doctor also surfaces malformed local JSON config files explicitly via `configDiagnostics`
-  - No SDK change required; diagnostics remain Forge-local runtime tooling
+  - No SDK change required; diagnostics remain Orca-local runtime tooling
 - Serve follow-up:
-  - `forge serve` now exposes richer `/health`, `/providers`, and `/doctor` surfaces
+  - `orca serve` now exposes richer `/health`, `/providers`, and `/doctor` surfaces
   - Headless server responses reuse the same model catalog and doctor diagnostics used by CLI commands
 - Stats follow-up:
-  - `forge stats` now includes runtime health and recent error summaries
+  - `orca stats` now includes runtime health and recent error summaries
   - The stats surface now composes usage-db + doctor + logger instead of showing cost-only data
+- Branding follow-up:
+  - Canonical docs and governance files now consistently use `Orca/orca/.orca`
+  - Real filesystem `PROJECT_DIR` references remain `/Users/mauricewen/Projects/MARUCIE-orca-cli` until the repo directory itself is renamed
 - Verification completed:
   - `npm run lint` passed
   - `npm test` passed (`426/426`)
   - `npm run build` passed
   - `npm run bench` passed (`10/10`, `100%`)
-  - `node dist/bin/forge.js --help` rendered expected command help
+  - `node dist/bin/orca.js --help` rendered expected command help
   - `tests/hermes-runtime.test.ts` passed (`3/3`)
   - `tests/model-catalog.test.ts` passed (`4/4`)
   - `tests/model-catalog.test.ts` + `tests/providers-command.test.ts` passed (`5/5`)
-  - `node dist/bin/forge.js providers` rendered provider metadata as expected
+  - `node dist/bin/orca.js providers` rendered provider metadata as expected
   - `tests/logger.test.ts` + `tests/logs-command.test.ts` + `tests/program.test.ts` passed (`12/12`)
-  - `node dist/bin/forge.js logs` rendered the expected empty-log state
+  - `node dist/bin/orca.js logs` rendered the expected empty-log state
   - `tests/doctor-command.test.ts` passed (`1/1`)
-  - `node dist/bin/forge.js doctor --json` returned structured diagnostics
-  - malformed-config smoke for `forge doctor` now reports config issues without the old bare stderr warning prefix
+  - `node dist/bin/orca.js doctor --json` returned structured diagnostics
+  - malformed-config smoke for `orca doctor` now reports config issues without the old bare stderr warning prefix
   - `tests/serve-command.test.ts` passed (`1/1`)
   - `tests/stats-command.test.ts` passed (`1/1`)
 - Boundary reminder:
-  - Hermes-inspired runtime, model-catalog, logs, and doctor slices all remain Forge-local
+  - Hermes-inspired runtime, model-catalog, logs, and doctor slices all remain Orca-local
   - `MARUCIE-open-agent-sdk` still intentionally unchanged because no provider-neutral seam has been proven yet

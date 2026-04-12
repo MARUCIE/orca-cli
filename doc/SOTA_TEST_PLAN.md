@@ -1,6 +1,6 @@
-# Forge CLI — SOTA Agent Test Plan
+# Orca CLI — SOTA Agent Test Plan
 
-> Goal: Transform Forge CLI from "feature-complete" to "SOTA programming agent"
+> Goal: Transform Orca CLI from "feature-complete" to "SOTA programming agent"
 > by systematically testing and hardening every dimension that separates
 > a good coding agent from a great one.
 
@@ -11,7 +11,7 @@ All 10 SOTA dimensions covered + 3 hardening rounds (determinism, adversarial, p
 
 Key insight from research: **Model raw score vs agent delivery has a 20+ point gap**
 (Claude Opus 80.9% SWE-bench vs Claude Code 58.0%). The gap = harness engineering.
-Forge CLI wins by having the best harness, not the best model.
+Orca CLI wins by having the best harness, not the best model.
 
 ---
 
@@ -22,7 +22,7 @@ Forge CLI wins by having the best harness, not the best model.
 | D1 | Tool Execution Accuracy | Aider | 87/129 tests | Covered |
 | D2 | Edit Format Compliance | Aider Polyglot | 24/129 tests | Covered |
 | D3 | Agent Loop Integrity | SWE-bench | 0 tests | **CRITICAL** |
-| D4 | Multi-Model Collaboration | Forge-unique | 0 tests | **CRITICAL** |
+| D4 | Multi-Model Collaboration | Orca-unique | 0 tests | **CRITICAL** |
 | D5 | Hook System & Safety | Claude Code | 0 tests | **CRITICAL** |
 | D6 | Complex Bug Fix | SWE-bench | 5 tests (basic) | **HIGH** |
 | D7 | Feature Development | FeatureBench | 3 tests (basic) | **HIGH** |
@@ -72,8 +72,8 @@ Tests the 8-event hook lifecycle that provides extensibility and safety.
 
 | Test | What It Proves | Dimension |
 |------|---------------|-----------|
-| 5.1 | HookManager loads from .armature/hooks.json | D5 |
-| 5.2 | HookManager loads from .armature.json | D5 |
+| 5.1 | HookManager loads from .orca/hooks.json | D5 |
+| 5.2 | HookManager loads from .orca.json | D5 |
 | 5.3 | HookManager loads from .claude/hooks.json | D5 |
 | 5.4 | PreToolUse hook receives tool name + input JSON | D5 |
 | 5.5 | PreToolUse non-zero exit blocks tool execution | D5 |
@@ -84,7 +84,7 @@ Tests the 8-event hook lifecycle that provides extensibility and safety.
 | 5.10 | PostSendMessage hook receives response | D5 |
 | 5.11 | Error hook fires on tool failure | D5 |
 | 5.12 | Notification hook fires on notify_user | D5 |
-| 5.13 | Hook env vars: FORGE_HOOK_EVENT, FORGE_HOOK_TOOL, FORGE_CWD | D5 |
+| 5.13 | Hook env vars: ORCA_HOOK_EVENT, ORCA_HOOK_TOOL, ORCA_CWD | D5 |
 | 5.14 | DANGEROUS_TOOLS set has exactly 9 members | D5 |
 | 5.15 | Safe mode blocks dangerous tools without permission | D5 |
 
@@ -151,7 +151,7 @@ Tests the full agent experience: markdown rendering, output formatting, session 
 
 #### Round 9: Multi-Model Collaboration (multi-model.test.ts) — 11 tests
 
-Tests Forge CLI's unique multi-model feature.
+Tests Orca CLI's unique multi-model feature.
 
 | Test | What It Proves | Dimension |
 |------|---------------|-----------|
@@ -171,7 +171,7 @@ Tests Forge CLI's unique multi-model feature.
 
 ## SOTA Quality Gate
 
-A Forge CLI release is SOTA-ready when ALL of the following pass:
+A Orca CLI release is SOTA-ready when ALL of the following pass:
 
 1. **Tool Accuracy**: 41/41 tools functional, edit precision >99%
 2. **Agent Loop**: Auto-continue works, context management active

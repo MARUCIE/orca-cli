@@ -1,16 +1,16 @@
-# AGENTS.md - Forge CLI Project Conventions
+# AGENTS.md - Orca CLI Project Conventions
 
-This file governs the entire `MARUCIE-forge-cli` repository.
+This file governs the entire `MARUCIE-orca-cli` repository.
 
 ## Intent
 
-- Maintain Forge CLI as a provider-neutral TypeScript coding-agent runtime.
+- Maintain Orca CLI as a provider-neutral TypeScript coding-agent runtime.
 - Prefer small, auditable diffs over broad rewrites.
-- Keep project documentation under `doc/00_project/initiative_forge_cli/` in sync with product behavior.
+- Keep project documentation under `doc/00_project/initiative_orca/` in sync with product behavior.
 
 ## Project Map
 
-- CLI entry: `src/bin/forge.ts`
+- CLI entry: `src/bin/orca.ts`
 - Command registration: `src/program.ts`
 - Command implementations: `src/commands/*.ts`
 - Provider bridge: `src/providers/openai-compat.ts`
@@ -28,7 +28,7 @@ This file governs the entire `MARUCIE-forge-cli` repository.
 - Do not add compatibility layers, fallback branches, or mock flows.
 - Reuse existing command, config, and test patterns before introducing new abstractions.
 - Do not manually edit generated artifacts in `dist/`; change `src/` and rebuild.
-- If command surfaces, model routing, hooks, or tool semantics change, update `README.md` and the project docs in `doc/00_project/initiative_forge_cli/`.
+- If command surfaces, model routing, hooks, or tool semantics change, update `README.md` and the project docs in `doc/00_project/initiative_orca/`.
 
 ## Verification
 
@@ -43,6 +43,6 @@ This file governs the entire `MARUCIE-forge-cli` repository.
 
 ## Documentation Contract
 
-- Canonical project docs live under `doc/00_project/initiative_forge_cli/`.
+- Canonical project docs live under `doc/00_project/initiative_orca/`.
 - Legacy flat docs in `doc/` are reference material until explicitly migrated.
 - Before changing behavior, update the relevant project docs if architecture, UX flow, or delivery scope changes.

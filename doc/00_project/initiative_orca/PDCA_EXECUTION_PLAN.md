@@ -1,4 +1,4 @@
-# Forge CLI PDCA Execution Plan
+# Orca CLI PDCA Execution Plan
 
 ## Plan
 

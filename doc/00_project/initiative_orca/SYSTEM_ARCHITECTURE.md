@@ -1,19 +1,19 @@
-# Forge CLI System Architecture
+# Orca CLI System Architecture
 
 <!-- AI-FLEET:PROJECT_DIR:START -->
-- `PROJECT_DIR`: `/Users/mauricewen/Projects/MARUCIE-forge-cli`
+- `PROJECT_DIR`: `/Users/mauricewen/Projects/MARUCIE-orca-cli`
 <!-- AI-FLEET:PROJECT_DIR:END -->
 
 ## Architecture Summary
 
-Forge CLI is a TypeScript ESM CLI product composed of a terminal entry layer, command layer, runtime/config layer, provider bridge, and test/verification layer. It is a CLI runtime, so the primary surface is command invocation and streaming terminal output rather than browser routes.
+Orca CLI is a TypeScript ESM CLI product composed of a terminal entry layer, command layer, runtime/config layer, provider bridge, and test/verification layer. It is a CLI runtime, so the primary surface is command invocation and streaming terminal output rather than browser routes.
 
 ## High-Level Diagram
 
 ```mermaid
 flowchart TD
   User[Developer in Terminal]
-  Bin[src/bin/forge.ts]
+  Bin[src/bin/orca.ts]
   Program[src/program.ts]
   Commands[src/commands/*.ts]
   Runtime[src/commands/chat.ts<br/>src/commands/run.ts]
@@ -56,7 +56,7 @@ flowchart TD
 
 | Layer | Files | Responsibility |
 | --- | --- | --- |
-| Entry | `src/bin/forge.ts` | Shell entry point and signal handling |
+| Entry | `src/bin/orca.ts` | Shell entry point and signal handling |
 | Command assembly | `src/program.ts` | Registers commands and default prompt passthrough |
 | Command modules | `src/commands/*.ts` | User-facing CLI flows (`chat`, `run`, `multi`, `bench`, `providers`, `stats`, `session`, `pr`, `serve`, `init`) |
 | Runtime/config | `src/config.ts`, `src/context.ts`, `src/system-prompt.ts`, `src/token-budget.ts`, `src/model-catalog.ts`, `src/doctor.ts` | Resolve providers, model metadata, runtime diagnostics, context, prompts, and runtime limits |
@@ -70,24 +70,24 @@ flowchart TD
 
 | Command | Source File | Purpose |
 | --- | --- | --- |
-| `forge` / `forge chat` | `src/commands/chat.ts` | Interactive REPL and one-shot prompting |
-| `forge run` | `src/commands/run.ts` | Agent task execution |
-| `forge council` / `forge race` / `forge pipeline` | `src/commands/multi.ts` | Multi-model collaboration flows |
-| `forge bench` | `src/commands/bench.ts` | Benchmark and self-evaluation |
-| `forge providers` | `src/commands/providers.ts` | Provider introspection |
-| `forge stats` | `src/commands/stats.ts` | Usage/cost reporting |
-| `forge session` | `src/commands/session.ts` | Session lifecycle |
-| `forge pr` | `src/commands/pr.ts` | Pull request review workflow |
-| `forge serve` | `src/commands/serve.ts` | Headless HTTP + SSE runtime |
-| `forge init` | `src/commands/init.ts` | Local configuration bootstrap |
+| `orca` / `orca chat` | `src/commands/chat.ts` | Interactive REPL and one-shot prompting |
+| `orca run` | `src/commands/run.ts` | Agent task execution |
+| `orca council` / `orca race` / `orca pipeline` | `src/commands/multi.ts` | Multi-model collaboration flows |
+| `orca bench` | `src/commands/bench.ts` | Benchmark and self-evaluation |
+| `orca providers` | `src/commands/providers.ts` | Provider introspection |
+| `orca stats` | `src/commands/stats.ts` | Usage/cost reporting |
+| `orca session` | `src/commands/session.ts` | Session lifecycle |
+| `orca pr` | `src/commands/pr.ts` | Pull request review workflow |
+| `orca serve` | `src/commands/serve.ts` | Headless HTTP + SSE runtime |
+| `orca init` | `src/commands/init.ts` | Local configuration bootstrap |
 
 ## Route / Page Map
 
 - Web routes: `N/A`
 - Primary interaction surface: terminal commands and REPL slash-style workflows
-- Headless HTTP surface: `forge serve` (see `src/commands/serve.ts`)
-- Detached job state: `~/.armature/background-jobs/` or `$ARMATURE_HOME/background-jobs/`
-- Runtime logs: `~/.armature/logs/` or `$ARMATURE_HOME/logs/`
+- Headless HTTP surface: `orca serve` (see `src/commands/serve.ts`)
+- Detached job state: `~/.orca/background-jobs/` or `$ORCA_HOME/background-jobs/`
+- Runtime logs: `~/.orca/logs/` or `$ORCA_HOME/logs/`
 - Serve diagnostics: `/health`, `/providers`, `/doctor`
 
 ## Legacy Documentation Cross-References

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Armature 生态系统 三层架构 — McKinsey Blue</title>
+<title>Orca 生态系统 三层架构 — McKinsey Blue</title>
 <style>
   /* ========== McKinsey Blue Design System ========== */
   :root {
@@ -376,7 +376,7 @@
 <!-- ==================== 英雄区 ==================== -->
 <section class="hero">
   <div class="gold-line"></div>
-  <h1>Armature 生态系统 三层架构</h1>
+  <h1>Orca 生态系统 三层架构</h1>
   <p class="subtitle">SDK（软件开发工具包）+ CLI（命令行界面）+ AI-OS（人工智能操作系统）完整能力清单</p>
 
   <div class="decision-cards">
@@ -418,18 +418,18 @@
 │  启动器 · 112 技能 · 38 核心模块 · 16 Harness 模块               │
 │  53 启动函数 · 技能组 · DNA 胶囊 · 定时任务                        │</span>
 <span class="layer2">├─────────────────────────────────────────────────────────────────┤
-│                   第二层: Forge CLI（产品层）                       │
+│                   第二层: Orca CLI（产品层）                       │
 │  REPL · 3 命令 · 13 斜杠命令 · 5 Agent 工具                      │
 │  多模型 · Poe/OpenRouter 代理 · 流式输出 · 成本追踪               │</span>
 <span class="layer1">├─────────────────────────────────────────────────────────────────┤
-│                 第一层: Armature SDK（基础层）                      │
+│                 第一层: Orca Agent SDK（基础层）                      │
 │  Agent 引擎 · 51 内置工具 · 12 核心契约                            │
 │  2 Provider 适配器 · Eval 框架 · MCP 客户端（7 种传输）             │
 └─────────────────────────────────────────────────────────────────┘</span></div>
 
     <h3>依赖方向</h3>
     <div class="card">
-      <div class="arch-diagram" style="margin-bottom:0">AI-Fleet ──依赖──→ Forge CLI ──可选依赖──→ Armature SDK
+      <div class="arch-diagram" style="margin-bottom:0">AI-Fleet ──依赖──→ Orca CLI ──可选依赖──→ Orca Agent SDK
                           │
                           └──直接依赖──→ OpenAI SDK（Poe 代理）</div>
     </div>
@@ -441,8 +441,8 @@
           <tr><th>层级</th><th>仓库</th><th>地址</th><th>语言</th><th>测试</th></tr>
         </thead>
         <tbody>
-          <tr><td>L1: SDK</td><td><code>armature-agent-sdk</code></td><td>github.com/MARUCIE/armature-agent-sdk</td><td>TypeScript</td><td>170 / 27 文件</td></tr>
-          <tr><td>L2: CLI</td><td><code>forge-cli</code></td><td>github.com/MARUCIE/forge-cli</td><td>TypeScript</td><td>22 / 3 文件</td></tr>
+          <tr><td>L1: SDK</td><td><code>orca-agent-sdk</code></td><td>github.com/MARUCIE/orca-agent-sdk</td><td>TypeScript</td><td>170 / 27 文件</td></tr>
+          <tr><td>L2: CLI</td><td><code>orca-cli</code></td><td>github.com/MARUCIE/orca-cli</td><td>TypeScript</td><td>22 / 3 文件</td></tr>
           <tr><td>L3: AI-OS</td><td><code>00-AI-Fleet</code></td><td>本地（私有）</td><td>Python + Bash</td><td>Harness 门控</td></tr>
         </tbody>
       </table>
@@ -453,7 +453,7 @@
   <section class="section" id="layer1">
     <div class="section-header">
       <span class="section-number">2</span>
-      <h2>第一层: Armature SDK（基础层）</h2>
+      <h2>第一层: Orca Agent SDK（基础层）</h2>
     </div>
 
     <h3>2.1 包结构</h3>
@@ -463,11 +463,11 @@
           <tr><th>包名</th><th>用途</th><th>文件数</th><th>导出</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>@armature/sdk</code></td><td>Agent（智能体）引擎入口</td><td>2000+ 源文件</td><td><code>createAgent</code>, <code>Agent</code>, <code>query</code>, 50+ 工具</td></tr>
-          <tr><td><code>@armature/core</code></td><td>Provider（提供商）无关的中间表示</td><td>13 模块</td><td>12 契约 + 类型定义</td></tr>
-          <tr><td><code>@armature/provider-anthropic</code></td><td>Anthropic 编解码器</td><td>2 模块</td><td>适配器工厂 + 编解码器</td></tr>
-          <tr><td><code>@armature/provider-openai</code></td><td>OpenAI 编解码器</td><td>2 模块</td><td>适配器工厂 + 编解码器</td></tr>
-          <tr><td><code>@armature/eval</code></td><td>质量评估框架</td><td>6 模块</td><td>轨迹 + 工具验证 + 黄金标准</td></tr>
+          <tr><td><code>@orca/sdk</code></td><td>Agent（智能体）引擎入口</td><td>2000+ 源文件</td><td><code>createAgent</code>, <code>Agent</code>, <code>query</code>, 50+ 工具</td></tr>
+          <tr><td><code>@orca/core</code></td><td>Provider（提供商）无关的中间表示</td><td>13 模块</td><td>12 契约 + 类型定义</td></tr>
+          <tr><td><code>@orca/provider-anthropic</code></td><td>Anthropic 编解码器</td><td>2 模块</td><td>适配器工厂 + 编解码器</td></tr>
+          <tr><td><code>@orca/provider-openai</code></td><td>OpenAI 编解码器</td><td>2 模块</td><td>适配器工厂 + 编解码器</td></tr>
+          <tr><td><code>@orca/eval</code></td><td>质量评估框架</td><td>6 模块</td><td>轨迹 + 工具验证 + 黄金标准</td></tr>
         </tbody>
       </table>
     </div>
@@ -762,7 +762,7 @@
   <section class="section" id="layer2">
     <div class="section-header">
       <span class="section-number">3</span>
-      <h2>第二层: Forge CLI（产品层）</h2>
+      <h2>第二层: Orca CLI（产品层）</h2>
     </div>
 
     <h3>3.1 模块结构</h3>
@@ -772,9 +772,9 @@
           <tr><th>文件</th><th>行数</th><th>用途</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>bin/forge.ts</code></td><td>23</td><td>入口点，含 SIGINT/SIGTERM 信号处理</td></tr>
+          <tr><td><code>bin/orca.ts</code></td><td>23</td><td>入口点，含 SIGINT/SIGTERM 信号处理</td></tr>
           <tr><td><code>commands/chat.ts</code></td><td>780+</td><td>REPL + 单次查询 + 多轮对话 + 斜杠命令</td></tr>
-          <tr><td><code>commands/init.ts</code></td><td>40</td><td>初始化 <code>.armature/</code> 配置</td></tr>
+          <tr><td><code>commands/init.ts</code></td><td>40</td><td>初始化 <code>.orca/</code> 配置</td></tr>
           <tr><td><code>commands/run.ts</code></td><td>170</td><td>任务执行，默认 acceptEdits</td></tr>
           <tr><td><code>config.ts</code></td><td>240</td><td>3 层配置解析器 + Zod Schema 验证 + Provider 自动检测</td></tr>
           <tr><td><code>output.ts</code></td><td>260</td><td>流式输出 + 工具展示 + 成本 + 错误 + 会话摘要</td></tr>
@@ -795,9 +795,9 @@
           <tr><th>命令</th><th>描述</th><th>模式</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>forge chat [prompt]</code></td><td>交互式 REPL 或单次查询</td><td>流式输出、JSON</td></tr>
-          <tr><td><code>forge run &lt;task&gt;</code></td><td>使用 Agent 工具执行任务</td><td>默认 acceptEdits</td></tr>
-          <tr><td><code>forge init</code></td><td>创建 <code>~/.armature/</code> + <code>.armature.json</code></td><td>全局 + 项目</td></tr>
+          <tr><td><code>orca chat [prompt]</code></td><td>交互式 REPL 或单次查询</td><td>流式输出、JSON</td></tr>
+          <tr><td><code>orca run &lt;task&gt;</code></td><td>使用 Agent 工具执行任务</td><td>默认 acceptEdits</td></tr>
+          <tr><td><code>orca init</code></td><td>创建 <code>~/.orca/</code> + <code>.orca.json</code></td><td>全局 + 项目</td></tr>
         </tbody>
       </table>
     </div>
@@ -890,9 +890,9 @@
         </thead>
         <tbody>
           <tr><td>1（最高）</td><td>CLI 标志</td><td><code>--provider poe --model GPT-4o</code></td><td>运行时</td></tr>
-          <tr><td>2</td><td>环境变量</td><td><code>POE_API_KEY</code>、<code>ARMATURE_PROVIDER</code>、<code>ARMATURE_MODEL</code></td><td>进程</td></tr>
-          <tr><td>3</td><td>项目配置</td><td><code>.armature.json</code></td><td>按目录</td></tr>
-          <tr><td>4（最低）</td><td>全局配置</td><td><code>~/.armature/config.json</code></td><td>用户级</td></tr>
+          <tr><td>2</td><td>环境变量</td><td><code>POE_API_KEY</code>、<code>ORCA_PROVIDER</code>、<code>ORCA_MODEL</code></td><td>进程</td></tr>
+          <tr><td>3</td><td>项目配置</td><td><code>.orca.json</code></td><td>按目录</td></tr>
+          <tr><td>4（最低）</td><td>全局配置</td><td><code>~/.orca/config.json</code></td><td>用户级</td></tr>
         </tbody>
       </table>
     </div>
@@ -957,7 +957,7 @@
           <tr><td>Gemini CLI</td><td><code>ai gemini</code> 或 <code>ai</code> → <code>3</code></td><td><code>start_gemini</code></td></tr>
           <tr><td>Amp CLI</td><td><code>ai amp</code> 或 <code>ai</code> → <code>4</code></td><td><code>start_amp</code></td></tr>
           <tr><td>Droid</td><td><code>ai droid</code> 或 <code>ai</code> → <code>5</code></td><td><code>start_droid</code></td></tr>
-          <tr style="background:#EBF5FF; font-weight:600"><td>Forge CLI</td><td><code>ai forge</code> 或 <code>ai</code> → <code>6</code></td><td>内联（<code>node dist/bin/forge.js</code>）</td></tr>
+          <tr style="background:#EBF5FF; font-weight:600"><td>Orca CLI</td><td><code>ai orca</code> 或 <code>ai</code> → <code>6</code></td><td>内联（<code>node dist/bin/orca.js</code>）</td></tr>
         </tbody>
       </table>
     </div>
@@ -989,18 +989,18 @@
       </table>
     </div>
 
-    <h3>4.4 Forge CLI 在 AI-Fleet 中的集成</h3>
+    <h3>4.4 Orca CLI 在 AI-Fleet 中的集成</h3>
     <div class="card">
       <div class="arch-diagram" style="margin-bottom:16px"># 直接命令
-ai forge chat -p poe -m GPT-4o "analyze this project"
+ai orca chat -p poe -m GPT-4o "analyze this project"
 
 # 交互菜单 → 6
 ai
 > 6
-启动 Forge CLI (Armature SDK)...
+启动 Orca CLI (Orca Agent SDK)...
 
 # 菜单内联
-> forge what is this project about?</div>
+> orca what is this project about?</div>
       <p><strong>特性：</strong></p>
       <ul style="margin-left:20px; color:var(--text-secondary)">
         <li>自动代理检测（通过 <code>scutil --proxy</code> 读取 macOS 系统代理）</li>
@@ -1137,7 +1137,7 @@ ai
       <h2>数据流</h2>
     </div>
 
-    <h3>6.1 Poe 代理路径（<code>forge chat -p poe</code>）</h3>
+    <h3>6.1 Poe 代理路径（<code>orca chat -p poe</code>）</h3>
     <div class="card">
       <div class="arch-diagram" style="margin-bottom:0">用户输入
     │
@@ -1169,7 +1169,7 @@ OpenAI 兼容 API（Poe/OpenRouter）
 下一轮提示</div>
     </div>
 
-    <h3>6.2 SDK 原生路径（<code>forge chat --provider anthropic</code>）</h3>
+    <h3>6.2 SDK 原生路径（<code>orca chat --provider anthropic</code>）</h3>
     <div class="card gold-border">
       <div class="arch-diagram" style="margin-bottom:0">用户输入
     │
@@ -1177,7 +1177,7 @@ OpenAI 兼容 API（Poe/OpenRouter）
 REPL → 配置 → Provider 路由器
     │
     ▼
-@armature/sdk createAgent()
+@orca/sdk createAgent()
     │
     ▼
 QueryEngine → styleRouter → providerSelection
@@ -1212,8 +1212,8 @@ Anthropic/OpenAI API
           <tr><td>2026-04-03</td><td>从 Claude Code 引擎提取 SDK</td><td>第 1-2 阶段完成</td></tr>
           <tr><td>2026-04-03</td><td>5 路蜂群审计：识别 14 个 SOTA（最先进水平）差距</td><td>架构方向确定</td></tr>
           <tr><td>2026-04-03</td><td>SOTA 冲刺 Sprint 1-4：全部 14 个差距关闭</td><td>170 测试，12 契约</td></tr>
-          <tr><td>2026-04-03</td><td>更名为 Armature；仓库：armature-agent-sdk</td><td>品牌建立</td></tr>
-          <tr><td>2026-04-04</td><td>Forge CLI 创建（Sprint A-F）</td><td>REPL + 工具 + 多模型</td></tr>
+          <tr><td>2026-04-03</td><td>更名为 Orca；仓库：orca-agent-sdk</td><td>品牌建立</td></tr>
+          <tr><td>2026-04-04</td><td>Orca CLI 创建（Sprint A-F）</td><td>REPL + 工具 + 多模型</td></tr>
           <tr><td>2026-04-04</td><td>Poe API 集成验证通过</td><td>Claude + GPT + Gemini 端到端</td></tr>
           <tr><td>2026-04-04</td><td>3 轮代码审计通过</td><td>安全 + 架构 + 开发者体验</td></tr>
           <tr><td>2026-04-04</td><td>用户旅程端到端验证：6 个场景通过</td><td>所有工具已验证</td></tr>
@@ -1228,7 +1228,7 @@ Anthropic/OpenAI API
 
 <!-- ==================== 页脚 ==================== -->
 <footer>
-  <p>Armature Ecosystem v1.0 -- Three-Tier Architecture</p>
+  <p>Orca Ecosystem v1.0 -- Three-Tier Architecture</p>
   <p>Maurice | maurice_wen@proton.me</p>
   <p style="font-size:12px; margin-top:8px;">2026-04-04 生成 | 数据来源: THREE_TIER_ARCHITECTURE.md v1.0</p>
 </footer>

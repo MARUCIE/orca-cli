@@ -1,16 +1,16 @@
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Forge CLI System Architecture</title><style>:root { --primary:#003a70; --accent:#0077c8; --gold:#c4a35a; --bg:#f4f6f9; --card:#ffffff; --text:#172033; --muted:#4b5b73; --border:#d8e1eb; --code-bg:#0f1c2e; --code-text:#e8eef8; --shadow:0 10px 30px rgba(0,58,112,0.08); } * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); line-height:1.7; } header { background:linear-gradient(135deg,#003a70,#001f3f); color:#fff; padding:56px 24px 40px; } header h1 { margin:0 0 10px; font-size:clamp(28px,5vw,44px); } header p { margin:0; color:rgba(255,255,255,0.78); } .shell { max-width:1280px; margin:-24px auto 48px; padding:0 24px; display:grid; grid-template-columns:minmax(0,1fr); gap:20px; } .toc { background:rgba(255,255,255,0.9); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); padding:20px; position:sticky; top:16px; height:fit-content; } .toc-title { font-size:12px; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); margin-bottom:12px; font-weight:700; } .toc a { display:block; color:var(--primary); text-decoration:none; padding:6px 0; font-size:14px; } .content { background:var(--card); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow); padding:32px; min-width:0; } .content h1:first-child { display:none; } .content h2 { color:var(--primary); margin-top:36px; scroll-margin-top:24px; } .content h3 { color:var(--accent); margin-top:28px; scroll-margin-top:24px; } .content p, .content li { color:var(--text); } .content code { background:rgba(15,28,46,0.08); padding:0.1em 0.35em; border-radius:6px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:0.92em; } .content pre { background:var(--code-bg); color:var(--code-text); padding:18px; border-radius:14px; overflow:auto; } .content pre code { background:transparent; color:inherit; padding:0; } .content table { width:100%; border-collapse:collapse; margin:16px 0 24px; display:block; overflow-x:auto; } .content th, .content td { border:1px solid var(--border); padding:10px 12px; text-align:left; vertical-align:top; min-width:120px; } .content th { background:#eef5fb; color:var(--primary); } .content blockquote { margin:16px 0; padding:12px 16px; border-left:4px solid var(--gold); background:#f8fbfe; color:var(--muted); } @media (min-width:1080px) { .shell { grid-template-columns:260px minmax(0,1fr); } } @media (max-width:1079px) { .toc { position:static; } }</style></head><body><header><h1>Forge CLI System Architecture</h1><p>Canonical Markdown source rendered as a single-file offline HTML companion.</p></header><main class="shell"><aside class="toc"><div class="toc-title">Sections</div><a href="#architecture-summary">Architecture Summary</a><a href="#high-level-diagram">High-Level Diagram</a><a href="#layer-breakdown">Layer Breakdown</a><a href="#command-surface-map">Command Surface Map</a><a href="#route-page-map">Route / Page Map</a><a href="#legacy-documentation-cross-references">Legacy Documentation Cross-References</a></aside><article class="content markdown-body"><h1>Forge CLI System Architecture</h1>
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Orca CLI System Architecture</title><style>:root { --primary:#003a70; --accent:#0077c8; --gold:#c4a35a; --bg:#f4f6f9; --card:#ffffff; --text:#172033; --muted:#4b5b73; --border:#d8e1eb; --code-bg:#0f1c2e; --code-text:#e8eef8; --shadow:0 10px 30px rgba(0,58,112,0.08); } * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); line-height:1.7; } header { background:linear-gradient(135deg,#003a70,#001f3f); color:#fff; padding:56px 24px 40px; } header h1 { margin:0 0 10px; font-size:clamp(28px,5vw,44px); } header p { margin:0; color:rgba(255,255,255,0.78); } .shell { max-width:1280px; margin:-24px auto 48px; padding:0 24px; display:grid; grid-template-columns:minmax(0,1fr); gap:20px; } .toc { background:rgba(255,255,255,0.9); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); padding:20px; position:sticky; top:16px; height:fit-content; } .toc-title { font-size:12px; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); margin-bottom:12px; font-weight:700; } .toc a { display:block; color:var(--primary); text-decoration:none; padding:6px 0; font-size:14px; } .content { background:var(--card); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow); padding:32px; min-width:0; } .content h1:first-child { display:none; } .content h2 { color:var(--primary); margin-top:36px; scroll-margin-top:24px; } .content h3 { color:var(--accent); margin-top:28px; scroll-margin-top:24px; } .content p, .content li { color:var(--text); } .content code { background:rgba(15,28,46,0.08); padding:0.1em 0.35em; border-radius:6px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:0.92em; } .content pre { background:var(--code-bg); color:var(--code-text); padding:18px; border-radius:14px; overflow:auto; } .content pre code { background:transparent; color:inherit; padding:0; } .content table { width:100%; border-collapse:collapse; margin:16px 0 24px; display:block; overflow-x:auto; } .content th, .content td { border:1px solid var(--border); padding:10px 12px; text-align:left; vertical-align:top; min-width:120px; } .content th { background:#eef5fb; color:var(--primary); } .content blockquote { margin:16px 0; padding:12px 16px; border-left:4px solid var(--gold); background:#f8fbfe; color:var(--muted); } @media (min-width:1080px) { .shell { grid-template-columns:260px minmax(0,1fr); } } @media (max-width:1079px) { .toc { position:static; } }</style></head><body><header><h1>Orca CLI System Architecture</h1><p>Canonical Markdown source rendered as a single-file offline HTML companion.</p></header><main class="shell"><aside class="toc"><div class="toc-title">Sections</div><a href="#architecture-summary">Architecture Summary</a><a href="#high-level-diagram">High-Level Diagram</a><a href="#layer-breakdown">Layer Breakdown</a><a href="#command-surface-map">Command Surface Map</a><a href="#route-page-map">Route / Page Map</a><a href="#legacy-documentation-cross-references">Legacy Documentation Cross-References</a></aside><article class="content markdown-body"><h1>Orca CLI System Architecture</h1>
 <!-- AI-FLEET:PROJECT_DIR:START -->
 <ul>
-<li><code>PROJECT_DIR</code>: <code>/Users/mauricewen/Projects/MARUCIE-forge-cli</code></li>
+<li><code>PROJECT_DIR</code>: <code>/Users/mauricewen/Projects/MARUCIE-orca-cli</code></li>
 </ul>
 <!-- AI-FLEET:PROJECT_DIR:END -->
 
 <h2 id="architecture-summary">Architecture Summary</h2>
-<p>Forge CLI is a TypeScript ESM CLI product composed of a terminal entry layer, command layer, runtime/config layer, provider bridge, and test/verification layer. It is a CLI runtime, so the primary surface is command invocation and streaming terminal output rather than browser routes.</p>
+<p>Orca CLI is a TypeScript ESM CLI product composed of a terminal entry layer, command layer, runtime/config layer, provider bridge, and test/verification layer. It is a CLI runtime, so the primary surface is command invocation and streaming terminal output rather than browser routes.</p>
 <h2 id="high-level-diagram">High-Level Diagram</h2>
 <pre><code class="language-mermaid">flowchart TD
   User[Developer in Terminal]
-  Bin[src/bin/forge.ts]
+  Bin[src/bin/orca.ts]
   Program[src/program.ts]
   Commands[src/commands/*.ts]
   Runtime[src/commands/chat.ts&lt;br/&gt;src/commands/run.ts]
@@ -59,7 +59,7 @@
 </thead>
 <tbody><tr>
 <td>Entry</td>
-<td><code>src/bin/forge.ts</code></td>
+<td><code>src/bin/orca.ts</code></td>
 <td>Shell entry point and signal handling</td>
 </tr>
 <tr>
@@ -113,52 +113,52 @@
 </tr>
 </thead>
 <tbody><tr>
-<td><code>forge</code> / <code>forge chat</code></td>
+<td><code>orca</code> / <code>orca chat</code></td>
 <td><code>src/commands/chat.ts</code></td>
 <td>Interactive REPL and one-shot prompting</td>
 </tr>
 <tr>
-<td><code>forge run</code></td>
+<td><code>orca run</code></td>
 <td><code>src/commands/run.ts</code></td>
 <td>Agent task execution</td>
 </tr>
 <tr>
-<td><code>forge council</code> / <code>forge race</code> / <code>forge pipeline</code></td>
+<td><code>orca council</code> / <code>orca race</code> / <code>orca pipeline</code></td>
 <td><code>src/commands/multi.ts</code></td>
 <td>Multi-model collaboration flows</td>
 </tr>
 <tr>
-<td><code>forge bench</code></td>
+<td><code>orca bench</code></td>
 <td><code>src/commands/bench.ts</code></td>
 <td>Benchmark and self-evaluation</td>
 </tr>
 <tr>
-<td><code>forge providers</code></td>
+<td><code>orca providers</code></td>
 <td><code>src/commands/providers.ts</code></td>
 <td>Provider introspection</td>
 </tr>
 <tr>
-<td><code>forge stats</code></td>
+<td><code>orca stats</code></td>
 <td><code>src/commands/stats.ts</code></td>
 <td>Usage/cost reporting</td>
 </tr>
 <tr>
-<td><code>forge session</code></td>
+<td><code>orca session</code></td>
 <td><code>src/commands/session.ts</code></td>
 <td>Session lifecycle</td>
 </tr>
 <tr>
-<td><code>forge pr</code></td>
+<td><code>orca pr</code></td>
 <td><code>src/commands/pr.ts</code></td>
 <td>Pull request review workflow</td>
 </tr>
 <tr>
-<td><code>forge serve</code></td>
+<td><code>orca serve</code></td>
 <td><code>src/commands/serve.ts</code></td>
 <td>Headless HTTP + SSE runtime</td>
 </tr>
 <tr>
-<td><code>forge init</code></td>
+<td><code>orca init</code></td>
 <td><code>src/commands/init.ts</code></td>
 <td>Local configuration bootstrap</td>
 </tr>
@@ -167,9 +167,9 @@
 <ul>
 <li>Web routes: <code>N/A</code></li>
 <li>Primary interaction surface: terminal commands and REPL slash-style workflows</li>
-<li>Headless HTTP surface: <code>forge serve</code> (see <code>src/commands/serve.ts</code>)</li>
-<li>Detached job state: <code>~/.armature/background-jobs/</code> or <code>$ARMATURE_HOME/background-jobs/</code></li>
-<li>Runtime logs: <code>~/.armature/logs/</code> or <code>$ARMATURE_HOME/logs/</code></li>
+<li>Headless HTTP surface: <code>orca serve</code> (see <code>src/commands/serve.ts</code>)</li>
+<li>Detached job state: <code>~/.orca/background-jobs/</code> or <code>$ORCA_HOME/background-jobs/</code></li>
+<li>Runtime logs: <code>~/.orca/logs/</code> or <code>$ORCA_HOME/logs/</code></li>
 <li>Serve diagnostics: <code>/health</code>, <code>/providers</code>, <code>/doctor</code></li>
 </ul>
 <h2 id="legacy-documentation-cross-references">Legacy Documentation Cross-References</h2>
