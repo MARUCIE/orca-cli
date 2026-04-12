@@ -326,7 +326,7 @@ describe('printRichBanner with path abbreviation', () => {
     logSpy.mockRestore()
   })
 
-  it('abbreviates HOME directory path with ~', () => {
+  it('abbreviates HOME directory path with ~', async () => {
     const home = process.env.HOME || ''
 
     if (!home) {
@@ -336,7 +336,7 @@ describe('printRichBanner with path abbreviation', () => {
     }
 
     const testPath = home + '/my/project'
-    printRichBanner({
+    await printRichBanner({
       provider: 'test',
       model: 'claude-opus-4',
       cwd: testPath,

@@ -94,7 +94,7 @@ export function createChatCommand(): Command {
           } else {
             // Interactive REPL: rich banner with ASCII art
             const configFiles = detectConfigFiles(cwd)
-            printRichBanner({
+            await printRichBanner({
               provider: resolved.provider,
               model: resolved.model,
               cwd,

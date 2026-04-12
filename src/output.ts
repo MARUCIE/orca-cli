@@ -15,24 +15,28 @@ export type OutputMode = 'streaming' | 'json'
 
 const VERSION = '0.2.0'
 
-// Orca — density-gradient whale silhouette (horizontal oval + tail)
-const ART_WIDTH = 38 // visible character width of art column (widest line + gap)
+// Orca — large density-gradient killer whale with dorsal fin + tail flukes
 const ORCA_ART = [
-  '\x1b[36m       ..:::....\x1b[0m',
-  '\x1b[36m    .::------::::..\x1b[0m',
-  '\x1b[36m  .::--========----::::..\x1b[0m',
-  '\x1b[36m.:--==+++*****+++===---::::..\x1b[0m',
-  '\x1b[36m.:-=++**#########**++==---::..\x1b[0m',
-  '\x1b[36m.:-=+*##############*++==--::..\x1b[0m',
-  '\x1b[36m.:-=+*##############*++==-::..\x1b[0m',
-  '\x1b[36m.:-=++**#########**++==---::..\x1b[0m',
-  '\x1b[36m.:--==+++*****+++===---::::..\x1b[0m',
-  '\x1b[36m  .::--========----::::..\x1b[0m',
-  '\x1b[36m    .::------::::..\x1b[0m',
-  '\x1b[36m       ..:::....\x1b[0m',
+  '\x1b[36m                              .::.\x1b[0m',
+  '\x1b[36m                            .:-==-:.\x1b[0m',
+  '\x1b[36m                           .:=+##+=:.\x1b[0m',
+  '\x1b[36m                    ..:::::=++*##*+==::.\x1b[0m',
+  '\x1b[36m                 .:--==+++**#####**++==--::.\x1b[0m',
+  '\x1b[36m               .:--=++**###########**++==-::.\x1b[0m',
+  '\x1b[36m             .::--=+*################*++==--::.\x1b[0m',
+  '\x1b[36m            .:--=+*##################**++==-::.\x1b[0m',
+  '\x1b[36m           .:--=+*####################*++==--::.\x1b[0m',
+  '\x1b[36m          .::--=+*#####################*++==-::.\x1b[0m',
+  '\x1b[36m          .:--=+*######################*++==--::.\x1b[0m',
+  '\x1b[36m          .::--=+*#####################*++==-::.\x1b[0m',
+  '\x1b[36m           .:--=+*##################**++==--::.\x1b[0m',
+  '\x1b[36m            .:--=++*###############**++==-::.\x1b[0m',
+  '\x1b[36m             .::--=++*###########**++==--::.\x1b[0m',
+  '\x1b[36m               .::--==++*######**++==---::.\x1b[0m',
+  '\x1b[36m                 .::---===++++===---::.\x1b[0m',
+  '\x1b[36m                    ..::--------::::..\x1b[0m',
+  '\x1b[36m                        ..::::::.\x1b[0m',
 ]
-// Visible widths of each art line (excluding ANSI codes)
-const ART_VIS_WIDTHS = [16, 22, 28, 32, 33, 34, 33, 33, 32, 28, 22, 16]
 
 // Model context window sizes (for display)
 const MODEL_CONTEXT: Record<string, string> = {
@@ -65,61 +69,39 @@ function abbreviatePath(p: string): string {
 }
 
 /**
- * Rich startup banner with ASCII art orca, model info, and project context.
+ * Rich startup banner with animated ASCII art orca, model info below.
+ * Progressive reveal: each line of the orca prints with a short delay.
  */
-export function printRichBanner(opts: {
+export async function printRichBanner(opts: {
   provider: string
   model: string
   cwd: string
   configFiles?: string[]
   toolCount?: number
   mode?: 'yolo' | 'safe'
-}): void {
+}): Promise<void> {
   const { provider, model, cwd, configFiles, toolCount, mode } = opts
-  const spec = getModelSpec(model)
   const shortCwd = abbreviatePath(cwd)
 
-  // Build right-side info lines — aligned to middle of the orca art
-  const info: string[] = [
-    '',  // line 0
-    '',  // line 1
-    '',  // line 2
-    '',  // line 3
-    `\x1b[1;37mOrca\x1b[0m  \x1b[90mv${VERSION}\x1b[0m`,
-    `\x1b[90mprovider-neutral agent runtime\x1b[0m`,
-    '',  // line 6
-    `\x1b[36m▸\x1b[0m \x1b[90m${shortCwd}\x1b[0m`,
-    '',  // line 8
-    '',  // line 9
-    '',  // line 10
-    '',  // line 11
-  ]
-
-  // Print art + info side by side with consistent padding
-  const pad = ' '.repeat(ART_WIDTH)
+  // Animated progressive reveal of the orca
   console.log()
-  for (let i = 0; i < ORCA_ART.length; i++) {
-    const artLine = ORCA_ART[i]!
-    const visWidth = ART_VIS_WIDTHS[i] || 0
-    const gap = ' '.repeat(Math.max(0, ART_WIDTH - visWidth))
-    const infoLine = info[i] || ''
-    if (infoLine) {
-      console.log(`${artLine}${gap}${infoLine}`)
-    } else {
-      console.log(artLine)
-    }
+  for (const line of ORCA_ART) {
+    console.log(line)
+    await new Promise(r => setTimeout(r, 35))
   }
 
-  // Extra info below the art (aligned with info column)
-  const extras: string[] = []
+  // Info below the art
+  console.log()
+  console.log(`  \x1b[1;37mOrca\x1b[0m  \x1b[90mv${VERSION}\x1b[0m`)
+  console.log(`  \x1b[90mprovider-neutral agent runtime\x1b[0m`)
+  console.log(`  \x1b[36m▸\x1b[0m \x1b[90m${shortCwd}\x1b[0m`)
+
+  // Extra info
   if (configFiles && configFiles.length > 0) {
-    extras.push(`\x1b[90mconfig: ${configFiles.join(', ')}\x1b[0m`)
+    console.log(`  \x1b[90mconfig: ${configFiles.join(', ')}\x1b[0m`)
   }
   if (toolCount) {
-    extras.push(`\x1b[90m${toolCount} tools · 8 hooks\x1b[0m`)
-  }
-  for (const line of extras) {
-    console.log(`${pad}${line}`)
+    console.log(`  \x1b[90m${toolCount} tools · 8 hooks\x1b[0m`)
   }
   console.log()
 }
