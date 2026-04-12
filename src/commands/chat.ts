@@ -322,21 +322,17 @@ async function runREPL(
   } catch { /* not a git repo */ }
 
   const renderStatusAndPrompt = (): string => {
-    const contextChars = history.reduce((sum, m) => sum + m.content.length, 0)
+    const budget = tokenBudget.getBudget(history)
     const totalTokens = stats.totalInputTokens + stats.totalOutputTokens
-
-    // Layout (reliable, no cursor tricks):
-    //   ─────────────────────
-    //   ◇ ORCA │ model │ ██ │ project git:(branch)
-    //   ▸▸ yolo │ ⚡⚡⚡high            tokens
-    //   ❯ (user input here)
 
     printSeparator()
     printStatusLine({
       model: currentModel,
       provider: resolved.provider,
       mode: opts.safe ? 'safe' : 'yolo',
-      contextChars,
+      contextPct: budget.utilizationPct,
+      contextWindow: budget.contextWindow,
+      contextTokens: budget.historyTokensEst,
       totalTokens,
       cwd,
       gitBranch,

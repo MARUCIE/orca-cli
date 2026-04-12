@@ -408,7 +408,13 @@ export interface StatusLineInfo {
   model: string
   provider: string
   mode: 'yolo' | 'safe'
-  contextChars: number
+  /** Current context utilization percentage (0-100), from TokenBudgetManager */
+  contextPct: number
+  /** Model context window size in tokens */
+  contextWindow: number
+  /** Current estimated context tokens (history) */
+  contextTokens: number
+  /** Cumulative total tokens consumed across all turns */
   totalTokens: number
   cwd: string
   gitBranch?: string
@@ -418,15 +424,15 @@ export interface StatusLineInfo {
 /**
  * Print the status line below the separator, above the prompt.
  * Shows: model · context bar · project · git branch · tokens · mode
+ *
+ * Context % comes from TokenBudgetManager.getBudget() — not estimated here.
  */
 export function printStatusLine(info: StatusLineInfo): void {
   const cols = process.stdout.columns || 80
 
-  // Context bar
-  const estimatedTokens = Math.round(info.contextChars / 4)
-  const maxTokens = 200_000
-  const pct = Math.min(100, Math.round((estimatedTokens / maxTokens) * 100))
-  const barLen = 6
+  // Context bar — driven by budget data, not local estimation
+  const pct = Math.min(100, info.contextPct)
+  const barLen = 8
   const filled = Math.round((pct / 100) * barLen)
   const empty = barLen - filled
   let barColor = '\x1b[32m'  // green
@@ -458,15 +464,19 @@ export function printStatusLine(info: StatusLineInfo): void {
   // Model short
   const modelShort = info.model.length > 20 ? info.model.slice(0, 18) + '..' : info.model
 
-  // Tokens right-aligned
-  const tokenStr = `${info.totalTokens.toLocaleString()} tokens`
+  // Context tokens display: "12K / 200K" format
+  const fmtK = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${Math.round(n / 1000)}K` : String(n)
+  const ctxStr = `${fmtK(info.contextTokens)}/${fmtK(info.contextWindow)}`
 
-  // Left side: ◇ ORCA │ model │ ██░░ 15% │ project git:(branch)
-  const left = `\x1b[36m◇\x1b[0m \x1b[1;37mORCA\x1b[0m \x1b[90m│\x1b[0m ${modelShort} \x1b[90m│\x1b[0m ${bar} ${pct}% \x1b[90m│\x1b[0m \x1b[36m${project}\x1b[0m${gitPart}`
+  // Cumulative total tokens right-aligned
+  const tokenStr = `\x1b[90mtotal\x1b[0m ${info.totalTokens.toLocaleString()}`
 
-  // Print status line
+  // Line 1: ◇ ORCA │ model │ ████░░░░ 15% (12K/200K) │ project git:(branch)
+  const left = `\x1b[36m◇\x1b[0m \x1b[1;37mORCA\x1b[0m \x1b[90m│\x1b[0m ${modelShort} \x1b[90m│\x1b[0m ${bar} ${pct}% \x1b[90m(${ctxStr})\x1b[0m \x1b[90m│\x1b[0m \x1b[36m${project}\x1b[0m${gitPart}`
+
+  // Line 2: ▸▸ yolo │ ⚡⚡⚡high                    total 1,618,413
   console.log(`${left}`)
-  console.log(`${modeTag} \x1b[90m│\x1b[0m ${effortTag}${' '.repeat(Math.max(0, cols - 45 - tokenStr.length))}\x1b[90m${tokenStr}\x1b[0m`)
+  console.log(`${modeTag} \x1b[90m│\x1b[0m ${effortTag}${' '.repeat(Math.max(0, cols - 45 - tokenStr.length))}${tokenStr}`)
 }
 
 // ── Progress Indicator ──────────────────────────────────────────────
