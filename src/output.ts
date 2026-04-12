@@ -110,30 +110,55 @@ export async function printRichBanner(opts: {
       console.log(`${pad}${line}`)
     }
 
-    // Swimming animation: graceful drift from right to left with oscillation
-    const totalFrames = 48
-    const frameDuration = 80  // slower, more graceful
+    // Swimming animation: body-wave undulation + drift from right to left
+    // Each line gets a phase-shifted sine offset — simulates the S-curve
+    // of a whale's swimming stroke (head leads, wave propagates to tail)
+    const totalFrames = 54
+    const frameDuration = 75
+    const bodyWaveAmp = 3  // how far each line can deviate from its neighbors
+    const phaseSpread = 0.45  // phase difference between adjacent lines (wave tightness)
+
     for (let frame = 0; frame < totalFrames; frame++) {
       const progress = frame / totalFrames
-      // Linear drift from startPad to endPad
-      const drift = startPad + (endPad - startPad) * progress
-      // Damped sine wave for swimming oscillation (3 gentle cycles)
-      const wave = Math.sin(progress * Math.PI * 6) * amplitude * (1 - progress * 0.8)
-      const shift = Math.round(drift + wave)
+      // Ease-out drift from startPad to endPad
+      const ease = 1 - Math.pow(1 - progress, 2)
+      const drift = startPad + (endPad - startPad) * ease
+      // Overall oscillation (damped)
+      const t = progress * Math.PI * 5  // 2.5 swim-stroke cycles
+      const globalWave = Math.sin(t) * amplitude * (1 - progress * 0.7)
 
       // Move cursor up to top of art
       process.stdout.write(`\x1b[${artHeight}A`)
 
-      // Redraw each line at new position
-      for (const line of ORCA_ART) {
-        const pad = ' '.repeat(Math.max(0, Math.min(cols - 4, shift)))
-        process.stdout.write(`\x1b[2K${pad}${line}\n`)
+      // Redraw each line with body-wave deformation
+      for (let i = 0; i < ORCA_ART.length; i++) {
+        const baseShift = Math.round(drift + globalWave)
+        // Body wave: tail lines flex more than head lines
+        const tailFactor = 0.3 + (i / artHeight) * 0.7  // 0.3 at head → 1.0 at tail
+        const bodyWave = Math.round(Math.sin(t + i * phaseSpread) * bodyWaveAmp * tailFactor)
+        const totalShift = Math.max(0, Math.min(maxPad, baseShift + bodyWave))
+        const pad = ' '.repeat(totalShift)
+        process.stdout.write(`\x1b[2K${pad}${ORCA_ART[i]}\n`)
       }
 
       await new Promise(r => setTimeout(r, frameDuration))
     }
 
-    // Final frame: settle on the left
+    // Final settle: ease into left position with one last gentle wave
+    const settleFrames = 8
+    for (let f = 0; f < settleFrames; f++) {
+      const sp = f / settleFrames
+      process.stdout.write(`\x1b[${artHeight}A`)
+      for (let i = 0; i < ORCA_ART.length; i++) {
+        const tailFactor = 0.3 + (i / artHeight) * 0.7
+        const residual = Math.round(Math.sin(i * phaseSpread) * bodyWaveAmp * tailFactor * (1 - sp))
+        const pad = ' '.repeat(Math.max(0, endPad + residual))
+        process.stdout.write(`\x1b[2K${pad}${ORCA_ART[i]}\n`)
+      }
+      await new Promise(r => setTimeout(r, 60))
+    }
+
+    // Final static frame: perfectly still
     process.stdout.write(`\x1b[${artHeight}A`)
     for (const line of ORCA_ART) {
       const pad = ' '.repeat(endPad)
