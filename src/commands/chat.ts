@@ -1342,8 +1342,20 @@ function handleSlashCommand(
     }
 
     case '/mcp': {
-      console.log(`\x1b[90m  MCP servers: ${mcpClient.configuredCount} configured\x1b[0m`)
-      // TODO: show individual server status
+      const servers = mcpClient.listServers()
+      if (servers.length === 0) {
+        console.log('\x1b[90m  no MCP servers configured.\x1b[0m')
+      } else {
+        console.log(`\x1b[90m  MCP servers: ${servers.length} configured, ${mcpClient.connectedCount} connected\x1b[0m`)
+        for (const s of servers) {
+          const status = s.initialized
+            ? `\x1b[32mconnected\x1b[0m (pid ${s.pid})`
+            : s.pid > 0
+              ? '\x1b[33mstarting\x1b[0m'
+              : '\x1b[90mnot connected\x1b[0m'
+          console.log(`    ${s.name}  ${status}`)
+        }
+      }
       return 'handled'
     }
 
