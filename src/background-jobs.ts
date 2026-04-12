@@ -95,12 +95,11 @@ function writeMeta(patch) {
 }
 const logFd = fs.openSync(logPath, 'a');
 writeMeta({ runnerPid: process.pid, logPath, metaPath, cwd, command, status: 'running' });
-const shell = process.env.SHELL || '/bin/sh';
-const child = spawn(shell, ['-lc', command], {
+const child = spawn(command, {
   cwd,
   detached: false,
   stdio: ['ignore', logFd, logFd],
-  env: { ...process.env },
+  shell: true,
 });
 writeMeta({ pid: child.pid });
 child.on('error', (err) => {
@@ -132,6 +131,7 @@ child.on('close', (code, signal) => {
     cwd,
     detached: true,
     stdio: 'ignore',
+    env: { ...process.env },
   })
   runner.unref()
 
