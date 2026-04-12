@@ -171,18 +171,18 @@ export async function printRichBanner(opts: {
     process.stdout.write('\x1b[?25h')
   }
 
-  // Info below the art
+  // Info below the art — aligned, clean layout
+  const label = '\x1b[90m'  // dim gray
+  const reset = '\x1b[0m'
+  const accent = '\x1b[36m' // cyan
   console.log()
-  console.log(`  \x1b[1;37mOrca\x1b[0m  \x1b[90mv${VERSION}\x1b[0m`)
-  console.log(`  \x1b[90mprovider-neutral agent runtime\x1b[0m`)
-  console.log(`  \x1b[36m▸\x1b[0m \x1b[90m${shortCwd}\x1b[0m`)
-
-  // Extra info
+  console.log(`  \x1b[1;37mOrca\x1b[0m \x1b[90mv${VERSION}\x1b[0m  ${label}provider-neutral agent runtime${reset}`)
+  console.log(`  ${accent}▸${reset} ${label}${shortCwd}${reset}`)
   if (configFiles && configFiles.length > 0) {
-    console.log(`  \x1b[90mconfig: ${configFiles.join(', ')}\x1b[0m`)
+    console.log(`  ${label}config  ${configFiles.join(', ')}${reset}`)
   }
   if (toolCount) {
-    console.log(`  \x1b[90m${toolCount} tools · 8 hooks\x1b[0m`)
+    console.log(`  ${label}${toolCount} tools · 8 hooks${reset}`)
   }
   console.log()
 }
