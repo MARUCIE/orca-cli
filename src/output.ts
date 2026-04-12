@@ -15,27 +15,24 @@ export type OutputMode = 'streaming' | 'json'
 
 const VERSION = '0.2.0'
 
-// Orca — large density-gradient killer whale with dorsal fin + tail flukes
+// Orca — side-view killer whale silhouette
+// Features: dorsal fin, eye patch (●), black body (█), white belly (░), tail flukes
+// Uses Unicode half-block chars for crisp edges + density contrast for color pattern
 const ORCA_ART = [
-  '\x1b[36m                              .::.\x1b[0m',
-  '\x1b[36m                            .:-==-:.\x1b[0m',
-  '\x1b[36m                           .:=+##+=:.\x1b[0m',
-  '\x1b[36m                    ..:::::=++*##*+==::.\x1b[0m',
-  '\x1b[36m                 .:--==+++**#####**++==--::.\x1b[0m',
-  '\x1b[36m               .:--=++**###########**++==-::.\x1b[0m',
-  '\x1b[36m             .::--=+*################*++==--::.\x1b[0m',
-  '\x1b[36m            .:--=+*##################**++==-::.\x1b[0m',
-  '\x1b[36m           .:--=+*####################*++==--::.\x1b[0m',
-  '\x1b[36m          .::--=+*#####################*++==-::.\x1b[0m',
-  '\x1b[36m          .:--=+*######################*++==--::.\x1b[0m',
-  '\x1b[36m          .::--=+*#####################*++==-::.\x1b[0m',
-  '\x1b[36m           .:--=+*##################**++==--::.\x1b[0m',
-  '\x1b[36m            .:--=++*###############**++==-::.\x1b[0m',
-  '\x1b[36m             .::--=++*###########**++==--::.\x1b[0m',
-  '\x1b[36m               .::--==++*######**++==---::.\x1b[0m',
-  '\x1b[36m                 .::---===++++===---::.\x1b[0m',
-  '\x1b[36m                    ..::--------::::..\x1b[0m',
-  '\x1b[36m                        ..::::::.\x1b[0m',
+  '\x1b[36m                      ██\x1b[0m',
+  '\x1b[36m                     ████\x1b[0m',
+  '\x1b[36m                    ██████\x1b[0m',
+  '\x1b[36m              ▄▄████████████▄\x1b[0m',
+  '\x1b[36m         ▄████████████████████████▄\x1b[0m',
+  '\x1b[36m      ▄████\x1b[0m \x1b[97m●\x1b[0m \x1b[36m█████████████████████████▄\x1b[0m',
+  '\x1b[36m    ▄████████████████████████████████████████▄\x1b[0m',
+  '\x1b[36m  █████████████████████████████████████████████████\x1b[0m',
+  '\x1b[36m   ░░░░░░░░░░░░░░░░░░░░░░░░░████████████████████████\x1b[0m',
+  '\x1b[36m     ░░░░░░░░░░░░░░░░░░░░░░░░░░████████████████▀\x1b[0m',
+  '\x1b[36m        ░░░░░░░░░░░░░░░░░░░░░░░░░░█████████▀\x1b[0m',
+  '\x1b[36m            ░░░░░░░░░░░░░░░░░░░░░░░░████▀\x1b[0m \x1b[36m▄▀\x1b[0m',
+  '\x1b[36m                 ░░░░░░░░░░░░░░░░░░░░▀\x1b[0m \x1b[36m▄▀\x1b[0m',
+  '\x1b[36m                                      ▀▀\x1b[0m',
 ]
 
 // Model context window sizes (for display)
@@ -91,53 +88,56 @@ export async function printRichBanner(opts: {
   const artHeight = ORCA_ART.length
   const maxVisWidth = Math.max(...ORCA_ART.map(l => stripAnsi(l).length))
 
-  // Center position and swimming amplitude
-  const centerPad = Math.max(0, Math.floor((cols - maxVisWidth) / 2))
-  const amplitude = Math.min(centerPad - 1, Math.floor(cols / 6))
+  // Starting position (right side) and ending position (left side)
+  const startPad = Math.max(0, cols - maxVisWidth - 4)
+  const endPad = 2
+  const amplitude = Math.min(Math.floor((cols - maxVisWidth) / 3), 15)
 
   // Only animate if terminal is wide enough and interactive
-  const canAnimate = process.stdout.isTTY && amplitude > 2
+  const canAnimate = process.stdout.isTTY && amplitude > 2 && cols > maxVisWidth + 10
 
   if (!canAnimate) {
     // Static fallback
     console.log()
-    for (const line of ORCA_ART) console.log(line)
+    for (const line of ORCA_ART) console.log(`  ${line}`)
   } else {
     // Hide cursor during animation
     process.stdout.write('\x1b[?25l')
     console.log()
 
-    // Print initial frame (centered)
+    // Print initial frame (start from right side)
     for (const line of ORCA_ART) {
-      const pad = ' '.repeat(centerPad)
+      const pad = ' '.repeat(startPad)
       console.log(`${pad}${line}`)
     }
 
-    // Swimming animation: 2 full cycles (left → right → left → right → center)
-    const totalFrames = 36
-    const frameDuration = 55
+    // Swimming animation: graceful drift from right to left with oscillation
+    const totalFrames = 48
+    const frameDuration = 80  // slower, more graceful
     for (let frame = 0; frame < totalFrames; frame++) {
-      const t = (frame / totalFrames) * Math.PI * 4  // 2 full sine cycles
-      // Dampen toward end so it settles at center
-      const dampen = 1 - (frame / totalFrames) * 0.6
-      const shift = Math.round(Math.sin(t) * amplitude * dampen)
+      const progress = frame / totalFrames
+      // Linear drift from startPad to endPad
+      const drift = startPad + (endPad - startPad) * progress
+      // Damped sine wave for swimming oscillation (3 gentle cycles)
+      const wave = Math.sin(progress * Math.PI * 6) * amplitude * (1 - progress * 0.8)
+      const shift = Math.round(drift + wave)
 
       // Move cursor up to top of art
       process.stdout.write(`\x1b[${artHeight}A`)
 
-      // Redraw each line with shifted position
+      // Redraw each line at new position
       for (const line of ORCA_ART) {
-        const pad = ' '.repeat(Math.max(0, centerPad + shift))
+        const pad = ' '.repeat(Math.max(0, Math.min(cols - 4, shift)))
         process.stdout.write(`\x1b[2K${pad}${line}\n`)
       }
 
       await new Promise(r => setTimeout(r, frameDuration))
     }
 
-    // Final frame: exactly centered
+    // Final frame: settle on the left
     process.stdout.write(`\x1b[${artHeight}A`)
     for (const line of ORCA_ART) {
-      const pad = ' '.repeat(centerPad)
+      const pad = ' '.repeat(endPad)
       process.stdout.write(`\x1b[2K${pad}${line}\n`)
     }
 
