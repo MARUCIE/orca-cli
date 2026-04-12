@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Orca 生态系统 SOTA 差距分析 — 蜂群头脑风暴报告</title>
+<title>Orca 生态系统 SOTA 差距分析 -- 蜂群头脑风暴报告</title>
 <style>
   :root {
     --mckinsey-blue: #003A70;
@@ -21,250 +21,62 @@
     --danger: #DC3545;
     --orange: #FD7E14;
   }
-
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
-    color: var(--gray-900);
-    background: #fff;
-    line-height: 1.7;
-    font-size: 15px;
+    color: var(--gray-900); background: #fff; line-height: 1.75; font-size: 15px;
   }
-
-  /* Header */
   .header {
     background: linear-gradient(135deg, var(--mckinsey-dark) 0%, var(--mckinsey-blue) 100%);
-    color: #fff;
-    padding: 80px 40px 60px;
+    color: #fff; padding: 80px 40px 60px;
   }
-  .header-inner {
-    max-width: 960px;
-    margin: 0 auto;
-  }
-  .header h1 {
-    font-size: 32px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    margin-bottom: 16px;
-  }
-  .header .subtitle {
-    font-size: 16px;
-    color: rgba(255,255,255,0.75);
-    font-weight: 400;
-  }
-  .header .meta-row {
-    margin-top: 24px;
-    display: flex;
-    gap: 32px;
-    font-size: 13px;
-    color: rgba(255,255,255,0.6);
-  }
-  .header .meta-row span {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  /* Content */
-  .content {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 48px 40px 80px;
-  }
-
-  h2 {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--mckinsey-blue);
-    margin: 48px 0 20px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid var(--mckinsey-accent);
-  }
+  .header-inner { max-width: 960px; margin: 0 auto; }
+  .header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 16px; }
+  .header .subtitle { font-size: 16px; color: rgba(255,255,255,0.75); }
+  .header .meta-row { margin-top: 24px; display: flex; gap: 32px; font-size: 13px; color: rgba(255,255,255,0.6); flex-wrap: wrap; }
+  .content { max-width: 960px; margin: 0 auto; padding: 48px 40px 80px; }
+  h2 { font-size: 22px; font-weight: 700; color: var(--mckinsey-blue); margin: 48px 0 20px; padding-bottom: 10px; border-bottom: 2px solid var(--mckinsey-accent); }
   h2:first-of-type { margin-top: 0; }
-
-  h3 {
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--mckinsey-dark);
-    margin: 32px 0 12px;
-  }
-
+  h3 { font-size: 17px; font-weight: 600; color: var(--mckinsey-dark); margin: 32px 0 12px; }
   p { margin-bottom: 14px; color: var(--gray-700); }
-
-  /* Executive Summary Box */
-  .exec-summary {
-    background: var(--gray-50);
-    border-left: 4px solid var(--mckinsey-accent);
-    padding: 24px 28px;
-    margin-bottom: 32px;
-    border-radius: 0 8px 8px 0;
-  }
+  .exec-summary { background: var(--gray-50); border-left: 4px solid var(--mckinsey-accent); padding: 24px 28px; margin-bottom: 32px; border-radius: 0 8px 8px 0; }
   .exec-summary p { margin-bottom: 8px; color: var(--gray-900); }
   .exec-summary strong { color: var(--mckinsey-blue); }
-
-  /* Tables */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 16px 0 24px;
-    font-size: 14px;
-  }
-  thead th {
-    background: var(--mckinsey-blue);
-    color: #fff;
-    font-weight: 600;
-    text-align: left;
-    padding: 10px 14px;
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  tbody td {
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--gray-200);
-    vertical-align: top;
-  }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 14px; }
+  thead th { background: var(--mckinsey-blue); color: #fff; font-weight: 600; text-align: left; padding: 10px 14px; font-size: 13px; }
+  tbody td { padding: 10px 14px; border-bottom: 1px solid var(--gray-200); vertical-align: top; }
   tbody tr:nth-child(even) { background: var(--gray-50); }
   tbody tr:hover { background: #E8F4FD; }
-
-  /* Maturity Badges */
-  .badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #fff;
-  }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; color: #fff; }
   .badge-green { background: var(--success); }
   .badge-yellow { background: var(--warning); color: var(--gray-900); }
   .badge-orange { background: var(--orange); }
   .badge-red { background: var(--danger); }
   .badge-blue { background: var(--mckinsey-light); }
-
-  /* Priority Tags */
   .priority { font-weight: 700; font-size: 13px; }
   .p0 { color: var(--danger); }
   .p1 { color: var(--orange); }
   .p2 { color: var(--mckinsey-light); }
-  .p3 { color: var(--gray-500); }
-
-  /* Metric Cards */
-  .metric-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin: 24px 0;
-  }
-  .metric-card {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
-    border-radius: 8px;
-    padding: 20px;
-    text-align: center;
-  }
-  .metric-card .value {
-    font-size: 36px;
-    font-weight: 700;
-    color: var(--mckinsey-blue);
-    line-height: 1.1;
-  }
-  .metric-card .label {
-    font-size: 12px;
-    color: var(--gray-500);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-top: 6px;
-  }
-
-  /* Phase Timeline */
-  .timeline {
-    position: relative;
-    padding-left: 32px;
-    margin: 24px 0;
-  }
-  .timeline::before {
-    content: '';
-    position: absolute;
-    left: 8px;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: var(--mckinsey-accent);
-  }
-  .timeline-item {
-    position: relative;
-    margin-bottom: 28px;
-  }
-  .timeline-item::before {
-    content: '';
-    position: absolute;
-    left: -28px;
-    top: 6px;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--mckinsey-accent);
-    border: 3px solid #fff;
-    box-shadow: 0 0 0 2px var(--mckinsey-accent);
-  }
-  .timeline-item h4 {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--mckinsey-dark);
-    margin-bottom: 6px;
-  }
-  .timeline-item p {
-    font-size: 14px;
-    color: var(--gray-500);
-    margin-bottom: 4px;
-  }
-
-  /* Gap Cards */
-  .gap-card {
-    border: 1px solid var(--gray-200);
-    border-radius: 8px;
-    padding: 24px;
-    margin: 16px 0;
-    border-left: 4px solid var(--mckinsey-blue);
-  }
-  .gap-card h4 {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--mckinsey-dark);
-    margin-bottom: 8px;
-  }
-  .gap-card .source {
-    font-size: 12px;
-    color: var(--gray-500);
-    margin-bottom: 12px;
-  }
-
-  /* Competitive Matrix */
-  .matrix-legend {
-    display: flex;
-    gap: 16px;
-    margin: 12px 0 8px;
-    font-size: 13px;
-    color: var(--gray-500);
-  }
-
-  /* Footer */
-  footer {
-    text-align: center;
-    padding: 60px 20px 40px;
-    color: #9B9B9D;
-    font-size: 13px;
-    line-height: 2.2;
-  }
-
+  .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 24px 0; }
+  .metric-card { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; padding: 20px; text-align: center; }
+  .metric-card .value { font-size: 36px; font-weight: 700; color: var(--mckinsey-blue); line-height: 1.1; }
+  .metric-card .label { font-size: 12px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 6px; }
+  .timeline { position: relative; padding-left: 32px; margin: 24px 0; }
+  .timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: var(--mckinsey-accent); }
+  .timeline-item { position: relative; margin-bottom: 28px; }
+  .timeline-item::before { content: ''; position: absolute; left: -28px; top: 6px; width: 14px; height: 14px; border-radius: 50%; background: var(--mckinsey-accent); border: 3px solid #fff; box-shadow: 0 0 0 2px var(--mckinsey-accent); }
+  .timeline-item h4 { font-size: 15px; font-weight: 700; color: var(--mckinsey-dark); margin-bottom: 6px; }
+  .timeline-item p { font-size: 14px; color: var(--gray-500); margin-bottom: 4px; }
+  .gap-card { border: 1px solid var(--gray-200); border-radius: 8px; padding: 24px; margin: 16px 0; border-left: 4px solid var(--mckinsey-blue); }
+  .gap-card h4 { font-size: 16px; font-weight: 700; color: var(--mckinsey-dark); margin-bottom: 8px; }
+  .gap-card .source { font-size: 12px; color: var(--gray-500); margin-bottom: 12px; }
+  .matrix-legend { display: flex; gap: 16px; margin: 12px 0 8px; font-size: 13px; color: var(--gray-500); }
+  footer { text-align: center; padding: 60px 20px 40px; color: #9B9B9D; font-size: 13px; line-height: 2.2; }
   @media (max-width: 720px) {
     .header { padding: 48px 20px 36px; }
     .header h1 { font-size: 24px; }
     .content { padding: 32px 20px 60px; }
     .metric-grid { grid-template-columns: repeat(2, 1fr); }
-    .header .meta-row { flex-wrap: wrap; gap: 12px; }
   }
 </style>
 </head>
@@ -273,258 +85,257 @@
 <div class="header">
   <div class="header-inner">
     <h1>Orca 生态系统 SOTA 差距分析</h1>
-    <div class="subtitle">蜂群头脑风暴报告 -- 3 Agent 并行研究综合</div>
+    <div class="subtitle">蜂群头脑风暴报告 -- 3 个研究 Agent 并行综合</div>
     <div class="meta-row">
-      <span>v0.3.0 Baseline</span>
+      <span>v0.3.0 基线</span>
       <span>2026-04-12</span>
-      <span>AI-Fleet / Claude Code / Codex / Amp / KiloCode / Hermes</span>
+      <span>对标: AI-Fleet / Claude Code / Codex / Amp / KiloCode / Hermes</span>
     </div>
   </div>
 </div>
 
 <div class="content">
 
-  <!-- Executive Summary -->
-  <h2>Executive Summary</h2>
+  <h2>概要结论</h2>
   <div class="exec-summary">
-    <p>Orca CLI v0.3.0 拥有扎实的基础（41 tools、10 hook events、multi-model council/race/pipeline、493 tests）。但对标 SOTA 编码代理（Claude Code、Codex CLI、Amp CLI、KiloCode、Hermes），Orca 在 <strong>6 个关键维度存在差距</strong>，阻碍其成为真正的 SOTA 级别 CLI。</p>
-    <p>好消息：AI-Fleet 已经拥有大部分差距的成熟实现。移植路径清晰。</p>
+    <p>Orca CLI v0.3.0 拥有扎实基础（41 个工具、10 个钩子事件、多模型 council/race/pipeline、493 个测试用例）。但对标 SOTA 级编码代理（Claude Code、Codex CLI、Amp CLI、KiloCode、Hermes），Orca 在 <strong>6 个关键维度存在结构性差距</strong>，阻碍其成为真正的 SOTA 级 CLI 工具。</p>
+    <p>好消息是：AI-Fleet 已经对大部分差距有成熟实现，移植路径清晰，风险可控。</p>
   </div>
 
   <div class="metric-grid">
     <div class="metric-card">
       <div class="value">70-75%</div>
-      <div class="label">Production Readiness</div>
+      <div class="label">生产就绪度</div>
     </div>
     <div class="metric-card">
       <div class="value">6</div>
-      <div class="label">Critical Gap Dimensions</div>
+      <div class="label">关键差距维度</div>
     </div>
     <div class="metric-card">
       <div class="value">493</div>
-      <div class="label">Tests Passing</div>
+      <div class="label">测试用例通过</div>
     </div>
     <div class="metric-card">
       <div class="value">3</div>
-      <div class="label">Phase Roadmap</div>
+      <div class="label">阶段路线图</div>
     </div>
   </div>
 
-  <!-- Current State -->
-  <h2>Current State: Orca v0.3.0 (Honest Assessment)</h2>
+  <!-- 现状 -->
+  <h2>现状：Orca v0.3.0（诚实评估）</h2>
 
   <table>
     <thead>
-      <tr><th>Dimension</th><th>Claimed</th><th>Actual</th><th>Maturity</th></tr>
+      <tr><th>维度</th><th>声称</th><th>实际</th><th>成熟度</th></tr>
     </thead>
     <tbody>
-      <tr><td>Tool System</td><td>41 tools</td><td>35 fully implemented, 3 async stubs, 3 partial</td><td><span class="badge badge-yellow">75%</span></td></tr>
-      <tr><td>Multi-Model</td><td>Council/Race/Pipeline</td><td>Council works, Race/Pipeline incomplete</td><td><span class="badge badge-yellow">75%</span></td></tr>
-      <tr><td>Hooks</td><td>10 events</td><td>8 implemented, SubagentStop+Stop missing</td><td><span class="badge badge-green">80%</span></td></tr>
-      <tr><td>MCP Client</td><td>Full client</td><td>Production-ready, no server hosting</td><td><span class="badge badge-green">90%</span></td></tr>
-      <tr><td>Context Mgmt</td><td>Project detection + budget</td><td>Solid detection, weak window estimation</td><td><span class="badge badge-green">80%</span></td></tr>
-      <tr><td>Session</td><td>Save/Load/Resume</td><td>Save only, NO resume</td><td><span class="badge badge-orange">50%</span></td></tr>
-      <tr><td>Security</td><td>shellEscape + safe</td><td>Binary safe/yolo, no OS sandbox</td><td><span class="badge badge-orange">60%</span></td></tr>
-      <tr><td>Agent Loop</td><td>Unlimited auto-continue</td><td>Sequential only, no sub-agent</td><td><span class="badge badge-yellow">70%</span></td></tr>
-      <tr><td>Observability</td><td>Logs + doctor + stats</td><td>Minimal instrumentation</td><td><span class="badge badge-red">40%</span></td></tr>
-      <tr><td>Testing</td><td>493 tests / 36 files</td><td>Verified: all pass</td><td><span class="badge badge-green">95%</span></td></tr>
+      <tr><td>工具系统</td><td>41 个工具</td><td>35 个完整实现，3 个异步桩，3 个部分实现</td><td><span class="badge badge-yellow">75%</span></td></tr>
+      <tr><td>多模型协作</td><td>Council/Race/Pipeline</td><td>Council 可用，Race/Pipeline 不完整</td><td><span class="badge badge-yellow">75%</span></td></tr>
+      <tr><td>钩子系统</td><td>10 个事件</td><td>8 个已实现，SubagentStop+Stop 代码缺失</td><td><span class="badge badge-green">80%</span></td></tr>
+      <tr><td>MCP 客户端</td><td>完整客户端</td><td>生产可用，不支持服务端托管</td><td><span class="badge badge-green">90%</span></td></tr>
+      <tr><td>上下文管理</td><td>项目检测 + 预算</td><td>检测扎实，窗口估算偏弱</td><td><span class="badge badge-green">80%</span></td></tr>
+      <tr><td>会话管理</td><td>保存/加载/恢复</td><td>仅支持保存，无法恢复继续</td><td><span class="badge badge-orange">50%</span></td></tr>
+      <tr><td>安全</td><td>shellEscape + 安全模式</td><td>仅有二档权限，无 OS 级沙箱</td><td><span class="badge badge-orange">60%</span></td></tr>
+      <tr><td>Agent 循环</td><td>无限自动续写</td><td>仅支持顺序执行，无子代理隔离</td><td><span class="badge badge-yellow">70%</span></td></tr>
+      <tr><td>可观测性</td><td>日志 + 诊断 + 统计</td><td>仪表化程度低，无请求追踪</td><td><span class="badge badge-red">40%</span></td></tr>
+      <tr><td>测试</td><td>493 测试 / 36 文件</td><td>已验证：全部通过</td><td><span class="badge badge-green">95%</span></td></tr>
     </tbody>
   </table>
 
-  <h3>Code Audit: Key Gaps Revealed</h3>
+  <h3>代码审计发现的关键问题</h3>
   <table>
     <thead>
-      <tr><th>Stub / Issue</th><th>Current State</th><th>Impact</th></tr>
+      <tr><th>桩/问题</th><th>当前状态</th><th>影响</th></tr>
     </thead>
     <tbody>
-      <tr><td>spawn_agent / delegate_task</td><td>Defined but async stub</td><td>No sub-agent spawning</td></tr>
-      <tr><td>Session resume</td><td><code>-c</code> flag not wired</td><td>Cannot continue sessions</td></tr>
-      <tr><td>Race cancellation</td><td>CancelRequest not implemented</td><td>Losing models waste tokens</td></tr>
-      <tr><td>Cost tracking</td><td>Always passes 0</td><td>Stats dashboard shows $0</td></tr>
-      <tr><td>--effort flag</td><td>Defined but ignored</td><td>No thinking mode support</td></tr>
-      <tr><td>PR command</td><td>3.8K stub</td><td>Minimal functionality</td></tr>
+      <tr><td>spawn_agent / delegate_task</td><td>已定义但为异步空壳</td><td>无法生成子代理</td></tr>
+      <tr><td>会话恢复</td><td><code>-c</code> 参数未接线</td><td>无法续接历史会话</td></tr>
+      <tr><td>Race 取消机制</td><td>CancelRequest 未实现</td><td>失败模型继续消耗 token</td></tr>
+      <tr><td>费用追踪</td><td>始终传入 0</td><td>统计面板显示 $0</td></tr>
+      <tr><td>--effort 参数</td><td>已定义但未生效</td><td>无思维模式支持</td></tr>
+      <tr><td>PR 命令</td><td>3.8K 桩代码</td><td>功能极简</td></tr>
     </tbody>
   </table>
 
-  <!-- 6 Critical Gaps -->
-  <h2>6 Critical Gap Dimensions</h2>
+  <!-- 6 大差距 -->
+  <h2>6 个关键差距维度</h2>
 
   <div class="gap-card" style="border-left-color: var(--danger);">
-    <h4>Gap 1: Harness Engineering Layer</h4>
-    <div class="source">Source: AI-Fleet core/harness/ (18 modules, ~196K Python) | <span class="priority p0">P0 CRITICAL</span></div>
-    <p>AI-Fleet 的 18 模块 harness 层是其核心竞争力。包含 verification gate（预完成门禁）、loop detector（循环检测）、context monitor（上下文监控）、error classifier（错误分类）等。这是弥合"模型能力"与"代理交付"之间 20 分差距的关键层。</p>
-    <p><strong>Phase 1 已完成</strong>：4 个 P0 模块已移植为 TypeScript（loop-detector, context-monitor, error-classifier, verification-gate），29 个新测试全部通过。</p>
+    <h4>差距 1：线束工程层（Harness）</h4>
+    <div class="source">来源: AI-Fleet core/harness/（18 模块，~196K Python）| <span class="priority p0">P0 紧急</span></div>
+    <p>AI-Fleet 的 18 模块线束层是其核心竞争力。包含预完成门禁、循环检测器、上下文监控器、错误分类器等。这是弥合"模型能力"与"代理交付"之间 20 分差距的关键层。</p>
+    <p><strong>Phase 1 进展</strong>：4 个 P0 模块已移植为 TypeScript 并接入 Agent 循环，29 个新测试全部通过。</p>
     <table>
-      <thead><tr><th>Module</th><th>Purpose</th><th>Status</th></tr></thead>
+      <thead><tr><th>模块</th><th>功能</th><th>状态</th></tr></thead>
       <tbody>
-        <tr><td>verification-gate</td><td>Pre-completion check (lint/typecheck/test)</td><td><span class="badge badge-green">Done</span></td></tr>
-        <tr><td>loop-detector</td><td>Tw93 rule: 2x fail -> pivot, 3x -> escalate</td><td><span class="badge badge-green">Done</span></td></tr>
-        <tr><td>context-monitor</td><td>4-tier risk: GREEN/YELLOW/ORANGE/RED</td><td><span class="badge badge-green">Done</span></td></tr>
-        <tr><td>error-classifier</td><td>9 categories + recovery suggestions</td><td><span class="badge badge-green">Done</span></td></tr>
-        <tr><td>trace-collector</td><td>Structured execution traces</td><td><span class="badge badge-blue">P1</span></td></tr>
-        <tr><td>quality-scorer</td><td>5-dimension A-F grading</td><td><span class="badge badge-blue">P1</span></td></tr>
-        <tr><td>knowledge-compounder</td><td>Fix -> pattern -> DNA capsule</td><td><span class="badge badge-blue">P2</span></td></tr>
+        <tr><td>verification-gate</td><td>预完成质量门禁（lint/typecheck/test）</td><td><span class="badge badge-green">已完成</span></td></tr>
+        <tr><td>loop-detector</td><td>Tw93 规则：2 次失败转向，3 次上报</td><td><span class="badge badge-green">已完成</span></td></tr>
+        <tr><td>context-monitor</td><td>4 级风险：绿/黄/橙/红</td><td><span class="badge badge-green">已完成</span></td></tr>
+        <tr><td>error-classifier</td><td>9 类错误 + 恢复建议</td><td><span class="badge badge-green">已完成</span></td></tr>
+        <tr><td>trace-collector</td><td>结构化执行追踪</td><td><span class="badge badge-blue">P1 待实现</span></td></tr>
+        <tr><td>quality-scorer</td><td>5 维度 A-F 评分</td><td><span class="badge badge-blue">P1 待实现</span></td></tr>
+        <tr><td>knowledge-compounder</td><td>修复模式 -> DNA 胶囊</td><td><span class="badge badge-blue">P2 待实现</span></td></tr>
       </tbody>
     </table>
   </div>
 
   <div class="gap-card" style="border-left-color: var(--danger);">
-    <h4>Gap 2: Agent Isolation & Multi-Agent</h4>
-    <div class="source">Source: Claude Code (Agent Teams, Worktree) | <span class="priority p0">P0 CRITICAL</span></div>
-    <p>Claude Code 的 Agent Teams 通过 git worktree 实现代理间的代码隔离，每个 worker 在独立分支上工作。Orca 当前 spawn_agent 和 delegate_task 均为空壳。</p>
+    <h4>差距 2：代理隔离与多代理协作</h4>
+    <div class="source">来源: Claude Code（Agent Teams, Worktree）| <span class="priority p0">P0 紧急</span></div>
+    <p>Claude Code 的 Agent Teams 通过 git worktree 实现代理间代码隔离，每个 worker 在独立分支上工作，互不干扰。Orca 当前的 spawn_agent 和 delegate_task 均为空壳实现。</p>
     <table>
-      <thead><tr><th>Feature</th><th>Claude Code</th><th>Orca</th><th>Gap</th></tr></thead>
+      <thead><tr><th>功能</th><th>Claude Code</th><th>Orca</th><th>差距</th></tr></thead>
       <tbody>
-        <tr><td>Sub-agent spawn</td><td>Haiku exploration agents</td><td>Async stub</td><td>Needs real isolation</td></tr>
-        <tr><td>Worktree isolation</td><td>--worktree per agent</td><td>None</td><td>Missing</td></tr>
-        <tr><td>Agent teams</td><td>Lead + N workers</td><td>None</td><td>Missing</td></tr>
-        <tr><td>Cheap delegation</td><td>Haiku for search, Opus for think</td><td>Single model</td><td>Missing</td></tr>
+        <tr><td>子代理生成</td><td>Haiku 做探索，Opus 做推理</td><td>异步桩</td><td>需要真正的进程隔离</td></tr>
+        <tr><td>Worktree 隔离</td><td>每个代理独立 git 分支</td><td>无</td><td>完全缺失</td></tr>
+        <tr><td>Agent 团队</td><td>Leader + N Workers 编排</td><td>无</td><td>完全缺失</td></tr>
+        <tr><td>模型分层委托</td><td>廉价模型做搜索，高级模型做推理</td><td>单一模型</td><td>完全缺失</td></tr>
       </tbody>
     </table>
   </div>
 
   <div class="gap-card" style="border-left-color: var(--orange);">
-    <h4>Gap 3: Security Sandbox</h4>
-    <div class="source">Source: Codex CLI (Seatbelt, bwrap, Landlock) | <span class="priority p1">P1 HIGH</span></div>
-    <p>Codex CLI 使用 OS 级别的沙箱隔离（macOS Seatbelt, Linux bubblewrap+Landlock），硬件级别不可绕过。Orca 当前仅有 shellEscape + binary safe/yolo 两档权限。</p>
+    <h4>差距 3：安全沙箱</h4>
+    <div class="source">来源: Codex CLI（Seatbelt, bwrap, Landlock）| <span class="priority p1">P1 高优</span></div>
+    <p>Codex CLI 使用操作系统级别的沙箱隔离（macOS Seatbelt、Linux bubblewrap+Landlock），硬件级不可绕过。Orca 当前仅有 shellEscape 字符转义和 safe/yolo 二档权限切换，不足以在不可信环境运行。</p>
   </div>
 
   <div class="gap-card" style="border-left-color: var(--orange);">
-    <h4>Gap 4: Skills System</h4>
-    <div class="source">Source: AI-Fleet (503 skills, 28 groups) + Hermes (123 skills) | <span class="priority p1">P1 HIGH</span></div>
-    <p>AI-Fleet 拥有 4 种执行模式（swarm/pipeline/loop/sequential）的技能编排引擎，KiloCode 有 Mode System。Orca 当前仅有基础的 context loading，没有技能执行引擎。</p>
+    <h4>差距 4：技能系统（Skills）</h4>
+    <div class="source">来源: AI-Fleet（503 技能，28 组）+ Hermes（123 技能）| <span class="priority p1">P1 高优</span></div>
+    <p>AI-Fleet 拥有 4 种执行模式（蜂群/管道/循环/顺序）的技能编排引擎，KiloCode 有行为配置系统（Mode System）。Orca 当前仅有基础的上下文文件加载，缺乏技能执行引擎和注册表。</p>
   </div>
 
   <div class="gap-card" style="border-left-color: var(--mckinsey-light);">
-    <h4>Gap 5: Platform Gateway</h4>
-    <div class="source">Source: Hermes (15+ channels) | <span class="priority p2">P2 MEDIUM</span></div>
-    <p>Hermes 通过单一 Gateway 接入 Telegram、Discord、Slack、WhatsApp 等 15+ 平台。Orca 当前仅有 CLI + HTTP serve 两个入口。</p>
+    <h4>差距 5：平台网关</h4>
+    <div class="source">来源: Hermes（15+ 渠道）| <span class="priority p2">P2 中优</span></div>
+    <p>Hermes 通过单一网关架构接入 Telegram、Discord、Slack、WhatsApp 等 15+ 平台。Orca 当前仅有 CLI 和基础 HTTP serve 两个入口，无法触达终端以外的用户。</p>
   </div>
 
   <div class="gap-card" style="border-left-color: var(--mckinsey-light);">
-    <h4>Gap 6: Persistent Memory & Learning</h4>
-    <div class="source">Source: OpenClaw + AI-Fleet (DNA Capsules) | <span class="priority p2">P2 MEDIUM</span></div>
-    <p>AI-Fleet 的 DNA 胶囊系统实现跨会话知识继承——将修复模式编码为可复用的胶囊，新会话自动匹配症状并注入修复方案。Orca 当前仅有 session save/load。</p>
+    <h4>差距 6：持久化记忆与跨会话学习</h4>
+    <div class="source">来源: OpenClaw + AI-Fleet（DNA 胶囊系统）| <span class="priority p2">P2 中优</span></div>
+    <p>AI-Fleet 的 DNA 胶囊系统实现跨会话知识继承——将修复模式编码为可复用胶囊，新会话自动匹配症状并注入修复方案。OpenClaw 有自我改进 Agent 模式。Orca 当前仅有 session save/load，无学习能力。</p>
   </div>
 
-  <!-- Competitive Positioning -->
-  <h2>Competitive Positioning Matrix</h2>
+  <!-- 竞争定位 -->
+  <h2>竞争定位矩阵</h2>
 
   <div class="matrix-legend">
-    <span><span class="badge badge-green">Leads</span> 行业领先</span>
-    <span><span class="badge badge-blue">Parity</span> 持平</span>
-    <span><span class="badge badge-yellow">Gap</span> 存在差距</span>
-    <span><span class="badge badge-red">Missing</span> 完全缺失</span>
+    <span><span class="badge badge-green">领先</span></span>
+    <span><span class="badge badge-blue">持平</span></span>
+    <span><span class="badge badge-yellow">有差距</span></span>
+    <span><span class="badge badge-red">完全缺失</span></span>
   </div>
 
   <table>
     <thead>
-      <tr><th>Dimension</th><th>Current Leader</th><th>Orca Now</th><th>Orca After Transplant</th></tr>
+      <tr><th>维度</th><th>当前领导者</th><th>Orca 现状</th><th>移植后定位</th></tr>
     </thead>
     <tbody>
-      <tr><td>Multi-model Collaboration</td><td>Orca (unique)</td><td><span class="badge badge-green">Leads</span></td><td><span class="badge badge-green">Leads</span></td></tr>
-      <tr><td>Harness Engineering</td><td>AI-Fleet (internal)</td><td><span class="badge badge-red">Missing</span></td><td><span class="badge badge-green">Leads</span> (open source)</td></tr>
-      <tr><td>Agent Isolation</td><td>Claude Code</td><td><span class="badge badge-red">Missing</span></td><td><span class="badge badge-blue">Parity</span></td></tr>
-      <tr><td>Security Sandbox</td><td>Codex CLI</td><td><span class="badge badge-red">Missing</span></td><td><span class="badge badge-blue">Parity</span></td></tr>
-      <tr><td>Skills Ecosystem</td><td>KiloCode</td><td><span class="badge badge-yellow">Gap</span></td><td><span class="badge badge-blue">Parity</span></td></tr>
-      <tr><td>Platform Reach</td><td>Hermes</td><td><span class="badge badge-yellow">Gap</span></td><td><span class="badge badge-blue">Parity</span></td></tr>
-      <tr><td>Testing Rigor</td><td>Orca (493 tests)</td><td><span class="badge badge-green">Leads</span></td><td><span class="badge badge-green">Leads</span> (545+)</td></tr>
+      <tr><td>多模型协作</td><td>Orca（独有）</td><td><span class="badge badge-green">领先</span></td><td><span class="badge badge-green">领先</span></td></tr>
+      <tr><td>线束工程</td><td>AI-Fleet（内部）</td><td><span class="badge badge-red">缺失</span></td><td><span class="badge badge-green">领先</span>（开源首创）</td></tr>
+      <tr><td>代理隔离</td><td>Claude Code</td><td><span class="badge badge-red">缺失</span></td><td><span class="badge badge-blue">持平</span></td></tr>
+      <tr><td>安全沙箱</td><td>Codex CLI</td><td><span class="badge badge-red">缺失</span></td><td><span class="badge badge-blue">持平</span></td></tr>
+      <tr><td>技能生态</td><td>KiloCode</td><td><span class="badge badge-yellow">有差距</span></td><td><span class="badge badge-blue">持平</span></td></tr>
+      <tr><td>平台触达</td><td>Hermes</td><td><span class="badge badge-yellow">有差距</span></td><td><span class="badge badge-blue">持平</span></td></tr>
+      <tr><td>测试严谨度</td><td>Orca（493 测试）</td><td><span class="badge badge-green">领先</span></td><td><span class="badge badge-green">领先</span>（545+）</td></tr>
     </tbody>
   </table>
 
-  <!-- Execution Roadmap -->
-  <h2>3-Phase Execution Roadmap</h2>
+  <!-- 路线图 -->
+  <h2>3 阶段执行路线图</h2>
 
   <div class="timeline">
     <div class="timeline-item">
-      <h4>Phase 1: Foundation (v0.3.0 -> v0.4.0)</h4>
-      <p>Harness Layer (verification gate + loop detector + context monitor + error classifier)</p>
-      <p>Sub-Agent Process Isolation + Fix Existing Stubs</p>
-      <p><strong>~3,500 LOC | 4 modules done, wiring in progress</strong></p>
+      <h4>Phase 1: 基础层（v0.3.0 -> v0.4.0）</h4>
+      <p>线束层（预完成门禁 + 循环检测 + 上下文监控 + 错误分类）</p>
+      <p>子代理进程隔离 + 修复现有桩代码</p>
+      <p><strong>~3,500 行代码 | 4 模块已完成并接入，正在接线验证</strong></p>
     </div>
     <div class="timeline-item">
-      <h4>Phase 2: Power (v0.4.0 -> v0.5.0)</h4>
-      <p>Skills Execution Engine (swarm/pipeline/loop modes)</p>
-      <p>Security Sandbox (macOS Seatbelt + Linux bwrap)</p>
-      <p>Git Worktree Agent Teams</p>
-      <p><strong>~3,000 LOC</strong></p>
+      <h4>Phase 2: 能力层（v0.4.0 -> v0.5.0）</h4>
+      <p>技能执行引擎（蜂群/管道/循环模式）</p>
+      <p>安全沙箱（macOS Seatbelt + Linux bwrap）</p>
+      <p>Git Worktree Agent 团队</p>
+      <p><strong>~3,000 行代码</strong></p>
     </div>
     <div class="timeline-item">
-      <h4>Phase 3: Platform (v0.5.0 -> v0.6.0)</h4>
-      <p>Webhook Gateway + Telegram/Discord Adapters</p>
-      <p>DNA Capsule System + Knowledge Compounding</p>
-      <p><strong>~2,500 LOC</strong></p>
+      <h4>Phase 3: 平台层（v0.5.0 -> v0.6.0）</h4>
+      <p>Webhook 网关 + Telegram / Discord 适配器</p>
+      <p>DNA 胶囊系统 + 知识沉淀引擎</p>
+      <p><strong>~2,500 行代码</strong></p>
     </div>
   </div>
 
-  <!-- Priority Matrix -->
-  <h2>Priority Matrix</h2>
+  <!-- 优先级矩阵 -->
+  <h2>优先级矩阵</h2>
 
   <table>
     <thead>
-      <tr><th>Priority</th><th>Gap</th><th>Effort</th><th>Impact</th><th>ROI</th></tr>
+      <tr><th>优先级</th><th>差距</th><th>工作量</th><th>影响</th><th>投入产出比</th></tr>
     </thead>
     <tbody>
-      <tr><td><span class="priority p0">P0</span></td><td>Harness Layer</td><td>2,000 LOC</td><td>Closes 20pt model-agent gap</td><td>HIGHEST</td></tr>
-      <tr><td><span class="priority p0">P0</span></td><td>Agent Isolation</td><td>1,500 LOC</td><td>Enables parallel work</td><td>HIGHEST</td></tr>
-      <tr><td><span class="priority p1">P1</span></td><td>Skills System</td><td>1,200 LOC</td><td>Composable behaviors</td><td>HIGH</td></tr>
-      <tr><td><span class="priority p1">P1</span></td><td>Security Sandbox</td><td>800 LOC</td><td>Production safety</td><td>HIGH</td></tr>
-      <tr><td><span class="priority p2">P2</span></td><td>Persistent Memory</td><td>1,000 LOC</td><td>Cross-session learning</td><td>MEDIUM</td></tr>
-      <tr><td><span class="priority p2">P2</span></td><td>Platform Gateway</td><td>1,800 LOC</td><td>Multi-channel reach</td><td>MEDIUM</td></tr>
+      <tr><td><span class="priority p0">P0</span></td><td>线束层</td><td>2,000 行</td><td>弥合模型与代理的 20 分差距</td><td>最高</td></tr>
+      <tr><td><span class="priority p0">P0</span></td><td>代理隔离</td><td>1,500 行</td><td>实现并行工作</td><td>最高</td></tr>
+      <tr><td><span class="priority p1">P1</span></td><td>技能系统</td><td>1,200 行</td><td>可组合行为</td><td>高</td></tr>
+      <tr><td><span class="priority p1">P1</span></td><td>安全沙箱</td><td>800 行</td><td>生产安全</td><td>高</td></tr>
+      <tr><td><span class="priority p2">P2</span></td><td>持久记忆</td><td>1,000 行</td><td>跨会话学习</td><td>中等</td></tr>
+      <tr><td><span class="priority p2">P2</span></td><td>平台网关</td><td>1,800 行</td><td>多渠道触达</td><td>中等</td></tr>
     </tbody>
   </table>
 
-  <!-- Three-Tier Architecture -->
-  <h2>Three-Tier Architecture</h2>
+  <!-- 三层架构 -->
+  <h2>三层架构映射</h2>
 
   <table>
     <thead>
-      <tr><th>Tier</th><th>Component</th><th>Current</th><th>Target</th></tr>
+      <tr><th>层级</th><th>组件</th><th>当前</th><th>目标</th></tr>
     </thead>
     <tbody>
       <tr>
         <td><strong>L1: Orca Agent SDK</strong></td>
-        <td>Core agent runtime</td>
-        <td>Tool system + streaming</td>
-        <td>+ Harness + Isolation + Sandbox</td>
+        <td>核心代理运行时</td>
+        <td>工具系统 + 流式输出</td>
+        <td>+ 线束层 + 隔离 + 沙箱</td>
       </tr>
       <tr>
         <td><strong>L2: Orca CLI</strong></td>
-        <td>User-facing CLI</td>
-        <td>41 tools, 10 hooks</td>
-        <td>+ Skills engine + Mode system + Agent teams</td>
+        <td>面向用户的命令行工具</td>
+        <td>41 工具, 10 钩子</td>
+        <td>+ 技能引擎 + 模式系统 + Agent 团队</td>
       </tr>
       <tr>
         <td><strong>L3: OrcaOS</strong></td>
-        <td>Platform layer</td>
-        <td>orca serve (basic)</td>
-        <td>+ Gateway + Webhook + Channel adapters</td>
+        <td>平台层</td>
+        <td>orca serve（基础）</td>
+        <td>+ 网关 + Webhook + 渠道适配器</td>
       </tr>
     </tbody>
   </table>
 
-  <!-- Research Sources -->
-  <h2>Research Sources</h2>
+  <!-- 研究来源 -->
+  <h2>研究来源</h2>
   <table>
-    <thead><tr><th>Source</th><th>Scope</th><th>Key Findings</th></tr></thead>
+    <thead><tr><th>来源</th><th>范围</th><th>核心发现</th></tr></thead>
     <tbody>
-      <tr><td>AI-Fleet core/harness/</td><td>18 modules, ~196K Python</td><td>Verification gate + loop detector + context monitor</td></tr>
-      <tr><td>AI-Fleet configs/skill-groups.json</td><td>28 skill groups, 4 execution modes</td><td>Swarm/Pipeline/Loop/Sequential</td></tr>
-      <tr><td>AI-Fleet configs/dna-registry.json</td><td>DNA capsule system</td><td>Cross-agent knowledge inheritance</td></tr>
-      <tr><td>Hermes Agent</td><td>123 skills, 15+ platforms</td><td>Gateway pattern, Apple ecosystem</td></tr>
-      <tr><td>Claude Code</td><td>Agent Teams, MCP lazy-loading</td><td>Worktree isolation, sub-agent delegation</td></tr>
-      <tr><td>Codex CLI</td><td>OS-enforced sandbox</td><td>Seatbelt (macOS), bwrap (Linux)</td></tr>
-      <tr><td>Amp CLI</td><td>Thread-based memory</td><td>AGENTS.md auto-discovery, workspace MCP</td></tr>
-      <tr><td>KiloCode</td><td>Mode system, MCP marketplace</td><td>Behavioral profiles, diff editing</td></tr>
+      <tr><td>AI-Fleet core/harness/</td><td>18 模块，约 196K Python 代码</td><td>预完成门禁 + 循环检测 + 上下文监控</td></tr>
+      <tr><td>AI-Fleet skill-groups.json</td><td>28 个技能组，4 种执行模式</td><td>蜂群/管道/循环/顺序编排</td></tr>
+      <tr><td>AI-Fleet dna-registry.json</td><td>DNA 胶囊系统</td><td>跨代理知识继承机制</td></tr>
+      <tr><td>Hermes Agent</td><td>123 个技能，15+ 平台渠道</td><td>网关模式，Apple 生态深度集成</td></tr>
+      <tr><td>Claude Code</td><td>Agent Teams, MCP 懒加载</td><td>Worktree 隔离，子代理委派</td></tr>
+      <tr><td>Codex CLI</td><td>OS 级沙箱隔离</td><td>Seatbelt (macOS), bwrap (Linux)</td></tr>
+      <tr><td>Amp CLI</td><td>线程式记忆系统</td><td>AGENTS.md 自动发现，工作区 MCP</td></tr>
+      <tr><td>KiloCode</td><td>模式系统，MCP 市场</td><td>行为配置切换，差分编辑</td></tr>
     </tbody>
   </table>
 
 </div>
 
 <footer>
-    <p>Orca CLI v0.3.0 -- SOTA Gap Analysis Report</p>
+    <p>Orca CLI v0.3.0 -- SOTA 差距分析报告</p>
     <p>Maurice | maurice_wen@proton.me</p>
-    <p style="font-size:12px; margin-top:8px;">Generated 2026-04-12 | Data from 3-agent parallel research (AI-Fleet infra + competitive analysis + Orca audit)</p>
+    <p style="font-size:12px; margin-top:8px;">生成日期 2026-04-12 | 数据来自 3 个 Agent 并行研究（AI-Fleet 基建 + 竞品对标 + Orca 审计）</p>
 </footer>
 
 </body>

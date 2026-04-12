@@ -39,8 +39,9 @@ import { TokenBudgetManager } from '../token-budget.js'
 import { RetryTracker } from '../retry-intelligence.js'
 import { recordUsage } from '../usage-db.js'
 import { consumeCompletedBackgroundJobs, listBackgroundJobs, readBackgroundJobLog } from '../background-jobs.js'
-import { formatContextWindow, formatPricing, getAgenticWarning, listModelChoices, type ModelChoice } from '../model-catalog.js'
+import { formatContextWindow, formatPricing, getAgenticWarning, getContextWindowForModel, getPricingForModel, listModelChoices, type ModelChoice } from '../model-catalog.js'
 import { logInfo, logWarning } from '../logger.js'
+import { ContextMonitor, LoopDetector, classifyError } from '../harness/index.js'
 
 interface ChatOptions {
   model?: string
@@ -274,6 +275,8 @@ async function runREPL(
   // SOTA agent intelligence modules
   const tokenBudget = new TokenBudgetManager(currentModel)
   const retryTracker = new RetryTracker(2)
+  const contextMonitor = new ContextMonitor(getContextWindowForModel(currentModel) || 200_000)
+  const loopDetector = new LoopDetector()
 
   const shortModel = (m: string) => m.length > 24 ? m.slice(0, 22) + '..' : m
   const getChoices = (): ModelChoice[] => listModelChoices(config, currentModel)
@@ -506,7 +509,7 @@ async function runREPL(
             model: currentModel,
             inputTokens: stats.totalInputTokens,
             outputTokens: stats.totalOutputTokens,
-            costUsd: 0,
+            costUsd: computeCost(currentModel, stats.totalInputTokens, stats.totalOutputTokens),
             durationMs: Date.now() - stats.startTime,
             turns: stats.turns,
             command: 'chat',
@@ -681,11 +684,27 @@ async function runREPL(
           onFileWrite: (path, oldContent) => { lastWrite = { path, oldContent } },
           safeMode: opts.safe || false,
           retryTracker,
+          loopDetector,
         })
         stats.turns++
         stats.totalInputTokens += result.inputTokens
         stats.totalOutputTokens += result.outputTokens
         tokenBudget.recordUsage(result.inputTokens, result.outputTokens)
+        contextMonitor.recordUsage(result.inputTokens, result.outputTokens)
+
+        // Harness: context utilization warning
+        const risk = contextMonitor.getRiskLevel()
+        if (risk !== 'green') {
+          const snap = contextMonitor.getSnapshot()
+          const pct = (snap.utilization * 100).toFixed(1)
+          if (risk === 'red') {
+            process.stderr.write(`\x1b[31m  [harness] context ${pct}% RED — /clear + HANDOFF.md recommended\x1b[0m\n`)
+          } else if (risk === 'orange') {
+            process.stderr.write(`\x1b[33m  [harness] context ${pct}% ORANGE — force /compact\x1b[0m\n`)
+          } else if (risk === 'yellow') {
+            process.stderr.write(`\x1b[33m  [harness] context ${pct}% YELLOW — consider /compact\x1b[0m\n`)
+          }
+        }
       } else if (!abortController.signal.aborted) {
         firstToken = true
         progress.stop()
@@ -1353,10 +1372,11 @@ interface ProxyTurnOptions {
   onFileWrite?: (path: string, oldContent: string | null) => void
   safeMode?: boolean
   retryTracker?: RetryTracker
+  loopDetector?: LoopDetector
 }
 
 async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: number; outputTokens: number }> {
-  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onStreamToken, onFileWrite, safeMode, retryTracker } = options
+  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onStreamToken, onFileWrite, safeMode, retryTracker, loopDetector } = options
 
   const startTime = Date.now()
   let inputTokens = 0
@@ -1507,6 +1527,32 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
           }
         }
 
+        // ── Error classifier: add recovery suggestion ──
+        if (!result.success) {
+          const classified = classifyError(result.output)
+          result.output += `\n[error-classifier] ${classified.category}: ${classified.suggestion}`
+          if (classified.retryable) {
+            result.output += ` (retryable after ${classified.retryDelay || 0}ms)`
+          }
+        }
+
+        // ── Loop detector: catch stuck patterns ──
+        if (loopDetector) {
+          const argsKey = String(args.path || args.pattern || args.command || name)
+          if (result.success) {
+            loopDetector.recordSuccess(name, argsKey)
+          } else {
+            const action = loopDetector.recordFailure(name, argsKey, result.output)
+            if (action === 'pivot') {
+              const suggestion = loopDetector.getPivotSuggestion(name, argsKey)
+              result.output += `\n[loop-detector] PIVOT — ${suggestion}`
+            } else if (action === 'escalate') {
+              result.output += `\n[loop-detector] ESCALATE — this tool has failed 3+ times on the same target. Stop and ask the user for guidance.`
+              process.stderr.write(`\x1b[31m  [harness] loop detected: ${name} failed 3+ times — escalating to user\x1b[0m\n`)
+            }
+          }
+        }
+
         // ── Auto-verify: run checks after file modifications ──
         if (result.success && ['write_file', 'edit_file', 'multi_edit'].includes(name) && args.path) {
           const { resolve: resolvePath } = await import('node:path')
@@ -1604,7 +1650,7 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
     model: resolved.model,
     inputTokens,
     outputTokens,
-    costUsd: 0,
+    costUsd: computeCost(resolved.model, inputTokens, outputTokens),
     durationMs: Date.now() - startTime,
     turns: 1,
     command: 'chat',
@@ -1712,11 +1758,21 @@ async function runSDKQuery(options: SDKQueryOptions): Promise<void> {
     model: resolved.model,
     inputTokens,
     outputTokens,
-    costUsd: 0,
+    costUsd: computeCost(resolved.model, inputTokens, outputTokens),
     durationMs: Date.now() - startTime,
     turns,
     command: 'chat-sdk',
   })
+}
+
+// ── Cost Computation ───────────────────────────────────────────
+
+/** Compute cost in USD from token counts and model pricing table. */
+function computeCost(model: string, inputTokens: number, outputTokens: number): number {
+  const pricing = getPricingForModel(model)
+  if (!pricing) return 0
+  const [inputPer1M, outputPer1M] = pricing
+  return (inputTokens * inputPer1M + outputTokens * outputPer1M) / 1_000_000
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
