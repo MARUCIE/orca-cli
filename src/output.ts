@@ -68,9 +68,14 @@ function abbreviatePath(p: string): string {
   return p
 }
 
+/** Strip ANSI escape codes to get visible character length */
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/g, '')
+}
+
 /**
- * Rich startup banner with animated ASCII art orca, model info below.
- * Progressive reveal: each line of the orca prints with a short delay.
+ * Rich startup banner with swimming orca animation.
+ * The orca swims left-right across the terminal, then settles at center.
  */
 export async function printRichBanner(opts: {
   provider: string
@@ -82,12 +87,62 @@ export async function printRichBanner(opts: {
 }): Promise<void> {
   const { provider, model, cwd, configFiles, toolCount, mode } = opts
   const shortCwd = abbreviatePath(cwd)
+  const cols = process.stdout.columns || 80
+  const artHeight = ORCA_ART.length
+  const maxVisWidth = Math.max(...ORCA_ART.map(l => stripAnsi(l).length))
 
-  // Animated progressive reveal of the orca
-  console.log()
-  for (const line of ORCA_ART) {
-    console.log(line)
-    await new Promise(r => setTimeout(r, 35))
+  // Center position and swimming amplitude
+  const centerPad = Math.max(0, Math.floor((cols - maxVisWidth) / 2))
+  const amplitude = Math.min(centerPad - 1, Math.floor(cols / 6))
+
+  // Only animate if terminal is wide enough and interactive
+  const canAnimate = process.stdout.isTTY && amplitude > 2
+
+  if (!canAnimate) {
+    // Static fallback
+    console.log()
+    for (const line of ORCA_ART) console.log(line)
+  } else {
+    // Hide cursor during animation
+    process.stdout.write('\x1b[?25l')
+    console.log()
+
+    // Print initial frame (centered)
+    for (const line of ORCA_ART) {
+      const pad = ' '.repeat(centerPad)
+      console.log(`${pad}${line}`)
+    }
+
+    // Swimming animation: 2 full cycles (left → right → left → right → center)
+    const totalFrames = 36
+    const frameDuration = 55
+    for (let frame = 0; frame < totalFrames; frame++) {
+      const t = (frame / totalFrames) * Math.PI * 4  // 2 full sine cycles
+      // Dampen toward end so it settles at center
+      const dampen = 1 - (frame / totalFrames) * 0.6
+      const shift = Math.round(Math.sin(t) * amplitude * dampen)
+
+      // Move cursor up to top of art
+      process.stdout.write(`\x1b[${artHeight}A`)
+
+      // Redraw each line with shifted position
+      for (const line of ORCA_ART) {
+        const pad = ' '.repeat(Math.max(0, centerPad + shift))
+        process.stdout.write(`\x1b[2K${pad}${line}\n`)
+      }
+
+      await new Promise(r => setTimeout(r, frameDuration))
+    }
+
+    // Final frame: exactly centered
+    process.stdout.write(`\x1b[${artHeight}A`)
+    for (const line of ORCA_ART) {
+      const pad = ' '.repeat(centerPad)
+      process.stdout.write(`\x1b[2K${pad}${line}\n`)
+    }
+
+    // Show cursor
+    process.stdout.write('\x1b[?25h')
   }
 
   // Info below the art
