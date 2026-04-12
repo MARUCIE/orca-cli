@@ -1,6 +1,6 @@
 {
   "name": "orca-cli",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Orca CLI — provider-neutral agent runtime with Claude Code depth",
   "type": "module",
   "main": "./dist/index.js",

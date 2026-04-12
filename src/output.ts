@@ -13,7 +13,7 @@ export type OutputMode = 'streaming' | 'json'
 
 // ── Banner ──────────────────────────────────────────────────────────
 
-const VERSION = '0.3.0'
+const VERSION = '0.4.0'
 
 // Orca — cute killer whale with dorsal fin, eye patch, body, belly, and iconic tail flukes
 // Tail section: body narrows → peduncle → flukes fork up/down (whale signature)
