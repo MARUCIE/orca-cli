@@ -15,8 +15,8 @@ export type OutputMode = 'streaming' | 'json'
 
 const VERSION = '0.2.0'
 
-// Orca — cute killer whale silhouette, all parts connected
-// Features: dorsal fin, big eye (◕), black body (█), white belly (░), smooth tail taper
+// Orca — cute killer whale with dorsal fin, eye patch, body, belly, and iconic tail flukes
+// Tail section: body narrows → peduncle → flukes fork up/down (whale signature)
 const ORCA_ART = [
   '\x1b[36m                   ▄▄\x1b[0m',
   '\x1b[36m                 ▄████▄\x1b[0m',
@@ -29,8 +29,10 @@ const ORCA_ART = [
   '\x1b[36m  ░░░░░░░░░░░░░░░░░░░░░░░░░████████████████████\x1b[0m',
   '\x1b[36m    ░░░░░░░░░░░░░░░░░░░░░░░░░░░████████████████▀\x1b[0m',
   '\x1b[36m       ░░░░░░░░░░░░░░░░░░░░░░░░░░░░██████████▀\x1b[0m',
-  '\x1b[36m           ░░░░░░░░░░░░░░░░░░░░░░░░░░░█████▀\x1b[0m',
-  '\x1b[36m                ░░░░░░░░░░░░░░░░░░░░░░░░▀▀\x1b[0m',
+  '\x1b[36m           ░░░░░░░░░░░░░░░░░░░░░░░░░░░████▀▄██▀\x1b[0m',
+  '\x1b[36m                ░░░░░░░░░░░░░░░░░░░░░░░░▀████▀\x1b[0m',
+  '\x1b[36m                                         ▀████▄\x1b[0m',
+  '\x1b[36m                                           ▀▀\x1b[0m',
 ]
 
 // Model context window sizes (for display)
