@@ -15,24 +15,22 @@ export type OutputMode = 'streaming' | 'json'
 
 const VERSION = '0.2.0'
 
-// Orca — side-view killer whale silhouette
-// Features: dorsal fin, eye patch (●), black body (█), white belly (░), tail flukes
-// Uses Unicode half-block chars for crisp edges + density contrast for color pattern
+// Orca — cute killer whale silhouette, all parts connected
+// Features: dorsal fin, big eye (◕), black body (█), white belly (░), smooth tail taper
 const ORCA_ART = [
-  '\x1b[36m                      ██\x1b[0m',
-  '\x1b[36m                     ████\x1b[0m',
-  '\x1b[36m                    ██████\x1b[0m',
-  '\x1b[36m              ▄▄████████████▄\x1b[0m',
-  '\x1b[36m         ▄████████████████████████▄\x1b[0m',
-  '\x1b[36m      ▄████\x1b[0m \x1b[97m●\x1b[0m \x1b[36m█████████████████████████▄\x1b[0m',
-  '\x1b[36m    ▄████████████████████████████████████████▄\x1b[0m',
-  '\x1b[36m  █████████████████████████████████████████████████\x1b[0m',
-  '\x1b[36m   ░░░░░░░░░░░░░░░░░░░░░░░░░████████████████████████\x1b[0m',
-  '\x1b[36m     ░░░░░░░░░░░░░░░░░░░░░░░░░░████████████████▀\x1b[0m',
-  '\x1b[36m        ░░░░░░░░░░░░░░░░░░░░░░░░░░█████████▀\x1b[0m',
-  '\x1b[36m            ░░░░░░░░░░░░░░░░░░░░░░░░████▀\x1b[0m \x1b[36m▄▀\x1b[0m',
-  '\x1b[36m                 ░░░░░░░░░░░░░░░░░░░░▀\x1b[0m \x1b[36m▄▀\x1b[0m',
-  '\x1b[36m                                      ▀▀\x1b[0m',
+  '\x1b[36m                   ▄▄\x1b[0m',
+  '\x1b[36m                 ▄████▄\x1b[0m',
+  '\x1b[36m                ████████\x1b[0m',
+  '\x1b[36m          ▄▄▄████████████▄▄▄\x1b[0m',
+  '\x1b[36m      ▄████████████████████████▄\x1b[0m',
+  '\x1b[36m   ▄█████\x1b[0m \x1b[97m◕\x1b[36m ██████████████████████▄\x1b[0m',
+  '\x1b[36m  ████████████████████████████████████████▄\x1b[0m',
+  '\x1b[36m █████████████████████████████████████████████\x1b[0m',
+  '\x1b[36m  ░░░░░░░░░░░░░░░░░░░░░░░░░████████████████████\x1b[0m',
+  '\x1b[36m    ░░░░░░░░░░░░░░░░░░░░░░░░░░░████████████████▀\x1b[0m',
+  '\x1b[36m       ░░░░░░░░░░░░░░░░░░░░░░░░░░░░██████████▀\x1b[0m',
+  '\x1b[36m           ░░░░░░░░░░░░░░░░░░░░░░░░░░░█████▀\x1b[0m',
+  '\x1b[36m                ░░░░░░░░░░░░░░░░░░░░░░░░▀▀\x1b[0m',
 ]
 
 // Model context window sizes (for display)
@@ -88,10 +86,11 @@ export async function printRichBanner(opts: {
   const artHeight = ORCA_ART.length
   const maxVisWidth = Math.max(...ORCA_ART.map(l => stripAnsi(l).length))
 
-  // Starting position (right side) and ending position (left side)
-  const startPad = Math.max(0, cols - maxVisWidth - 4)
+  // Starting position (right side, clamped to prevent overflow) and ending position (left side)
+  const maxPad = Math.max(0, cols - maxVisWidth - 2)
+  const startPad = Math.min(maxPad, Math.max(0, cols - maxVisWidth - 4))
   const endPad = 2
-  const amplitude = Math.min(Math.floor((cols - maxVisWidth) / 3), 15)
+  const amplitude = Math.min(Math.floor(maxPad / 4), 12)
 
   // Only animate if terminal is wide enough and interactive
   const canAnimate = process.stdout.isTTY && amplitude > 2 && cols > maxVisWidth + 10
