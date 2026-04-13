@@ -45,7 +45,7 @@ import { ContextMonitor, LoopDetector, classifyError } from '../harness/index.js
 import { ModeRegistry } from '../modes/index.js'
 import { ThreadManager } from '../memory/threads.js'
 import { matchCognitive, formatCognitiveContext } from '../cognitive-skeleton.js'
-import { PostmortemLog } from '../knowledge/index.js'
+import { PostmortemLog, NotesManager, PromptRepository, LearningJournal } from '../knowledge/index.js'
 
 interface ChatOptions {
   model?: string
@@ -206,6 +206,8 @@ async function runREPL(
     '/council', '/race', '/pipeline',
     // System
     '/config', '/init', '/hooks', '/mcp', '/jobs', '/cwd', '/mode', '/thread', '/threads',
+    // Knowledge
+    '/notes', '/postmortem', '/prompts', '/learn',
     // Exit
     '/exit', '/quit', '/retry',
   ]
@@ -1668,6 +1670,116 @@ function handleSlashCommand(
     case '/init': {
       const configPath = initProjectConfig(cwd)
       console.log(`\x1b[90m  created: ${configPath}\x1b[0m`)
+      return 'handled'
+    }
+
+    // ── Knowledge Management Commands ──────────────────────────
+    case '/notes': {
+      const notes = new NotesManager()
+      const subcmd = arg.split(/\s+/)[0] || ''
+      const subarg = arg.slice(subcmd.length).trim()
+
+      if (!subcmd || subcmd === 'list') {
+        const list = notes.list(10)
+        if (list.length === 0) { console.log('\x1b[90m  no notes.\x1b[0m') }
+        else {
+          for (const n of list) {
+            const tags = n.tags.length > 0 ? ` [${n.tags.join(', ')}]` : ''
+            console.log(`\x1b[90m  ${n.id.slice(0, 20)}  ${n.content.slice(0, 60)}${tags}\x1b[0m`)
+          }
+        }
+      } else if (subcmd === 'add') {
+        if (!subarg) { console.log('\x1b[33m  usage: /notes add <content> [#tag1 #tag2]\x1b[0m') }
+        else {
+          const tags = [...subarg.matchAll(/#(\S+)/g)].map(m => m[1]!)
+          const content = subarg.replace(/#\S+/g, '').trim()
+          const note = notes.create(content, tags, undefined, cwd.split('/').pop())
+          console.log(`\x1b[90m  note saved: ${note.id}\x1b[0m`)
+        }
+      } else if (subcmd === 'search') {
+        const results = notes.search(subarg || '', 5)
+        if (results.length === 0) { console.log('\x1b[90m  no matches.\x1b[0m') }
+        else { for (const n of results) console.log(`\x1b[90m  ${n.id.slice(0, 20)}  ${n.content.slice(0, 60)}\x1b[0m`) }
+      } else {
+        console.log('\x1b[33m  usage: /notes [list|add|search]\x1b[0m')
+      }
+      return 'handled'
+    }
+
+    case '/postmortem': {
+      const pmLog = new PostmortemLog()
+      const subcmd = arg.split(/\s+/)[0] || ''
+
+      if (!subcmd || subcmd === 'list') {
+        const list = pmLog.list(10)
+        if (list.length === 0) { console.log('\x1b[90m  no postmortems.\x1b[0m') }
+        else {
+          for (const pm of list) {
+            const sev = { low: '\x1b[90m', medium: '\x1b[33m', high: '\x1b[31m', critical: '\x1b[31;1m' }[pm.severity]
+            console.log(`${sev}  ${pm.id.slice(0, 16)}  ${pm.problem.slice(0, 50)}  applied:${pm.appliedCount}\x1b[0m`)
+          }
+        }
+      } else if (subcmd === 'search') {
+        const query = arg.slice(subcmd.length).trim()
+        const matches = pmLog.match(query)
+        if (matches.length === 0) { console.log('\x1b[90m  no matches.\x1b[0m') }
+        else { console.log(pmLog.formatForContext(matches)) }
+      } else {
+        console.log('\x1b[33m  usage: /postmortem [list|search <error>]\x1b[0m')
+      }
+      return 'handled'
+    }
+
+    case '/prompts': {
+      const repo = new PromptRepository()
+      const subcmd = arg.split(/\s+/)[0] || ''
+      const subarg = arg.slice(subcmd.length).trim()
+
+      if (!subcmd || subcmd === 'list') {
+        const list = repo.list(10)
+        if (list.length === 0) { console.log('\x1b[90m  no prompts saved.\x1b[0m') }
+        else {
+          for (const p of list) {
+            const rate = p.usageCount > 0 ? Math.round((p.successCount / p.usageCount) * 100) : 0
+            console.log(`\x1b[90m  ${p.name.padEnd(20)} [${p.category}]  used:${p.usageCount} success:${rate}%\x1b[0m`)
+          }
+        }
+      } else if (subcmd === 'find') {
+        const found = repo.find(subarg)
+        for (const p of found) console.log(`\x1b[90m  ${p.id}  ${p.name}  [${p.category}]\x1b[0m`)
+      } else {
+        console.log('\x1b[33m  usage: /prompts [list|find <query>]\x1b[0m')
+      }
+      return 'handled'
+    }
+
+    case '/learn': {
+      const journal = new LearningJournal()
+      const subcmd = arg.split(/\s+/)[0] || ''
+      const subarg = arg.slice(subcmd.length).trim()
+
+      if (!subcmd || subcmd === 'rules') {
+        const rules = journal.getPromotedRules()
+        if (rules.length === 0) { console.log('\x1b[90m  no promoted rules yet.\x1b[0m') }
+        else {
+          console.log('\x1b[90m  Promoted rules:\x1b[0m')
+          for (const r of rules) console.log(`\x1b[32m  + ${r.content.slice(0, 70)}\x1b[0m`)
+        }
+      } else if (subcmd === 'observe') {
+        if (!subarg) { console.log('\x1b[33m  usage: /learn observe <observation>\x1b[0m') }
+        else {
+          const entry = journal.observe(subarg, [], cwd.split('/').pop())
+          console.log(`\x1b[90m  recorded: ${entry.id}\x1b[0m`)
+        }
+      } else if (subcmd === 'status') {
+        const obs = journal.listByStatus('observation').length
+        const hyp = journal.listByStatus('hypothesis').length
+        const pro = journal.listByStatus('promoted').length
+        const rej = journal.listByStatus('rejected').length
+        console.log(`\x1b[90m  observations:${obs}  hypotheses:${hyp}  promoted:${pro}  rejected:${rej}\x1b[0m`)
+      } else {
+        console.log('\x1b[33m  usage: /learn [rules|observe|status]\x1b[0m')
+      }
       return 'handled'
     }
 

@@ -16,6 +16,7 @@ import { Command } from 'commander'
 import { getPricingForModel } from '../model-catalog.js'
 import type { OrcaConfig } from '../config.js'
 import { resolveConfig, resolveProvider } from '../config.js'
+import { parseDoneCriteria, runGoalLoop } from '../harness/goal-loop.js'
 import {
   printBanner, printProviderInfo, printError,
   ensureNewline, setLastNewline, printToolUse, printToolResult,
@@ -35,6 +36,7 @@ interface RunOptions {
   json?: boolean
   cwd?: string
   dangerously?: boolean
+  doneWhen?: string
 }
 
 export function createRunCommand(): Command {
@@ -49,6 +51,7 @@ export function createRunCommand(): Command {
     .option('--json', 'Output as NDJSON')
     .option('--cwd <dir>', 'Working directory')
     .option('--dangerously', 'Skip permission prompts (use with caution)')
+    .option('--done-when <criteria>', 'Goal-loop: repeat until criteria met (e.g., "tests pass", "/pattern/", "exit 0: cmd")')
     .action(async (taskParts: string[], opts: RunOptions) => {
       const task = taskParts.join(' ').trim()
       const outputMode: OutputMode = opts.json ? 'json' : 'streaming'
@@ -66,6 +69,46 @@ export function createRunCommand(): Command {
           printProviderInfo(resolved.provider, resolved.model)
         }
 
+        const runCwd = opts.cwd || process.cwd()
+
+        // Goal-loop mode: repeat task until criteria met
+        if (opts.doneWhen) {
+          const criteria = parseDoneCriteria(opts.doneWhen)
+          console.log(`\x1b[36m  goal-loop: ${criteria.type} — "${criteria.value}"\x1b[0m`)
+          console.log(`\x1b[90m  max iterations: ${config.maxTurns}\x1b[0m\n`)
+
+          const result = await runGoalLoop(
+            {
+              maxIterations: Math.min(config.maxTurns || 10, 20),
+              doneCriteria: criteria,
+              cwd: runCwd,
+              onIterationStart: (i, max) => {
+                console.log(`\x1b[36m  ── iteration ${i}/${max} ──\x1b[0m`)
+              },
+              onIterationDone: (i, passed, output) => {
+                const icon = passed ? '\x1b[32mPASS\x1b[0m' : '\x1b[33mFAIL\x1b[0m'
+                console.log(`\x1b[90m  check: ${icon} ${output.slice(0, 100)}\x1b[0m\n`)
+              },
+            },
+            async (iteration, feedback) => {
+              const iterTask = feedback
+                ? `${task}\n\nFeedback from previous iteration: ${feedback}`
+                : task
+              // TODO: wire executeTask to return output text for criteria checking
+              // For now, use a placeholder that runs the criteria command
+              return `Iteration ${iteration}: ${iterTask}`
+            },
+          )
+
+          if (result.success) {
+            console.log(`\x1b[32m  goal-loop: PASSED in ${result.iterations} iteration(s) (${(result.totalDurationMs / 1000).toFixed(1)}s)\x1b[0m`)
+          } else {
+            console.log(`\x1b[31m  goal-loop: ${result.reason} after ${result.iterations} iteration(s)\x1b[0m`)
+            console.log(`\x1b[90m  ${result.lastOutput}\x1b[0m`)
+          }
+          return
+        }
+
         await executeTask({
           task,
           provider: resolved.provider,
@@ -74,7 +117,7 @@ export function createRunCommand(): Command {
           baseURL: resolved.baseURL,
           config,
           outputMode,
-          cwd: opts.cwd || process.cwd(),
+          cwd: runCwd,
           dangerously: opts.dangerously || false,
         })
       } catch (err) {
