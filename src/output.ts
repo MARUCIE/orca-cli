@@ -103,7 +103,7 @@ export async function printRichBanner(opts: {
   configFiles?: string[]
   toolCount?: number
   hookCount?: number
-  mode?: 'yolo' | 'safe'
+  mode?: 'yolo' | 'auto' | 'plan'
 }): Promise<void> {
   const { provider, model, cwd, configFiles, toolCount, hookCount, mode } = opts
   const shortCwd = abbreviatePath(cwd)
@@ -432,7 +432,7 @@ export type ThinkingEffort = 'low' | 'medium' | 'high' | 'max'
 export interface StatusLineInfo {
   model: string
   provider: string
-  mode: 'yolo' | 'safe'
+  mode: 'yolo' | 'auto' | 'plan'
   /** Current context utilization percentage (0-100), from TokenBudgetManager */
   contextPct: number
   /** Model context window size in tokens */
@@ -471,10 +471,12 @@ export function printStatusLine(info: StatusLineInfo): void {
   // Project name (last directory component)
   const project = info.cwd.split('/').filter(Boolean).pop() || '~'
 
-  // Mode
-  const modeTag = info.mode === 'yolo'
-    ? '\x1b[33m▸▸ yolo\x1b[0m'
-    : '\x1b[32m▸▸ safe\x1b[0m'
+  // Mode (Shift+Tab to cycle)
+  const modeColors: Record<string, string> = {
+    yolo: '\x1b[33m', auto: '\x1b[36m', plan: '\x1b[32m',
+  }
+  const modeColor = modeColors[info.mode] || '\x1b[90m'
+  const modeTag = `${modeColor}▸▸ ${info.mode}${RST}`
 
   // Thinking effort indicator — compact single symbol
   const effortDisplay: Record<ThinkingEffort, string> = {

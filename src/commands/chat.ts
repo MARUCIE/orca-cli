@@ -107,7 +107,7 @@ export function createChatCommand(): Command {
               configFiles: configFiles.length > 0 ? configFiles : undefined,
               toolCount: TOOL_DEFINITIONS.length,
               hookCount: hooks.totalHooks || undefined,
-              mode: opts.safe ? 'safe' : 'yolo',
+              mode: opts.safe ? 'auto' : 'yolo',
             })
           }
         }
@@ -232,11 +232,42 @@ async function runREPL(
   rl.on('SIGCONT', () => { /* resume after bg */ })
   rl.on('line', () => { lastHintLen = 0 }) // clear hint state on submit
 
-  // Ctrl+L to clear screen
-  process.stdin.on('keypress', (_ch: string, key: { name?: string; ctrl?: boolean; sequence?: string }) => {
+  // Keyboard shortcuts
+  process.stdin.on('keypress', (_ch: string, key: { name?: string; ctrl?: boolean; shift?: boolean; meta?: boolean; sequence?: string }) => {
+    // Ctrl+L: clear screen
     if (key && key.ctrl && key.name === 'l') {
       process.stdout.write('\x1b[2J\x1b[H')
       rl.prompt()
+      return
+    }
+
+    // Shift+Tab: cycle permission mode (yolo → auto → plan → yolo)
+    if (key && key.name === 'tab' && key.shift) {
+      const idx = PERM_MODES.indexOf(currentPermMode)
+      currentPermMode = PERM_MODES[(idx + 1) % PERM_MODES.length]!
+      const modeColors: Record<PermMode, string> = {
+        yolo: '\x1b[33m', auto: '\x1b[36m', plan: '\x1b[32m',
+      }
+      process.stderr.write(`\r\x1b[2K${modeColors[currentPermMode]}  mode: ${currentPermMode}\x1b[0m\n`)
+      rl.prompt(true)
+      return
+    }
+
+    // Ctrl+Z: quick undo (same as /undo)
+    if (key && key.ctrl && key.name === 'z') {
+      if (lastWrite?.path) {
+        const { path: undoPath, oldContent } = lastWrite
+        try {
+          if (oldContent === null) {
+            unlinkSync(undoPath)
+            process.stderr.write(`\r\x1b[2K\x1b[90m  undo: deleted ${undoPath}\x1b[0m\n`)
+          } else {
+            writeFileSync(undoPath, oldContent, 'utf-8')
+            process.stderr.write(`\r\x1b[2K\x1b[90m  undo: restored ${undoPath}\x1b[0m\n`)
+          }
+          lastWrite = { path: '', oldContent: null }
+        } catch { /* ignore */ }
+      }
       return
     }
 
@@ -311,6 +342,11 @@ async function runREPL(
   let currentEffort: import('../output.js').ThinkingEffort =
     (opts.effort as import('../output.js').ThinkingEffort) || 'high'
 
+  // Permission mode: yolo (auto-approve all) → auto (approve safe, prompt dangerous) → plan (prompt all)
+  type PermMode = 'yolo' | 'auto' | 'plan'
+  const PERM_MODES: PermMode[] = ['yolo', 'auto', 'plan']
+  let currentPermMode: PermMode = opts.safe ? 'auto' : 'yolo'
+
   // SOTA agent intelligence modules
   const tokenBudget = new TokenBudgetManager(currentModel)
   const retryTracker = new RetryTracker(2)
@@ -346,7 +382,7 @@ async function runREPL(
     printStatusLine({
       model: currentModel,
       provider: resolved.provider,
-      mode: opts.safe ? 'safe' : 'yolo',
+      mode: currentPermMode,
       contextPct: budget.utilizationPct,
       contextWindow: budget.contextWindow,
       contextTokens: budget.historyTokensEst,
@@ -788,7 +824,7 @@ async function runREPL(
             progress.addChars(text.length)
           },
           onFileWrite: (path, oldContent) => { lastWrite = { path, oldContent } },
-          safeMode: opts.safe || false,
+          safeMode: currentPermMode !== 'yolo',
           retryTracker,
           loopDetector,
         })
@@ -954,6 +990,8 @@ function handleSlashCommand(
       console.log(row('/doctor   Health check',           'Tab       Auto-complete'))
       console.log(row('/retry    Retry last message',     '```       Multi-line input'))
       console.log(row('/exit     Quit',                   'Ctrl+L    Clear screen'))
+      console.log(row('',                                 'Ctrl+Z    Undo last write'))
+      console.log(row('',                                 'Shift+Tab Mode cycle'))
       console.log(r)
       return 'handled'
     }
