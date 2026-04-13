@@ -458,12 +458,13 @@ src/
 | Hooks system | **Yes** | No | No | No | No | **8 events** | Parity |
 | CJK-aware token estimation | No | No | No | No | No | **Yes** | **LEAD** |
 | Universal file preprocessing | No | No | No | No | No | **L0→L2 any-format→MD** | **LEAD** |
+| File reference expansion | **Yes** | **Yes** | No | No | No | **bare path + file:/// + stdin pipe + embedded** | Parity |
 
 ### Gap Summary
 
 **LEAD areas (7)**: Multi-model collaboration, task auto-decomposition, context protection, cognitive skeleton, knowledge management, CJK support, universal file preprocessing
 
-**Parity areas (8)**: Mission mode, concurrent execution, goal-loop, validation contract, hooks, git worktree isolation, sandbox security, MCP tool bridge
+**Parity areas (9)**: Mission mode, concurrent execution, goal-loop, validation contract, hooks, git worktree isolation, sandbox security, MCP tool bridge, file reference expansion
 
 **GAP areas (1)**: IDE integration (VS Code extension)
 
@@ -494,6 +495,7 @@ src/
 | v0.8.0 UI/UX overhaul | DONE | Box-drawing, compact status, clean help |
 | v0.8.0 915 tests | DONE | 50 files, all passing |
 | v0.8.0 Universal file preprocessing | DONE | L0 detect (70+ ext) → L1 convert (markitdown/pandoc/ffmpeg) → L2 smart truncate |
+| v0.8.0 File reference expansion | DONE | bare path + file:///URL + stdin pipe + embedded path detection (Claude Code/Codex parity) |
 
 ---
 
