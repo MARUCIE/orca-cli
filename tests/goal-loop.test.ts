@@ -1,0 +1,172 @@
+/**
+ * Round 30: Goal-Loop Controller + Sub-Agent Safety — 16 tests
+ *
+ * Covers:
+ *   1. Done-criteria parsing — 6 tests
+ *   2. Criteria evaluation — 4 tests
+ *   3. Goal-loop execution — 6 tests
+ */
+
+import { describe, it, expect } from 'vitest'
+import { parseDoneCriteria, evaluateCriteria, runGoalLoop } from '../src/harness/goal-loop.js'
+import type { DoneCriteria, GoalLoopConfig } from '../src/harness/goal-loop.js'
+
+// ── 1. Done-Criteria Parsing ─────────────────────────────────────
+
+describe('parseDoneCriteria: natural language → structured criteria', () => {
+  it('30.1 "tests pass" → command: npm test', () => {
+    const c = parseDoneCriteria('tests pass')
+    expect(c.type).toBe('command')
+    expect(c.value).toBe('npm test')
+  })
+
+  it('30.2 "lint clean" → command: npm run lint', () => {
+    const c = parseDoneCriteria('lint clean')
+    expect(c.type).toBe('command')
+    expect(c.value).toBe('npm run lint')
+  })
+
+  it('30.3 "typecheck passes" → command: npx tsc --noEmit', () => {
+    const c = parseDoneCriteria('typecheck passes')
+    expect(c.type).toBe('command')
+    expect(c.value).toBe('npx tsc --noEmit')
+  })
+
+  it('30.4 "/pattern/" → regex', () => {
+    const c = parseDoneCriteria('/all tests passed/')
+    expect(c.type).toBe('regex')
+    expect(c.value).toBe('all tests passed')
+  })
+
+  it('30.5 "exit 0: make build" → command: make build', () => {
+    const c = parseDoneCriteria('exit 0: make build')
+    expect(c.type).toBe('command')
+    expect(c.value).toBe('make build')
+  })
+
+  it('30.6 arbitrary string → regex fallback', () => {
+    const c = parseDoneCriteria('DONE')
+    expect(c.type).toBe('regex')
+    expect(c.value).toBe('DONE')
+  })
+})
+
+// ── 2. Criteria Evaluation ───────────────────────────────────────
+
+describe('evaluateCriteria: check conditions', () => {
+  it('30.7 regex matches in agent output', () => {
+    const criteria: DoneCriteria = { type: 'regex', value: 'all.*passed' }
+    const result = evaluateCriteria(criteria, 'Output: all 5 tests passed!', '/tmp')
+    expect(result.passed).toBe(true)
+  })
+
+  it('30.8 regex does not match', () => {
+    const criteria: DoneCriteria = { type: 'regex', value: 'PASS' }
+    const result = evaluateCriteria(criteria, 'All tests FAILED', '/tmp')
+    expect(result.passed).toBe(false)
+  })
+
+  it('30.9 command succeeds (echo exits 0)', () => {
+    const criteria: DoneCriteria = { type: 'command', value: 'echo ok' }
+    const result = evaluateCriteria(criteria, '', '/tmp')
+    expect(result.passed).toBe(true)
+    expect(result.output).toContain('ok')
+  })
+
+  it('30.10 command fails (false exits 1)', () => {
+    const criteria: DoneCriteria = { type: 'command', value: 'false' }
+    const result = evaluateCriteria(criteria, '', '/tmp')
+    expect(result.passed).toBe(false)
+  })
+})
+
+// ── 3. Goal-Loop Execution ───────────────────────────────────────
+
+describe('runGoalLoop: criteria-driven autonomous execution', () => {
+  it('30.11 succeeds on first iteration when criteria met', async () => {
+    const config: GoalLoopConfig = {
+      maxIterations: 5,
+      doneCriteria: { type: 'regex', value: 'DONE' },
+      cwd: '/tmp',
+    }
+    const result = await runGoalLoop(config, async () => 'Task DONE successfully')
+    expect(result.success).toBe(true)
+    expect(result.iterations).toBe(1)
+    expect(result.reason).toBe('criteria_met')
+  })
+
+  it('30.12 succeeds on third iteration', async () => {
+    let call = 0
+    const config: GoalLoopConfig = {
+      maxIterations: 5,
+      doneCriteria: { type: 'regex', value: 'COMPLETE' },
+      cwd: '/tmp',
+    }
+    const result = await runGoalLoop(config, async () => {
+      call++
+      return call >= 3 ? 'Task COMPLETE' : 'Still working...'
+    })
+    expect(result.success).toBe(true)
+    expect(result.iterations).toBe(3)
+  })
+
+  it('30.13 stops at max iterations', async () => {
+    let call = 0
+    const config: GoalLoopConfig = {
+      maxIterations: 2,  // 2 iterations: failure 1 (continue) + failure 2 (pivot) → hits max before escalate at 3
+      doneCriteria: { type: 'regex', value: 'IMPOSSIBLE' },
+      cwd: '/tmp',
+    }
+    const result = await runGoalLoop(config, async () => {
+      call++
+      return `Attempt ${call}: different progress`
+    })
+    expect(result.success).toBe(false)
+    expect(result.iterations).toBe(2)
+    expect(result.reason).toBe('max_iterations')
+  })
+
+  it('30.14 detects stuck and escalates', async () => {
+    const config: GoalLoopConfig = {
+      maxIterations: 10,
+      doneCriteria: { type: 'regex', value: 'DONE' },
+      cwd: '/tmp',
+    }
+    // Same failure message every time triggers loop detector
+    const result = await runGoalLoop(config, async () => 'Same error')
+    expect(result.success).toBe(false)
+    expect(result.reason).toBe('stuck')
+    expect(result.iterations).toBeLessThanOrEqual(4) // 3 failures → escalate
+  })
+
+  it('30.15 handles error in iteration', async () => {
+    const config: GoalLoopConfig = {
+      maxIterations: 5,
+      doneCriteria: { type: 'regex', value: 'DONE' },
+      cwd: '/tmp',
+    }
+    const result = await runGoalLoop(config, async () => {
+      throw new Error('API timeout')
+    })
+    expect(result.success).toBe(false)
+    expect(result.reason).toBe('error')
+    expect(result.lastOutput).toContain('API timeout')
+  })
+
+  it('30.16 passes feedback from previous iteration', async () => {
+    const feedbacks: Array<string | undefined> = []
+    const config: GoalLoopConfig = {
+      maxIterations: 3,
+      doneCriteria: { type: 'regex', value: 'DONE' },
+      cwd: '/tmp',
+    }
+    let call = 0
+    await runGoalLoop(config, async (_i, feedback) => {
+      feedbacks.push(feedback)
+      call++
+      return call >= 3 ? 'DONE' : 'not yet'
+    })
+    expect(feedbacks[0]).toBeUndefined() // first iteration has no feedback
+    expect(feedbacks[1]).toContain('did not meet criteria')
+  })
+})

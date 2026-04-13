@@ -16,3 +16,6 @@ export type { ErrorCategory, ClassifiedError } from './error-classifier.js'
 
 export { runVerificationGate, quickVerify } from './verification-gate.js'
 export type { CheckName, CheckResult, VerificationResult } from './verification-gate.js'
+
+export { runGoalLoop, parseDoneCriteria, evaluateCriteria } from './goal-loop.js'
+export type { DoneCriteria, GoalLoopConfig, GoalLoopResult } from './goal-loop.js'

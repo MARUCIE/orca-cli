@@ -17,6 +17,7 @@ export interface SubAgentConfig {
   model?: string         // default: inherit from parent
   tools?: string[]       // tool name whitelist (default: read-only tools)
   timeout?: number       // ms, default 60000
+  maxTurns?: number      // max agentic loop iterations (default: 15)
   cwd: string
 }
 
@@ -36,15 +37,17 @@ export interface WorkerRequest {
   baseURL: string
   systemPrompt: string
   tools: string[]
+  maxTurns: number
   cwd: string
 }
 
 /** IPC message sent from worker back to parent. */
 export interface WorkerResponse {
-  type: 'result'
+  type: 'result' | 'progress'
   success: boolean
   output: string
   tokensUsed: number
+  toolCalls?: number
 }
 
 // ── Read-only tool whitelist (safe for explore-type agents) ──
@@ -126,6 +129,11 @@ export function spawnSubAgent(
 
     child.on('message', (msg: WorkerResponse) => {
       if (settled) return
+      if (msg.type === 'progress') {
+        // Progress update — log but don't resolve
+        process.stderr.write(`\x1b[90m  sub-agent: ${msg.toolCalls || 0} tool calls, ${msg.tokensUsed} tokens\x1b[0m\r`)
+        return
+      }
       if (msg.type === 'result') {
         settled = true
         clearTimeout(timer)
@@ -173,6 +181,7 @@ export function spawnSubAgent(
       baseURL: parentContext.baseURL,
       systemPrompt: `You are a focused sub-agent. Complete the following task concisely. Use tools when needed. Working directory: ${config.cwd}`,
       tools: config.tools || READ_ONLY_TOOLS,
+      maxTurns: config.maxTurns ?? 15,
       cwd: config.cwd,
     }
 
