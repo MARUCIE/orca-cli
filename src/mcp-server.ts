@@ -67,7 +67,7 @@ export class MCPServer {
           id: req.id,
           result: {
             capabilities: { tools: {} },
-            serverInfo: { name: 'orca-cli', version: '0.6.0' },
+            serverInfo: { name: 'orca-cli', version: '0.7.1' },
           },
         }
 

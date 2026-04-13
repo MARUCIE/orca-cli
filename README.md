@@ -6,7 +6,7 @@ The one CLI that can do what no single-vendor CLI can: ask Claude, GPT, and Gemi
 
 ```
        ..:::....
-    .::------::::..          Orca  v0.6.0
+    .::------::::..          Orca  v0.7.1
   .::--========----::::..    provider-neutral agent runtime
 .:--==+++*****+++===---::::..
 .:-=++**#########**++==---::..

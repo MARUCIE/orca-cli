@@ -24,7 +24,7 @@ import { gatherDoctorReport } from '../src/doctor.js'
 describe('version consistency', () => {
   it('16.1 package.json version matches 0.3.0', () => {
     const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'))
-    expect(pkg.version).toBe('0.6.0')
+    expect(pkg.version).toBe('0.7.1')
   })
 
   it('16.2 Commander program version matches package.json', () => {

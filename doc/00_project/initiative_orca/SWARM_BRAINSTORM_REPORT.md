@@ -355,13 +355,13 @@ Versions:   0.6.0 aligned across 5 files
 
 ### Cumulative Progress (v0.3.0 → v0.6.0)
 
-| Metric | v0.3.0 | v0.6.0 | Delta |
-|---|---|---|---|
-| Source files | 37 | 63 | +26 |
-| Source LOC | 7,200 | 13,000+ | +5,800 |
-| Test files | 36 | 44 | +8 |
-| Tests | 493 | 668 | +175 |
-| SOTA gaps | 6 open | 0 open | ALL CLOSED |
+| Metric | v0.3.0 | v0.6.0 | v0.7.1 | Delta |
+|---|---|---|---|---|
+| Source files | 37 | 63 | 70+ | +33 |
+| Source LOC | 7,200 | 13,000+ | 15,000+ | +7,800 |
+| Test files | 36 | 44 | 47 | +11 |
+| Tests | 493 | 668 | 732 | +239 |
+| SOTA gaps | 6 open | 0 open | 0 open | ALL CLOSED |
 
 ---
 

@@ -35,7 +35,7 @@ const RST = '\x1b[0m'
 
 // ── Banner ──────────────────────────────────────────────────────────
 
-const VERSION = '0.6.0'
+const VERSION = '0.7.1'
 
 // Orca — cute killer whale with dorsal fin, eye patch, body, belly, and iconic tail flukes
 // Tail section: body narrows → peduncle → flukes fork up/down (whale signature)
