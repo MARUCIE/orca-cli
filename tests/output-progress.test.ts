@@ -180,9 +180,9 @@ describe('ProgressIndicator', () => {
 
       indicator.stop()
 
-      // Should have written a clear line
+      // Should have written ANSI clear sequence (save cursor + clear line + restore)
       const output = mockStderr.join('')
-      expect(output).toContain('\r') // Carriage return to clear
+      expect(output).toContain('\x1b[2K') // ANSI: clear entire line
     })
   })
 

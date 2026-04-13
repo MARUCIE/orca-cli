@@ -598,7 +598,6 @@ export class ProgressIndicator {
     const frame = frames[this.spinIdx % frames.length]!
     this.spinIdx++
 
-    // Show "esc to interrupt" only for first 5 seconds, then just "esc"
     const age = Date.now() - this.startTime
     const hint = age < 5000 ? 'esc to interrupt' : 'esc'
 
@@ -606,14 +605,15 @@ export class ProgressIndicator {
     if (this.phase === 'thinking') {
       line = `  ${frame} Thinking... (${elapsed} • ${hint})`
     } else {
-      // Token count already CJK-aware from addText()
       const tokStr = this.tokenCount > 0 ? ` · ↓ ${this.tokenCount.toLocaleString()} tokens` : ''
       line = `  ${frame} Working (${elapsed}${tokStr} • ${hint})`
     }
 
-    // Write to stderr to avoid polluting stdout's streamed text
+    // Render on a dedicated line below stdout output:
+    // Save cursor → move to next line → write status → restore cursor
+    // This prevents progress text from mixing with streamed LLM output
     const clearLen = Math.max(this.lastLineLen, line.length)
-    process.stderr.write(`\r\x1b[90m${line.padEnd(clearLen)}\x1b[0m`)
+    process.stderr.write(`\x1b[s\n\x1b[90m${line.padEnd(clearLen)}\x1b[0m\x1b[u`)
     this.lastLineLen = line.length
   }
 
@@ -624,7 +624,8 @@ export class ProgressIndicator {
       this.interval = null
     }
     if (this.lastLineLen > 0) {
-      process.stderr.write(`\r${' '.repeat(this.lastLineLen)}\r`)
+      // Clear the status line below: save → down → clear line → restore
+      process.stderr.write(`\x1b[s\n\x1b[2K\x1b[u`)
       this.lastLineLen = 0
     }
     return { elapsed: Date.now() - this.startTime, tokens: this.tokenCount }
