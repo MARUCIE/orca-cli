@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orca SOTA Architecture -- Gap Analysis v0.8.0</title>
+  <style>
+    :root {
+      --bg: #FAFAFA;
+      --fg: #1A1A1A;
+      --accent: #0066CC;
+      --muted: #6B7280;
+      --border: #E5E7EB;
+      --lead: #059669;
+      --parity: #D97706;
+      --gap: #DC2626;
+      --done: #059669;
+      --card-bg: #FFFFFF;
+      --code-bg: #F3F4F6;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.7;
+      padding: 60px 20px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+    h1 span { color: var(--accent); }
+    .subtitle {
+      color: var(--muted);
+      font-size: 15px;
+      margin-bottom: 48px;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 48px 0 20px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 32px 0 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Stats cards */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin: 20px 0 32px;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+    .stat-card .value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .stat-card .label {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* Gap matrix table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    th {
+      background: var(--code-bg);
+      font-weight: 600;
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 2px solid var(--border);
+    }
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:hover td { background: #F9FAFB; }
+
+    /* Gap badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .badge-lead { background: #D1FAE5; color: var(--lead); }
+    .badge-parity { background: #FEF3C7; color: var(--parity); }
+    .badge-gap { background: #FEE2E2; color: var(--gap); }
+    .badge-done { background: #D1FAE5; color: var(--done); }
+
+    /* Architecture diagram */
+    .arch-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-x: auto;
+      white-space: pre;
+      margin: 16px 0;
+    }
+
+    /* Summary cards */
+    .summary-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .summary-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .summary-card h4 {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .summary-card ul {
+      list-style: none;
+      padding: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .summary-card ul li { padding: 2px 0; }
+    .summary-card ul li::before { margin-right: 6px; }
+    .lead-card h4 { color: var(--lead); }
+    .lead-card ul li::before { content: "+"; color: var(--lead); }
+    .parity-card h4 { color: var(--parity); }
+    .parity-card ul li::before { content: "="; color: var(--parity); }
+    .gap-card h4 { color: var(--gap); }
+    .gap-card ul li::before { content: "-"; color: var(--gap); }
+
+    /* Milestone list */
+    .milestone {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .milestone .ver {
+      font-weight: 600;
+      color: var(--accent);
+      min-width: 50px;
+    }
+    .milestone .desc { flex: 1; }
+    .milestone .evidence { color: var(--muted); font-size: 13px; }
+
+    footer {
+      text-align: center;
+      padding: 60px 20px 40px;
+      color: #9B9B9D;
+      font-size: 13px;
+      line-height: 2.2;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Orca <span>SOTA</span> Architecture</h1>
+<p class="subtitle">竞品差距分析与升级路线 -- v0.8.0 | 2026-04-13</p>
+
+<h2>当前状态</h2>
+
+<div class="stats">
+  <div class="stat-card">
+    <div class="value">0.8.0</div>
+    <div class="label">版本</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">16,722</div>
+    <div class="label">代码行数</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">915</div>
+    <div class="label">测试用例</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">14</div>
+    <div class="label">模块目录</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">41+</div>
+    <div class="label">工具数</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">30+</div>
+    <div class="label">斜杠命令</div>
+  </div>
+</div>
+
+<h2>架构总览</h2>
+
+<div class="arch-box">
++-------------------------------------------------------------+
+|  OrcaOS  v0.8.0  (L3: Platform Layer)                       |
+|  Gateway + Webhook + Telegram + Discord + HTTP serve         |
++-------------------------------------------------------------+
+|  Orca CLI  v0.8.0  (L2: User-Facing CLI)                    |
+|  Mission Mode + Task Planner + Council/Race/Pipeline         |
+|  30+ slash commands + Cognitive Skeleton + Knowledge Mgmt    |
++-------------------------------------------------------------+
+|  Orca Agent SDK  (L1: Core Runtime)                          |
+|  Harness Layer + Sub-Agent Isolation + Goal-Loop             |
+|  Token Budget + Nuclear Compact + Verification Gate          |
++-------------------------------------------------------------+
+|  OpenAI-compat Provider + SQLite Usage + 9 Providers         |
+|  SSE streaming + 413 auto-recovery + CJK-aware estimation    |
++-------------------------------------------------------------+</div>
+
+<h2>SOTA 竞品差距矩阵</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>能力维度</th>
+      <th>Claude Code</th>
+      <th>Codex</th>
+      <th>Factory Droid</th>
+      <th>Orca v0.8.0</th>
+      <th>差距</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>多模型协作路由</td>
+      <td>--</td><td>--</td><td>--</td>
+      <td><strong>Council / Race / Pipeline</strong></td>
+      <td><span class="badge badge-lead">LEAD</span></td>
+    </tr>
+    <tr>
+      <td>任务自动拆分（Task Planner）</td>
+      <td>--</td><td>--</td><td>--</td>
+      <td><strong>自动分解 + 并发执行</strong></td>
+      <td><span class="badge badge-lead">LEAD</span></td>
+    </tr>
+    <tr>
+      <td>上下文核弹保护</td>
+      <td>Auto-compact</td><td>--</td><td>--</td>
+      <td><strong>4 层 + Nuclear + 413 自动恢复</strong></td>
+      <td><span class="badge badge-lead">LEAD</span></td>
+    </tr>
+    <tr>
+      <td>认知骨架（Cognitive Skeleton）</td>
+      <td>--</td><td>--</td><td>--</td>
+      <td><strong>9 场景 x 4 心智模型</strong></td>
+      <td><span class="badge badge-lead">LEAD</span></td>
+    </tr>
+    <tr>
+      <td>知识管理体系</td>
+      <td>Memory</td><td>--</td><td>--</td>
+      <td><strong>笔记 / 事后复盘 / 提示库 / 学习日志</strong></td>
+      <td><span class="badge badge-lead">LEAD</span></td>
+    </tr>
+    <tr>
+      <td>CJK 感知 Token 估算</td>
+      <td>--</td><td>--</td><td>--</td>
+      <td><strong>中日韩 1.5 字/token</strong></td>
+      <td><span class="badge badge-lead">LEAD</span></td>
+    </tr>
+    <tr>
+      <td>Mission 模式（多步自治）</td>
+      <td>Sub-agents</td><td>Codex Tasks</td><td><strong>Droid Missions</strong></td>
+      <td><strong>Orchestrator / Worker / Validator</strong></td>
+      <td><span class="badge badge-parity">Parity</span></td>
+    </tr>
+    <tr>
+      <td>并发任务执行</td>
+      <td>--</td><td>--</td><td>Worker Pool</td>
+      <td><strong>executePlan() main+side</strong></td>
+      <td><span class="badge badge-parity">Parity</span></td>
+    </tr>
+    <tr>
+      <td>目标循环（Goal-Loop）</td>
+      <td>--</td><td>Codex Loop</td><td>Droid Loop</td>
+      <td><strong>runGoalLoop (regex/cmd/judge)</strong></td>
+      <td><span class="badge badge-parity">Parity</span></td>
+    </tr>
+    <tr>
+      <td>验证契约优先</td>
+      <td>--</td><td>--</td><td><strong>Yes</strong></td>
+      <td><strong>ValidationContract FIRST</strong></td>
+      <td><span class="badge badge-parity">Parity</span></td>
+    </tr>
+    <tr>
+      <td>Hook 系统（8 事件）</td>
+      <td><strong>Yes</strong></td><td>--</td><td>--</td>
+      <td><strong>8 events lifecycle</strong></td>
+      <td><span class="badge badge-parity">Parity</span></td>
+    </tr>
+    <tr>
+      <td>Git Worktree 隔离</td>
+      <td><strong>Yes</strong></td><td>--</td><td>Yes</td>
+      <td>Planned</td>
+      <td><span class="badge badge-gap">GAP</span></td>
+    </tr>
+    <tr>
+      <td>沙箱安全（Seatbelt / bwrap）</td>
+      <td><strong>Yes</strong></td><td><strong>Yes</strong></td><td>Yes</td>
+      <td>Planned</td>
+      <td><span class="badge badge-gap">GAP</span></td>
+    </tr>
+    <tr>
+      <td>MCP Server 生态</td>
+      <td><strong>Mature</strong></td><td>--</td><td>--</td>
+      <td>Basic</td>
+      <td><span class="badge badge-gap">GAP</span></td>
+    </tr>
+    <tr>
+      <td>IDE 集成（VS Code）</td>
+      <td><strong>Yes</strong></td><td><strong>Yes</strong></td><td>--</td>
+      <td>--</td>
+      <td><span class="badge badge-gap">GAP</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>差距总结</h2>
+
+<div class="summary-row">
+  <div class="summary-card lead-card">
+    <h4>LEAD -- 领先 (6)</h4>
+    <ul>
+      <li>多模型协作路由</li>
+      <li>任务自动拆分</li>
+      <li>上下文核弹保护</li>
+      <li>认知骨架</li>
+      <li>知识管理体系</li>
+      <li>CJK Token 估算</li>
+    </ul>
+  </div>
+  <div class="summary-card parity-card">
+    <h4>Parity -- 持平 (5)</h4>
+    <ul>
+      <li>Mission 多步自治</li>
+      <li>并发任务执行</li>
+      <li>目标循环</li>
+      <li>验证契约优先</li>
+      <li>Hook 事件系统</li>
+    </ul>
+  </div>
+  <div class="summary-card gap-card">
+    <h4>GAP -- 待追赶 (4)</h4>
+    <ul>
+      <li>Git Worktree 隔离</li>
+      <li>沙箱安全执行</li>
+      <li>MCP Server 生态</li>
+      <li>IDE 集成</li>
+    </ul>
+  </div>
+</div>
+
+<h2>v0.9.0 优先目标</h2>
+
+<table>
+  <thead>
+    <tr><th>优先级</th><th>功能</th><th>对标竞品</th><th>预估代码量</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>P0</strong></td><td>Git Worktree Agent Teams</td><td>Claude Code</td><td>~800 LOC</td></tr>
+    <tr><td><strong>P0</strong></td><td>Seatbelt / bwrap 沙箱</td><td>Codex CLI</td><td>~600 LOC</td></tr>
+    <tr><td>P1</td><td>MCP Server 发现 + 自动连接</td><td>Claude Code</td><td>~500 LOC</td></tr>
+    <tr><td>P1</td><td>VS Code Extension 骨架</td><td>Amp</td><td>~1000 LOC</td></tr>
+    <tr><td>P2</td><td>DNA Capsule 跨 Agent 继承</td><td>Factory Droid</td><td>~400 LOC</td></tr>
+    <tr><td>P2</td><td>Webhook Gateway（Telegram / Discord）</td><td>Hermes</td><td>~600 LOC</td></tr>
+  </tbody>
+</table>
+
+<h2>已达成里程碑 (v0.4.0 → v0.8.0)</h2>
+
+<div class="milestone"><span class="ver">v0.4</span><span class="desc">Harness 工程层</span><span class="badge badge-done">DONE</span><span class="evidence">VerificationGate + LoopDetector + ContextMonitor + ErrorClassifier</span></div>
+<div class="milestone"><span class="ver">v0.4</span><span class="desc">Sub-Agent 进程隔离</span><span class="badge badge-done">DONE</span><span class="evidence">spawnSubAgent with fork + IPC + maxTurns</span></div>
+<div class="milestone"><span class="ver">v0.5</span><span class="desc">Skills 执行引擎</span><span class="badge badge-done">DONE</span><span class="evidence">ModeRegistry + command picker</span></div>
+<div class="milestone"><span class="ver">v0.5</span><span class="desc">会话恢复</span><span class="badge badge-done">DONE</span><span class="evidence">orca chat -c + auto-save</span></div>
+<div class="milestone"><span class="ver">v0.6</span><span class="desc">知识管理系统</span><span class="badge badge-done">DONE</span><span class="evidence">Notes + Postmortem + Prompts + Learning Journal</span></div>
+<div class="milestone"><span class="ver">v0.7</span><span class="desc">认知骨架</span><span class="badge badge-done">DONE</span><span class="evidence">9 scenarios x 4 models, always-on hook</span></div>
+<div class="milestone"><span class="ver">v0.7</span><span class="desc">Goal-Loop 控制器</span><span class="badge badge-done">DONE</span><span class="evidence">orca run --done-when (regex / command / judge)</span></div>
+<div class="milestone"><span class="ver">v0.7</span><span class="desc">上下文 4 层保护</span><span class="badge badge-done">DONE</span><span class="evidence">L1 工具截断 + L2 预发送 + L3 PostToolUse + L4 413 恢复</span></div>
+<div class="milestone"><span class="ver">v0.8</span><span class="desc">Mission Mode</span><span class="badge badge-done">DONE</span><span class="evidence">Orchestrator / Worker / Validator, validation contract first</span></div>
+<div class="milestone"><span class="ver">v0.8</span><span class="desc">Task Planner</span><span class="badge badge-done">DONE</span><span class="evidence">Auto-decompose + concurrent executor + visual checklist</span></div>
+<div class="milestone"><span class="ver">v0.8</span><span class="desc">Nuclear Compact</span><span class="badge badge-done">DONE</span><span class="evidence">>100% utilization -> drop all except system + last user</span></div>
+<div class="milestone"><span class="ver">v0.8</span><span class="desc">UI/UX 全面升级</span><span class="badge badge-done">DONE</span><span class="evidence">Box-drawing / compact status / clean help / quiet hooks</span></div>
+<div class="milestone"><span class="ver">v0.8</span><span class="desc">915 测试全绿</span><span class="badge badge-done">DONE</span><span class="evidence">50 files, 119 deep edge-case tests added</span></div>
+
+<footer>
+  <p>Orca CLI v0.8.0 -- SOTA Gap Analysis</p>
+  <p>Maurice | maurice_wen@proton.me</p>
+  <p style="font-size:12px; margin-top:8px;">Generated 2026-04-13 | Data source: git log + test suite + competitor research</p>
+</footer>
+
+</body>
+</html>
