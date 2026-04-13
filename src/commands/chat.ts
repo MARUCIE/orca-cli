@@ -776,9 +776,12 @@ async function runREPL(
   // Used by tool-level read guard to prevent duplicate reads that explode context.
   const sessionInjectedPaths = new Set<string>()
 
-  // ── Status Bar (transitional: inline until ink Phase 2) ────────
+  // ── UI Layer: ink (TTY) or legacy (pipe/non-interactive) ────────
 
-  const getStatusText = (): string => {
+  const { ChatSessionEmitter } = await import('../ui/session.js')
+  const session = new ChatSessionEmitter()
+
+  const getStatusInfo = (): import('../ui/types.js').StatusInfo => {
     const budget = tokenBudget.getBudget(history)
     const pricing = getPricingForModel(currentModel)
     let costUsd = 0
@@ -786,28 +789,70 @@ async function runREPL(
       costUsd = (stats.totalInputTokens / 1_000_000) * pricing[0]
              + (stats.totalOutputTokens / 1_000_000) * pricing[1]
     }
-    const modelShort = currentModel.length > 22 ? currentModel.slice(0, 20) + '..' : currentModel
-    const pct = Math.min(100, budget.utilizationPct)
-    const branchTag = gitBranch ? `(${gitBranch})` : ''
-    const costTag = costUsd > 0 ? `$${costUsd < 0.01 ? costUsd.toFixed(4) : costUsd.toFixed(2)}` : ''
-    return [modelShort, `ctx ${pct}%`, currentPermMode, branchTag, costTag].filter(Boolean).join('  ·  ')
+    return {
+      model: currentModel,
+      contextPct: Math.min(100, budget.utilizationPct),
+      permMode: currentPermMode,
+      gitBranch,
+      costUsd,
+      tokPerSec: lastTokPerSec,
+      turns: stats.turns,
+    }
   }
 
+  // Choose renderer based on environment
+  const useInk = process.stdout.isTTY && outputMode !== 'json' && !process.env.ORCA_NO_INK
+  let inkInstance: { unmount: () => void; waitUntilExit: () => Promise<void>; clear: () => void } | null = null
+
+  if (useInk) {
+    const { renderInkApp } = await import('../ui/render.js')
+    inkInstance = renderInkApp(session, getStatusInfo())
+  } else {
+    const { attachLegacyRenderer } = await import('../ui/legacy-renderer.js')
+    attachLegacyRenderer(session)
+  }
+
+  // Update status bar periodically (ink re-renders on state change)
+  const emitStatus = () => session.emitStatusUpdate(getStatusInfo())
+
   const renderStatusAndPrompt = (): string => {
+    if (useInk) {
+      // ink handles rendering — just return empty prompt (not used in ink mode)
+      emitStatus()
+      return ''
+    }
+    // Legacy: inline status separator
     const cols = process.stdout.columns || 80
-    const statusText = ` ${getStatusText()} `
+    const statusParts = [
+      currentModel.length > 22 ? currentModel.slice(0, 20) + '..' : currentModel,
+      `ctx ${getStatusInfo().contextPct}%`,
+      currentPermMode,
+      gitBranch || '',
+      getStatusInfo().costUsd > 0
+        ? (getStatusInfo().costUsd < 0.01 ? `$${getStatusInfo().costUsd.toFixed(4)}` : `$${getStatusInfo().costUsd.toFixed(2)}`)
+        : '',
+    ].filter(Boolean).join('  ·  ')
+    const statusText = ` ${statusParts} `
     const leftPad = 2
     const rightFill = Math.max(0, cols - leftPad - statusText.length)
     console.log(`\x1b[90m${'─'.repeat(leftPad)}${statusText}${'─'.repeat(rightFill)}\x1b[0m`)
     return `${theme.prompt}❯\x1b[0m `
   }
 
-  const promptUser = (): Promise<string | null> => new Promise((resolve) => {
-    if (stdinEnded) { resolve(null); return }
-    const promptStr = renderStatusAndPrompt()
-    rl.question(promptStr, (answer) => resolve(answer.trim()))
-    rl.once('close', () => resolve(null))
-  })
+  const promptUser = (): Promise<string | null> => {
+    if (useInk) {
+      // ink mode: delegate input to ink InputArea via emitter
+      emitStatus()
+      return session.waitForInput()
+    }
+    // Legacy readline mode
+    return new Promise((resolve) => {
+      if (stdinEnded) { resolve(null); return }
+      const promptStr = renderStatusAndPrompt()
+      rl.question(promptStr, (answer) => resolve(answer.trim()))
+      rl.once('close', () => resolve(null))
+    })
+  }
 
   // ── Progressive Loading: prompt first, heavy init in background ──
   // Hooks: sync file reads (fast, <50ms)
@@ -1510,6 +1555,7 @@ async function runREPL(
           contextMonitor,
           extraToolDefs: mcpToolDefs,
           injectedPaths: sessionInjectedPaths,
+          session: useInk ? session : undefined,
         })
         stats.turns++
         stats.totalInputTokens += result.inputTokens
@@ -1655,6 +1701,7 @@ async function runREPL(
   }
 
   // Cleanup
+  if (inkInstance) inkInstance.unmount()
   saveInputHistory(historyFile, inputHistory)
   rl.close()
 }
@@ -2526,10 +2573,12 @@ interface ProxyTurnOptions {
   extraToolDefs?: Array<Record<string, unknown>>
   /** Files already injected by file expansion — tool reads on these return dedup message */
   injectedPaths?: Set<string>
+  /** Session emitter for ink UI — when set, streaming events go to ink instead of stdout */
+  session?: import('../ui/session.js').ChatSessionEmitter
 }
 
 async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: number; outputTokens: number }> {
-  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onStreamToken, onFileWrite, safeMode, retryTracker, loopDetector, tokenBudget, contextMonitor, extraToolDefs, injectedPaths } = options
+  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onStreamToken, onFileWrite, safeMode, retryTracker, loopDetector, tokenBudget, contextMonitor, extraToolDefs, injectedPaths, session: emitterOpt } = options
 
   const startTime = Date.now()
   let inputTokens = 0
@@ -2788,32 +2837,51 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
           gotFirstToken = true
         }
         if (event.text) {
-          md.push(event.text)
           responseText += event.text
+          if (emitterOpt) {
+            emitterOpt.emitText(event.text)
+          } else {
+            md.push(event.text)
+          }
           if (onStreamToken) onStreamToken(event.text)
         }
         break
-      case 'tool_use':
-        // Flush any buffered markdown before tool output
-        md.flush(); setLastNewline(md.endsWithNewline)
+      case 'tool_use': {
+        if (!emitterOpt) { md.flush(); setLastNewline(md.endsWithNewline) }
         if (!gotFirstToken && onFirstToken) {
           onFirstToken()
           gotFirstToken = true
         }
-        printToolUse(event.toolName || 'tool', event.toolInput)
+        const toolName = event.toolName || 'tool'
+        if (emitterOpt) {
+          emitterOpt.emitToolStart({ name: toolName, args: {}, label: event.toolInput })
+        } else {
+          printToolUse(toolName, event.toolInput)
+        }
         break
-      case 'tool_result':
-        printToolResult(event.toolName || 'tool', event.toolSuccess !== false, event.toolOutput)
+      }
+      case 'tool_result': {
+        const trName = event.toolName || 'tool'
+        if (emitterOpt) {
+          emitterOpt.emitToolEnd({ name: trName, success: event.toolSuccess !== false, output: event.toolOutput || '', durationMs: 0 })
+        } else {
+          printToolResult(trName, event.toolSuccess !== false, event.toolOutput)
+        }
         break
+      }
       case 'usage':
         inputTokens = event.inputTokens || 0
         outputTokens = event.outputTokens || 0
         break
       case 'error':
-        md.flush(); setLastNewline(md.endsWithNewline)
+        if (!emitterOpt) { md.flush(); setLastNewline(md.endsWithNewline) }
         if (!gotFirstToken && onFirstToken) onFirstToken()
-        ensureNewline()
-        printError(event.error || 'Unknown error')
+        if (emitterOpt) {
+          emitterOpt.emitSystemMessage(event.error || 'Unknown error', 'error')
+        } else {
+          ensureNewline()
+          printError(event.error || 'Unknown error')
+        }
         break
       case 'done':
         break
