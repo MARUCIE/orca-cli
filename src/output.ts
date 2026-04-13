@@ -593,27 +593,22 @@ export class ProgressIndicator {
   }
 
   private render(): void {
+    // Only render during "thinking" phase (waiting for first token).
+    // Once streaming starts (working phase), the flowing text IS the progress.
+    // Rendering during streaming causes status lines to interleave with output.
+    if (this.phase === 'working') return
+
     const elapsed = formatElapsed(Date.now() - this.startTime)
-    const frames = this.phase === 'thinking' ? this.thinkFrames : this.workFrames
+    const frames = this.thinkFrames
     const frame = frames[this.spinIdx % frames.length]!
     this.spinIdx++
 
-    const age = Date.now() - this.startTime
-    const hint = age < 5000 ? 'esc to interrupt' : 'esc'
+    const hint = (Date.now() - this.startTime) < 5000 ? 'esc to interrupt' : 'esc'
+    const line = `  ${frame} Thinking... (${elapsed} • ${hint})`
 
-    let line: string
-    if (this.phase === 'thinking') {
-      line = `  ${frame} Thinking... (${elapsed} • ${hint})`
-    } else {
-      const tokStr = this.tokenCount > 0 ? ` · ↓ ${this.tokenCount.toLocaleString()} tokens` : ''
-      line = `  ${frame} Working (${elapsed}${tokStr} • ${hint})`
-    }
-
-    // Render on a dedicated line below stdout output:
-    // Save cursor → move to next line → write status → restore cursor
-    // This prevents progress text from mixing with streamed LLM output
+    // Overwrite in-place (safe during thinking — no stdout output yet)
     const clearLen = Math.max(this.lastLineLen, line.length)
-    process.stderr.write(`\x1b[s\n\x1b[90m${line.padEnd(clearLen)}\x1b[0m\x1b[u`)
+    process.stderr.write(`\r\x1b[90m${line.padEnd(clearLen)}\x1b[0m`)
     this.lastLineLen = line.length
   }
 
@@ -624,8 +619,7 @@ export class ProgressIndicator {
       this.interval = null
     }
     if (this.lastLineLen > 0) {
-      // Clear the status line below: save → down → clear line → restore
-      process.stderr.write(`\x1b[s\n\x1b[2K\x1b[u`)
+      process.stderr.write(`\r${' '.repeat(this.lastLineLen)}\r`)
       this.lastLineLen = 0
     }
     return { elapsed: Date.now() - this.startTime, tokens: this.tokenCount }

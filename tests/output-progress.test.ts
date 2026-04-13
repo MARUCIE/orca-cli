@@ -50,11 +50,11 @@ describe('ProgressIndicator', () => {
   })
 
   describe('markWorking()', () => {
-    it('transitions from thinking to working phase', () => {
+    it('transitions from thinking to working phase (stops rendering)', () => {
       const indicator = new ProgressIndicator()
       indicator.start()
 
-      // Initially in thinking phase
+      // Initially in thinking phase — renders spinner
       vi.advanceTimersByTime(100)
       let output = mockStderr.join('')
       expect(output).toContain('Thinking...')
@@ -62,10 +62,10 @@ describe('ProgressIndicator', () => {
       mockStderr = []
       indicator.markWorking()
 
-      // After marking working, should show working
+      // After marking working, should NOT render — streaming text is the progress
       vi.advanceTimersByTime(100)
       output = mockStderr.join('')
-      expect(output).toContain('Working')
+      expect(output).toBe('') // no output during working phase
     })
   })
 
@@ -180,40 +180,35 @@ describe('ProgressIndicator', () => {
 
       indicator.stop()
 
-      // Should have written ANSI clear sequence (save cursor + clear line + restore)
+      // Should have cleared the progress line (spaces + carriage return)
       const output = mockStderr.join('')
-      expect(output).toContain('\x1b[2K') // ANSI: clear entire line
+      expect(output).toContain('\r') // carriage return to clear line
     })
   })
 
   describe('rendering with tokens', () => {
-    it('shows token count when working and tokens present', () => {
+    it('working phase produces no stderr output (streaming text is the progress)', () => {
       const indicator = new ProgressIndicator()
       indicator.start()
       indicator.markWorking()
-      indicator.addChars(100) // 100 chars ≈ 25 tokens
+      indicator.addChars(100)
 
       mockStderr = []
       vi.advanceTimersByTime(100)
 
       const output = mockStderr.join('')
-      expect(output).toContain('Working')
-      expect(output).toContain('↓')
-      expect(output).toContain('25') // 100 chars / 4 = 25 tokens
+      expect(output).toBe('') // no render during working phase
     })
 
-    it('does not show token count when working but zero tokens', () => {
+    it('tokens still accumulate during working phase for stop() report', () => {
       const indicator = new ProgressIndicator()
       indicator.start()
       indicator.markWorking()
+      indicator.addChars(100) // 100 chars → 25 tokens
 
-      mockStderr = []
       vi.advanceTimersByTime(100)
-
-      const output = mockStderr.join('')
-      expect(output).toContain('Working')
-      // Should not show "↓" or token count when no tokens
-      expect(output).not.toContain('↓')
+      const result = indicator.stop()
+      expect(result.tokens).toBe(25)
     })
   })
 
