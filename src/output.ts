@@ -11,6 +11,28 @@ import { logError, logWarning } from './logger.js'
 
 export type OutputMode = 'streaming' | 'json'
 
+// ── Theme ──────────────────────────────────────────────────────────
+
+interface OrcaTheme {
+  accent: string    // ANSI color code for primary accent
+  prompt: string    // prompt icon color
+  success: string   // success color
+  dim: string       // dim/secondary text
+  name: string
+}
+
+const THEMES: Record<string, OrcaTheme> = {
+  default: { accent: '\x1b[36m', prompt: '\x1b[36m', success: '\x1b[32m', dim: '\x1b[90m', name: 'default' },
+  dark:    { accent: '\x1b[32m', prompt: '\x1b[32m', success: '\x1b[32m', dim: '\x1b[90m', name: 'dark' },
+  ocean:   { accent: '\x1b[34m', prompt: '\x1b[34m', success: '\x1b[36m', dim: '\x1b[90m', name: 'ocean' },
+  warm:    { accent: '\x1b[33m', prompt: '\x1b[33m', success: '\x1b[32m', dim: '\x1b[90m', name: 'warm' },
+  mono:    { accent: '\x1b[37m', prompt: '\x1b[37m', success: '\x1b[37m', dim: '\x1b[90m', name: 'mono' },
+}
+
+const themeId = (process.env.ORCA_THEME || 'default').toLowerCase()
+export const theme: OrcaTheme = THEMES[themeId] || THEMES['default']!
+const RST = '\x1b[0m'
+
 // ── Banner ──────────────────────────────────────────────────────────
 
 const VERSION = '0.6.0'
@@ -176,9 +198,9 @@ export async function printRichBanner(opts: {
   }
 
   // Info below the art — aligned, clean layout
-  const label = '\x1b[90m'  // dim gray
-  const reset = '\x1b[0m'
-  const accent = '\x1b[36m' // cyan
+  const label = theme.dim
+  const reset = RST
+  const accent = theme.accent
   console.log()
   console.log(`  \x1b[1;37mOrca\x1b[0m \x1b[90mv${VERSION}\x1b[0m  ${label}provider-neutral agent runtime${reset}`)
   console.log(`  ${accent}▸${reset} ${label}${shortCwd}${reset}`)
@@ -475,7 +497,7 @@ export function printStatusLine(info: StatusLineInfo): void {
   const tokenStr = `\x1b[90mtotal\x1b[0m ${info.totalTokens.toLocaleString()}`
 
   // Line 1: ◇ ORCA | model | ████░░░░ 15% (12K/200K) | project git:(branch)
-  const left1 = `\x1b[36m◇\x1b[0m \x1b[1;37mORCA\x1b[0m \x1b[90m|\x1b[0m ${modelShort} \x1b[90m|\x1b[0m ${bar} ${pct}% \x1b[90m(${ctxStr})\x1b[0m \x1b[90m|\x1b[0m \x1b[36m${project}\x1b[0m${gitPart}`
+  const left1 = `${theme.accent}◇${RST} \x1b[1;37mORCA${RST} ${theme.dim}|${RST} ${modelShort} ${theme.dim}|${RST} ${bar} ${pct}% ${theme.dim}(${ctxStr})${RST} ${theme.dim}|${RST} ${theme.accent}${project}${RST}${gitPart}`
   console.log(`${left1}`)
 
   // Line 2: ▸▸ yolo | high                                    total 1,618,413

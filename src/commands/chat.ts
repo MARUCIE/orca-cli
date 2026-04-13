@@ -20,7 +20,7 @@ import {
   printUsageSummary, printSessionSummary, emitJson,
   askPermission, printDiffPreview,
   printSeparator, printStatusLine,
-  ProgressIndicator,
+  ProgressIndicator, theme,
 } from '../output.js'
 import type { OutputMode } from '../output.js'
 import { streamChat } from '../providers/openai-compat.js'
@@ -356,7 +356,7 @@ async function runREPL(
       effort: currentEffort,
     })
 
-    return `\x1b[36m❯\x1b[0m `
+    return `${theme.prompt}❯\x1b[0m `
   }
 
   const promptUser = (): Promise<string | null> => new Promise((resolve) => {
@@ -931,64 +931,32 @@ function handleSlashCommand(
 
     case '/help':
     case '/h':
-    case '/?':
-      console.log('\x1b[90m')
-      console.log('  \x1b[1mSession\x1b[0m\x1b[90m')
-      console.log('  /help, /h, /?          Show this help')
-      console.log('  /clear                 Clear conversation history')
-      console.log('  /compact               Compress — keep last 2 turns')
-      console.log('  /status                Session status overview')
-      console.log('  /cost                  API cost breakdown')
-      console.log('  /doctor                Health check (provider/proxy/tools)')
-      console.log('')
-      console.log('  \x1b[1mModel\x1b[0m\x1b[90m')
-      console.log('  /model, /m             Show/switch model')
-      console.log('  /models                List available models')
-      console.log('  /providers             List all providers')
-      console.log('  /effort <lvl>          Thinking: low/medium/high/max')
-      console.log('  /mode [id]             Switch behavioral mode')
-      console.log('')
-      console.log('  \x1b[1mContext\x1b[0m\x1b[90m')
-      console.log('  /history               Message counts')
-      console.log('  /tokens                Token breakdown')
-      console.log('  /stats                 Full statistics')
-      console.log('  /system <prompt>       Set system prompt')
-      console.log('')
-      console.log('  \x1b[1mSession Management\x1b[0m\x1b[90m')
-      console.log('  /save [name]           Save session')
-      console.log('  /load [name]           Load session')
-      console.log('  /sessions              List saved sessions')
-      console.log('  /continue              Resume last session')
-      console.log('  /thread [sub]          Thread memory (list/save/load/search/delete)')
-      console.log('')
-      console.log('  \x1b[1mGit Workflow\x1b[0m\x1b[90m')
-      console.log('  /diff                  Show git diff')
-      console.log('  /git <cmd>             Run git command')
-      console.log('  /commit                Create commit (via agent)')
-      console.log('  /review                Review current changes (via agent)')
-      console.log('  /pr                    Create PR (via agent)')
-      console.log('  /undo                  Revert last file write')
-      console.log('')
-      console.log('  \x1b[1mMulti-Model\x1b[0m\x1b[90m')
-      console.log('  /council <prompt>      N models + judge synthesis')
-      console.log('  /race <prompt>         First answer wins')
-      console.log('  /pipeline <prompt>     Plan→Code→Review chain')
-      console.log('')
-      console.log('  \x1b[1mSystem\x1b[0m\x1b[90m')
-      console.log('  /config                Show configuration')
-      console.log('  /init                  Initialize project config')
-      console.log('  /hooks                 Show registered hooks')
-      console.log('  /mcp                   MCP server status')
-      console.log('  /jobs                  Background jobs')
-      console.log('  /cwd                   Working directory')
-      console.log('  /retry, /r             Retry last message')
-      console.log('  /exit, /quit, /q       Exit')
-      console.log('')
-      console.log('  \x1b[1mTips\x1b[0m\x1b[90m')
-      console.log('  /  shows all commands · Tab completes · ``` for multi-line')
-      console.log('  Esc interrupts · Ctrl+L clears screen')
-      console.log('\x1b[0m')
+    case '/?': {
+      const d = '\x1b[90m', b = '\x1b[1m', r = '\x1b[0m'
+      const row = (l: string, ri: string) => `${d}  ${l.padEnd(38)}${ri}${r}`
+      console.log()
+      console.log(`${d}  ${b}Session${r}${d}                                ${b}Model${r}`)
+      console.log(row('/clear    Clear history',          '/model    Show/switch model'))
+      console.log(row('/compact  Keep last 2 turns',      '/models   List all models'))
+      console.log(row('/status   Session overview',       '/mode     Behavioral profiles'))
+      console.log(row('/cost     Token cost breakdown',   '/effort   Thinking: low/med/high/max'))
+      console.log(row('/save     Save session',           '/providers List providers'))
+      console.log()
+      console.log(`${d}  ${b}Git${r}${d}                                    ${b}Multi-Model${r}`)
+      console.log(row('/diff     Show git diff',          '/council  N models + judge'))
+      console.log(row('/commit   Create commit',          '/race     First answer wins'))
+      console.log(row('/undo     Revert last write',      '/pipeline Plan-Code-Review'))
+      console.log(row('/git      Run git command',        '/thread   Conversation memory'))
+      console.log()
+      console.log(`${d}  ${b}System${r}${d}                                  ${b}Tips${r}`)
+      console.log(row('/mcp      MCP servers + toggle',   '!cmd      Shell command'))
+      console.log(row('/hooks    Registered hooks',       '/         Command picker'))
+      console.log(row('/doctor   Health check',           'Tab       Auto-complete'))
+      console.log(row('/retry    Retry last message',     '```       Multi-line input'))
+      console.log(row('/exit     Quit',                   'Ctrl+L    Clear screen'))
+      console.log(r)
       return 'handled'
+    }
 
     case '/model':
     case '/m':
