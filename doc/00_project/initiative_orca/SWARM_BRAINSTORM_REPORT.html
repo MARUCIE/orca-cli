@@ -626,12 +626,145 @@
     </div>
   </div>
 
+  <!-- v0.6.2 Output Intelligence -->
+  <h2>v0.6.2 输出智能 + 认知骨架</h2>
+  <p style="color: var(--gray-500); font-size: 13px;">2026-04-13 | 截图驱动的输入输出分析 → 6 项修复</p>
+
+  <h3>致命修复</h3>
+  <table>
+    <thead><tr><th>问题</th><th>根因</th><th>修复</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>上下文显示 3.0M/200K（溢出 15 倍）</td>
+        <td>chars/4 回退估算对含大量工具结果的长对话完全失效</td>
+        <td><span class="badge badge-green">已修复</span> 回退上限锁定在 contextWindow；CJK 感知估算</td>
+      </tr>
+      <tr>
+        <td>CJK token 估算偏低（中文 1.5:1 vs Latin 4:1）</td>
+        <td>所有文本按 Latin 4 chars/token 估算</td>
+        <td><span class="badge badge-green">已修复</span> <code>addText()</code> + <code>estimateTokens()</code> 区分 CJK/Latin</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>StatusLine 增强</h3>
+  <table>
+    <thead><tr><th>新增</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>费用显示</td><td>估算会话费用，$0.42 格式</td></tr>
+      <tr><td>tok/s 速度指标</td><td>最近一轮的输出速度</td></tr>
+      <tr><td>输入/输出拆分</td><td><code>in:1.2M out:234K</code> 与 total 并排</td></tr>
+      <tr><td>溢出指示器</td><td>上下文 >=95% 时显示 <code style="color:red;">!</code> 标记</td></tr>
+    </tbody>
+  </table>
+
+  <h3>认知骨架（新模块）</h3>
+  <p>9 个思维场景 x 4 个认知模型（111 个 Munger 思维模型 + 100 个 PM 框架），自动匹配用户提示词并注入对应的结构化思维框架。第一性原理预检注入系统提示词（始终开启）。</p>
+  <table>
+    <thead><tr><th>场景</th><th>触发词（示例）</th><th>注入模型</th></tr></thead>
+    <tbody>
+      <tr><td>定义问题</td><td>bug, error, fix, 报错, 修复</td><td>Inversion, 5-Why, Cynefin, Complex Systems</td></tr>
+      <tr><td>做决策</td><td>should, choose, 选择, 方案</td><td>Second-Order, Occam's, RICE, Reversibility</td></tr>
+      <tr><td>设计系统</td><td>architect, refactor, 架构, 重构</td><td>First Principles, Map vs Territory, MECE, Conway's</td></tr>
+      <tr><td>评估风险</td><td>risk, security, 安全, 漏洞</td><td>Margin of Safety, Pre-Mortem, FMEA</td></tr>
+      <tr><td>优化性能</td><td>optimize, slow, 性能, 延迟</td><td>Pareto, Bottleneck, Constraints, Amdahl</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size: 13px; color: var(--gray-500);">测试：688 通过 / 45 文件（+20 新增）</p>
+
+  <!-- v0.7.0 Multi-Model Routing -->
+  <h2>v0.7.0 多模型路由 + 上下文保护</h2>
+  <p style="color: var(--gray-500); font-size: 13px;">2026-04-13 | 用户 /council 实际运行失败分析 → P0 级核心差异化修复</p>
+
+  <div class="exec-summary" style="border-left-color: var(--danger);">
+    <p><strong>根因分析：</strong>用户执行 <code>/council</code> 审核报告。预期：Claude Opus 4.6 + GPT 5.4 + Gemini 3.1 Pro 三模型并行分析。实际：所有模型返回 "No provider endpoint found" — <code>findAggregator()</code> 不认识 Poe 是聚合器。</p>
+    <p>随后会话增长到 610K tokens，API 返回 413 错误（200K 窗口），auto-compact 仅释放 429 tokens（几乎无效）。<strong>两个 P0 问题同时暴露。</strong></p>
+  </div>
+
+  <h3>P0-A: 多模型路由修复</h3>
+  <table>
+    <thead><tr><th>组件</th><th>问题</th><th>修复</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>findAggregator()</code></td>
+        <td>要求 config 中显式声明 <code>aggregator: true</code></td>
+        <td><span class="badge badge-green">已修复</span> 按 provider ID 自动识别 poe/openrouter/zenmux</td>
+      </tr>
+      <tr>
+        <td><code>resolveModelEndpoint()</code></td>
+        <td>3 路回退中 Path 3 吞异常返回 null</td>
+        <td><span class="badge badge-green">已修复</span> 默认 provider 作为聚合器透传</td>
+      </tr>
+      <tr>
+        <td><code>/council</code> 显示</td>
+        <td>模型失败时静默无提示</td>
+        <td><span class="badge badge-green">已修复</span> 预检端点，显示 "model -> provider" 映射 + 诊断信息</td>
+      </tr>
+      <tr>
+        <td><code>/race</code> 同上</td>
+        <td>同样的静默失败</td>
+        <td><span class="badge badge-green">已修复</span> 预检 + 诊断</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>P0-B: 发送前上下文保护</h3>
+  <table>
+    <thead><tr><th>组件</th><th>问题</th><th>修复</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>发送前检查</td>
+        <td>无 — 610K 直接发到 200K 窗口</td>
+        <td><span class="badge badge-green">已修复</span> API 调用前检查，>75% 自动压缩</td>
+      </tr>
+      <tr>
+        <td><code>smartCompact()</code></td>
+        <td>200 字符阈值保留几乎所有消息</td>
+        <td><span class="badge badge-green">已修复</span> 激进策略：丢弃所有旧消息，截断 >2000 字符的大消息</td>
+      </tr>
+      <tr>
+        <td>413 错误恢复</td>
+        <td>无 — 直接报错</td>
+        <td><span class="badge badge-green">已修复</span> 捕获 413 → 激进压缩 → 允许重试</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>v0.7.0 待实现（P1/P2）</h3>
+  <table>
+    <thead><tr><th>功能</th><th>优先级</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>子代理自主循环</td><td><span class="priority p1">P1</span></td><td>sub-agent-worker 当前只做一次 API 调用就退出，需要 tool-call 循环（~60 行）</td></tr>
+      <tr><td>目标循环控制器</td><td><span class="priority p2">P2</span></td><td><code>orca run --done-when</code> 标准驱动自动循环交付（~100 行）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>累计进度（v0.3.0 -> v0.7.0）</h3>
+  <div class="metric-grid">
+    <div class="metric-card">
+      <div class="metric-value">65</div>
+      <div class="metric-label">源码文件（+28）</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">14,000+</div>
+      <div class="metric-label">源码行数（+6,800）</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">692</div>
+      <div class="metric-label">测试用例（+199）</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">2</div>
+      <div class="metric-label">新发现差距（P1+P2）</div>
+    </div>
+  </div>
+
 </div>
 
 <footer>
-    <p>Orca CLI v0.6.0 -- SOTA 差距分析报告（含 v0.4.0 / v0.5.0 / v0.6.0 闭合更新）</p>
+    <p>Orca CLI v0.7.0 -- SOTA 差距分析报告（含 v0.4.0 ~ v0.7.0 全量闭合更新）</p>
     <p>Maurice | maurice_wen@proton.me</p>
-    <p style="font-size:12px; margin-top:8px;">初始生成 2026-04-12 | v0.6.0 闭合更新 2026-04-13 | 数据来自 3 Agent 并行研究 + 全局审计</p>
+    <p style="font-size:12px; margin-top:8px;">初始生成 2026-04-12 | v0.7.0 更新 2026-04-13 | 数据来自 3 Agent 并行研究 + 截图驱动分析</p>
 </footer>
 
 </body>
