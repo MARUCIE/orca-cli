@@ -432,7 +432,7 @@ src/
 |---|---|
 | Version | 0.8.0 |
 | LOC | 16,722 |
-| Tests | 1077 (53 files) |
+| Tests | 1118 (53 files) |
 | Modules | 14 directories |
 | Tools | 41+ |
 | Slash commands | 30+ |
@@ -445,8 +445,8 @@ src/
 | Mission mode (multi-step) | Sub-agents | Codex tasks | No | No | **Droid Missions** | **Mission Mode** | Parity |
 | Task auto-decomposition | No | No | No | No | No | **Task Planner** | **LEAD** |
 | Concurrent side tasks | No | No | No | No | Worker pool | **executePlan()** | Parity |
-| Context protection (nuclear) | Auto-compact | Unknown | Unknown | No | Unknown | **4-layer + nuclear** | **LEAD** |
-| 413 auto-recovery | No | Unknown | Unknown | No | Unknown | **Auto-compact + retry** | **LEAD** |
+| Context protection (5-layer) | Auto-compact | Unknown | Unknown | No | Unknown | **5-layer defense: dedup hint + read guard + tool budget + hard stop + nuclear** | **LEAD** |
+| 413 auto-recovery | No | Unknown | Unknown | No | Unknown | **Injection dedup + cumulative budget + auto-compact + retry** | **LEAD** |
 | Cognitive skeleton (hook) | No | No | No | No | No | **9 scenarios** | **LEAD** |
 | Goal-loop (done-when) | No | Codex loop | No | No | Droid loop | **runGoalLoop (regex+cmd+judge)** | Parity |
 | Validation contract first | No | No | No | No | **Yes** | **Yes** | Parity |
@@ -488,7 +488,7 @@ src/
 | v0.6.0 Knowledge system | DONE | Notes + Postmortem + Prompts + Learning Journal |
 | v0.7.0 Cognitive skeleton | DONE | 9 scenarios × 4 models, always-on hook |
 | v0.7.0 Goal-loop controller | DONE | `orca run --done-when` with regex/command/judge |
-| v0.7.0 Context 4-layer protection | DONE | L1 tool truncation + L2 pre-round + L3 PostToolUse + L4 413 recovery |
+| v0.7.0 Context 4-layer protection | SUPERSEDED | Replaced by v0.8.0 5-layer defense |
 | v0.8.0 Mission Mode | DONE | Orchestrator/Worker/Validator, validation contract first |
 | v0.8.0 Task Planner | DONE | Auto-decompose + concurrent executor + visual checklist |
 | v0.8.0 Nuclear compact | DONE | >100% utilization → drop all except system + last user |
@@ -500,6 +500,8 @@ src/
 | v0.8.0 Audit fix: auto-contract | DONE | empty validation contract auto-generates file_exists criteria from feature files |
 | v0.8.0 Audit fix: worktree warnings | DONE | cleanup() returns warnings instead of silently swallowing errors |
 | v0.8.0 Audit fix: 413 status check | DONE | checks err.status/statusCode property in addition to string matching |
+| v0.8.0 5-layer context defense | DONE | L1 injection dedup hint + L2 tool read guard + L3 cumulative budget (50K) + L4 hard stop (85%) + L5 nuclear. 100× reduction in duplicate-read token waste |
+| v0.8.0 1118 tests | DONE | +26 context-guard tests covering all 5 defense layers |
 
 ---
 

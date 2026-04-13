@@ -90,7 +90,7 @@
       <span>v0.3.0 基线 → v0.8.0 现状</span>
       <span>2026-04-12 ~ 2026-04-13</span>
       <span>对标: AI-Fleet / Claude Code / Codex / Amp / KiloCode / Hermes / Factory Droid</span>
-      <span>1077 测试 · 53 文件 · 16.7K LOC · 14 模块</span>
+      <span>1118 测试 · 53 文件 · 16.7K LOC · 14 模块</span>
     </div>
   </div>
 </div>
@@ -117,7 +117,7 @@
       <div class="label">待追赶 GAP（IDE 集成）</div>
     </div>
     <div class="metric-card">
-      <div class="value">1077</div>
+      <div class="value">1118</div>
       <div class="label">测试用例（v0.3.0: 493）</div>
     </div>
   </div>
@@ -709,37 +709,43 @@
     </tbody>
   </table>
 
-  <h3>P0-B: 四层上下文保护（防 413 全链路）</h3>
+  <h3>P0-B: 五层上下文防御体系（防 413 全链路 v0.8.0）</h3>
   <table>
     <thead><tr><th>层级</th><th>位置</th><th>触发条件</th><th>行为</th></tr></thead>
     <tbody>
       <tr>
-        <td><strong>L1 内部截断</strong></td>
+        <td><strong>L1 注入去重提示</strong></td>
+        <td>expandFileReferences 返回时</td>
+        <td>文件被注入 prompt</td>
+        <td><span class="badge badge-green">提示</span> &lt;context-note&gt; 告知模型勿重复读取</td>
+      </tr>
+      <tr>
+        <td><strong>L2 工具读取拦截</strong></td>
+        <td>executeReadFile 执行前</td>
+        <td>read_file 目标在 injectedPaths 中</td>
+        <td><span class="badge badge-green">拦截</span> 返回 [ALREADY IN CONTEXT] (~200 chars vs ~20K)</td>
+      </tr>
+      <tr>
+        <td><strong>L3 累计工具预算</strong></td>
         <td>streamChat tool_result 写入时</td>
-        <td>单个结果 > 4000 chars</td>
-        <td><span class="badge badge-green">截断</span> head 40 行 + tail 20 行</td>
+        <td>累计 > 50K chars / 单个 > 动态上限</td>
+        <td><span class="badge badge-green">渐进截断</span> 4000→2000→1000→200 chars/result</td>
       </tr>
       <tr>
-        <td><strong>L2 内部预算</strong></td>
+        <td><strong>L4 每轮硬停</strong></td>
         <td>streamChat 每轮 API 调用前</td>
-        <td>messages 估算 > 75% window</td>
-        <td><span class="badge badge-green">截断</span> 旧 tool_result 到 150 chars</td>
+        <td>messages > 85% window</td>
+        <td><span class="badge badge-green">硬停</span> 注入强制输出指令，75% 时截断旧结果</td>
       </tr>
       <tr>
-        <td><strong>L3 外部 guard</strong></td>
-        <td>runProxyTurn PostToolUse 后</td>
-        <td>history > 60% budget</td>
-        <td><span class="badge badge-green">compact</span> 丢弃旧消息</td>
-      </tr>
-      <tr>
-        <td><strong>L4 恢复</strong></td>
-        <td>catch 413 错误</td>
-        <td>API 返回 413</td>
-        <td><span class="badge badge-green">恢复</span> 激进 compact + 重试</td>
+        <td><strong>L5 核弹恢复</strong></td>
+        <td>catch 413 / pre-send guard</td>
+        <td>API 413 或 utilization > 100%</td>
+        <td><span class="badge badge-green">核弹</span> 仅保留 system + last user，auto-compact + retry</td>
       </tr>
     </tbody>
   </table>
-  <p style="font-size: 13px; color: var(--gray-500);">根因：之前只有 L3+L4，但 L1/L2 缺失导致 streamChat 内部 messages 膨胀到 320K 时外部 guard 完全不可见。v0.7.1 修复后四层全覆盖。</p>
+  <p style="font-size: 13px; color: var(--gray-500);">v0.8.0 重构：根因是模型对已注入文件重复 read_file（截图中 7 次读取同一 HTML = 140K chars）。新增 L1/L2 从源头拦截，L3 提供 turn 内总量控制，L4/L5 兜底。效果：同场景 token 消耗从 35K 降至 350（100x 改善）。</p>
 
   <h3>v0.7.0 已完成（P1/P2）</h3>
   <table>
@@ -887,7 +893,7 @@
     </tbody>
   </table>
 
-  <h3>v0.8.0 深度测试覆盖（+281 tests → 1077 total）</h3>
+  <h3>v0.8.0 深度测试覆盖（+322 tests → 1118 total）</h3>
   <table>
     <thead><tr><th>模块</th><th>新增</th><th>覆盖面</th></tr></thead>
     <tbody>
@@ -925,7 +931,7 @@
       <div class="label">模块目录</div>
     </div>
     <div class="metric-card">
-      <div class="value">1077</div>
+      <div class="value">1118</div>
       <div class="label">测试用例（v0.3.0: 493）</div>
     </div>
     <div class="metric-card">
@@ -939,7 +945,7 @@
 <footer>
     <p>Orca CLI v0.8.0 -- SOTA 差距分析报告（v0.3.0 → v0.8.0）</p>
     <p>Maurice | maurice_wen@proton.me</p>
-    <p style="font-size:12px; margin-top:8px;">初始生成 2026-04-12 | v0.8.0 更新 2026-04-13 | 蜂群审计 2026-04-13 | 1077 测试 · 53 文件 · 16.7K LOC</p>
+    <p style="font-size:12px; margin-top:8px;">初始生成 2026-04-12 | v0.8.0 更新 2026-04-13 | 蜂群审计 2026-04-13 | 5-layer 防御 2026-04-13 | 1118 测试 · 53 文件 · 16.7K LOC</p>
 </footer>
 
 </body>
