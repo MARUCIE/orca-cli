@@ -220,7 +220,26 @@ export async function* streamChat(
 
   // Context window for budget checks (conservative estimate)
   const modelContextWindow = getModelContextWindow(options.model)
-  const MAX_TOOL_RESULT_CHARS = 4000 // truncate individual tool results beyond this
+
+  // ── Layer 3: Cumulative tool result budget ──────────────────────
+  // Track total chars from tool results within this turn.
+  // When budget is exhausted, refuse further read operations and signal
+  // the model to stop reading and start producing output.
+  //
+  // Budget: 50K chars ≈ 12.5K tokens — leaves room for system prompt,
+  // conversation history, and model output within a 200K window.
+  const TOOL_BUDGET_CHARS = 50_000
+  let cumulativeToolChars = 0
+  let toolBudgetExhausted = false
+
+  // Dynamic per-result limit: starts at 4000, shrinks as budget fills
+  function getMaxToolResultChars(): number {
+    const remaining = TOOL_BUDGET_CHARS - cumulativeToolChars
+    if (remaining <= 0) return 200 // minimal: just error messages
+    if (remaining < 10_000) return 1000 // tight: aggressive truncation
+    if (remaining < 25_000) return 2000 // moderate: reduced truncation
+    return 4000 // normal
+  }
 
   try {
     for (let round = 0; /* no limit — loop until task completes, error, or abort */ ; round++) {
@@ -231,15 +250,25 @@ export async function* streamChat(
         return
       }
 
-      // Pre-round context budget check: estimate messages size and truncate if needed
-      // This prevents 413 errors by ensuring we never send more than the context window
+      // ── Layer 4: Per-round context hard stop ──────────────────
+      // Before each API call, check total message size. If exceeding 85%
+      // of context window, inject a stop signal and break the tool loop.
       const estimatedChars = messages.reduce((sum, m) => {
         const c = m.content as string | null | undefined
         return sum + (typeof c === 'string' ? c.length : 0)
       }, 0)
       const estimatedTokens = Math.ceil(estimatedChars / 3) // conservative estimate
-      if (estimatedTokens > modelContextWindow * 0.75) {
-        // Truncate oldest tool results to free space (keep system + last 4 messages)
+
+      if (estimatedTokens > modelContextWindow * 0.85) {
+        // Hard stop: context is critically full
+        messages.push({
+          role: 'user',
+          content: '[CONTEXT CRITICAL] You have used 85%+ of the context window with tool calls. STOP calling tools immediately. Summarize your findings and produce your final answer NOW. Do not read any more files.',
+        })
+        yield { type: 'text', text: `\n[context-guard: hard stop at ${Math.round(estimatedTokens / 1000)}K/${Math.round(modelContextWindow / 1000)}K tokens — forcing output]\n` }
+        // Don't break — let the model produce one final response with the stop signal
+      } else if (estimatedTokens > modelContextWindow * 0.75) {
+        // Soft pressure: truncate old tool results to free space
         const keepCount = 4
         let freed = 0
         for (let i = 1; i < messages.length - keepCount; i++) {
@@ -349,17 +378,30 @@ export async function* streamChat(
           const result = await toolCallbacks.onToolCall(tc.name, args)
           yield { type: 'tool_result', toolName: tc.name, toolSuccess: result.success, toolOutput: result.output }
 
-          // Truncate large tool results to prevent context explosion
-          // A single read_file of 300 lines = ~12K chars = ~3K tokens
-          // 6 such reads = 72K chars = 18K tokens → easily overflows 200K window
+          // ── Layer 3: Cumulative tool budget enforcement ────────
+          // Track total tool result chars and progressively truncate
+          // as budget fills up. When exhausted, return minimal message.
           let toolContent = result.output
-          if (toolContent.length > MAX_TOOL_RESULT_CHARS) {
-            const lines = toolContent.split('\n')
-            const headLines = Math.min(40, Math.floor(lines.length / 2))
-            const tailLines = Math.min(20, Math.floor(lines.length / 4))
-            toolContent = lines.slice(0, headLines).join('\n')
-              + `\n\n[... ${lines.length - headLines - tailLines} lines truncated for context budget ...]\n\n`
-              + lines.slice(-tailLines).join('\n')
+
+          if (toolBudgetExhausted) {
+            // Budget already exhausted — return minimal response
+            toolContent = `[TOOL BUDGET EXHAUSTED] ${cumulativeToolChars} chars used of ${TOOL_BUDGET_CHARS} budget. Result suppressed to prevent context overflow. Work with the information already gathered — do not call more read operations.`
+          } else {
+            const maxChars = getMaxToolResultChars()
+            if (toolContent.length > maxChars) {
+              const lines = toolContent.split('\n')
+              const headLines = Math.min(40, Math.floor(lines.length / 2))
+              const tailLines = Math.min(20, Math.floor(lines.length / 4))
+              const headContent = lines.slice(0, headLines).join('\n')
+              const tailContent = lines.slice(-tailLines).join('\n')
+              const truncatedContent = headContent + `\n\n[... ${lines.length - headLines - tailLines} lines truncated (budget: ${Math.round(cumulativeToolChars / 1000)}K/${Math.round(TOOL_BUDGET_CHARS / 1000)}K chars used) ...]\n\n` + tailContent
+              toolContent = truncatedContent.slice(0, maxChars)
+            }
+            cumulativeToolChars += toolContent.length
+            if (cumulativeToolChars >= TOOL_BUDGET_CHARS) {
+              toolBudgetExhausted = true
+              yield { type: 'text', text: `\n[tool-budget: ${Math.round(cumulativeToolChars / 1000)}K chars exhausted — further reads will be suppressed]\n` }
+            }
           }
 
           messages.push({

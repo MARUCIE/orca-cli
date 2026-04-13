@@ -227,11 +227,11 @@ let _sandboxEnabled = false
 export function setSandboxMode(enabled: boolean): void { _sandboxEnabled = enabled }
 export function isSandboxEnabled(): boolean { return _sandboxEnabled }
 
-export function executeTool(name: string, args: Record<string, unknown>, cwd: string): ToolResult {
+export function executeTool(name: string, args: Record<string, unknown>, cwd: string, injectedPaths?: Set<string>): ToolResult {
   try {
     const normalizedArgs = normalizeToolArgs(name, args)
     switch (name) {
-      case 'read_file': return executeReadFile(normalizedArgs, cwd)
+      case 'read_file': return executeReadFile(normalizedArgs, cwd, injectedPaths)
       case 'list_directory': return executeListDirectory(normalizedArgs, cwd)
       case 'run_command': return executeRunCommand(normalizedArgs, cwd)
       case 'search_files': return executeSearchFiles(normalizedArgs, cwd)
@@ -420,8 +420,19 @@ function execShellTool(cmd: string, cwd: string): ToolResult {
   }
 }
 
-function executeReadFile(args: Record<string, unknown>, cwd: string): ToolResult {
+function executeReadFile(args: Record<string, unknown>, cwd: string, injectedPaths?: Set<string>): ToolResult {
   const filePath = resolve(cwd, String(args.path || ''))
+
+  // Layer 2: Read guard — if this file was already injected by file expansion,
+  // return a dedup message instead of the full content. This prevents the #1 cause
+  // of context explosion: model re-reading files that are already in the prompt.
+  if (injectedPaths?.has(filePath)) {
+    return {
+      success: true,
+      output: `[ALREADY IN CONTEXT] File "${filePath}" was already preprocessed and injected into the conversation above. Refer to the <file path="${filePath}"> tag in the prompt — do not re-read it. Its full content is already available.`,
+    }
+  }
+
   if (!existsSync(filePath)) {
     return { success: false, output: `File not found: ${filePath}. Use list_directory or glob_files to discover available files.` }
   }

@@ -64,14 +64,27 @@ import type { PlanEvent, PlannedTask } from '../planner/index.js'
 // Design: Claude Code auto-reads bare paths via UserPromptSubmit hook.
 // Orca does the same here, plus handles file:/// for council/race.
 
-function expandFileReferences(prompt: string, cwd: string): string {
+interface FileExpansionResult {
+  text: string
+  /** Absolute paths of files whose content was injected into the prompt */
+  injectedPaths: Set<string>
+}
+
+function expandFileReferences(prompt: string, cwd: string): FileExpansionResult {
   const home = process.env.HOME || ''
   const trimmed = prompt.trim()
+  const injectedPaths = new Set<string>()
 
   // Mode 0: Directory path — entire prompt is a directory path (or prompt ends with one)
   // Auto-discover and inject key project files so SOTA models have full context.
   const dirExpansion = tryExpandDirectory(trimmed, home, cwd)
-  if (dirExpansion) return dirExpansion
+  if (dirExpansion) {
+    // Collect injected paths from directory expansion
+    for (const m of dirExpansion.matchAll(/<file path="([^"]+)">/g)) {
+      injectedPaths.add(m[1]!)
+    }
+    return { text: appendDedupHint(dirExpansion, injectedPaths), injectedPaths }
+  }
 
   // Mode 1: Bare path — entire prompt is just a file path
   // Claude Code behavior: read file, ask "what would you like to do?"
@@ -79,7 +92,9 @@ function expandFileReferences(prompt: string, cwd: string): string {
   if (barePath && !trimmed.includes(' ') && tryReadFile(barePath) !== null) {
     const content = tryReadFile(barePath)!
     const truncated = truncateFileContent(content)
-    return `<file path="${barePath}">\n${truncated}\n</file>\n\nThe user shared this file. Analyze it and ask what they'd like to do with it.`
+    injectedPaths.add(barePath)
+    const text = `<file path="${barePath}">\n${truncated}\n</file>\n\nThe user shared this file. Analyze it and ask what they'd like to do with it.`
+    return { text: appendDedupHint(text, injectedPaths), injectedPaths }
   }
 
   let expanded = prompt
@@ -94,6 +109,7 @@ function expandFileReferences(prompt: string, cwd: string): string {
     const content = tryReadFile(filePath)
     if (content !== null) {
       injected.add(filePath)
+      injectedPaths.add(filePath)
       const truncated = truncateFileContent(content)
       expanded += `\n\n<file path="${filePath}">\n${truncated}\n</file>`
     }
@@ -108,6 +124,7 @@ function expandFileReferences(prompt: string, cwd: string): string {
     const content = tryReadFile(filePath)
     if (content !== null) {
       injected.add(filePath)
+      injectedPaths.add(filePath)
       const truncated = truncateFileContent(content)
       expanded += `\n\n<file path="${filePath}">\n${truncated}\n</file>`
     }
@@ -121,12 +138,26 @@ function expandFileReferences(prompt: string, cwd: string): string {
     const content = tryReadFile(filePath)
     if (content !== null) {
       injected.add(filePath)
+      injectedPaths.add(filePath)
       const truncated = truncateFileContent(content)
       expanded += `\n\n<file path="${filePath}">\n${truncated}\n</file>`
     }
   }
 
-  return expanded
+  if (injectedPaths.size > 0) {
+    expanded = appendDedupHint(expanded, injectedPaths)
+  }
+
+  return { text: expanded, injectedPaths }
+}
+
+/**
+ * Append a dedup hint to expanded prompts, telling the model not to re-read injected files.
+ * This is the first line of defense against context explosion from duplicate reads.
+ */
+function appendDedupHint(text: string, paths: Set<string>): string {
+  if (paths.size === 0) return text
+  return text + `\n\n<context-note>The file content above has been preprocessed and fully injected. Do NOT call read_file on these paths — their content is already complete in context: ${[...paths].join(', ')}</context-note>`
 }
 
 function resolveFilePath(p: string, home: string, cwd: string): string | null {
@@ -661,6 +692,10 @@ async function runREPL(
   // Track last turn's output speed for tok/s display
   let lastTokPerSec = 0
 
+  // Session-wide set of file paths already injected by file expansion.
+  // Used by tool-level read guard to prevent duplicate reads that explode context.
+  const sessionInjectedPaths = new Set<string>()
+
   const renderStatusAndPrompt = (): string => {
     const budget = tokenBudget.getBudget(history)
     const totalTokens = stats.totalInputTokens + stats.totalOutputTokens
@@ -1004,7 +1039,9 @@ async function runREPL(
           if (!mmPrompt) continue
 
           // Expand file references in multi-model prompts
-          mmPrompt = expandFileReferences(mmPrompt, cwd)
+          const mmExpansion = expandFileReferences(mmPrompt, cwd)
+          mmPrompt = mmExpansion.text
+          for (const p of mmExpansion.injectedPaths) sessionInjectedPaths.add(p)
 
           // Import routing functions
           const { resolveModelEndpoint, findAggregator } = await import('../config.js')
@@ -1284,11 +1321,14 @@ async function runREPL(
 
     // File reference expansion: read local files referenced in prompt
     // Detects file:///path, /absolute/path, ~/home/path patterns
+    // Returns injected paths so tool-level read guard can prevent duplicate reads
     {
-      const expanded = expandFileReferences(messageToSend, cwd)
-      if (expanded !== messageToSend) {
-        messageToSend = expanded
-        process.stderr.write(`\x1b[90m  [file-expand] injected file content into prompt\x1b[0m\n`)
+      const expansion = expandFileReferences(messageToSend, cwd)
+      if (expansion.text !== messageToSend) {
+        messageToSend = expansion.text
+        // Merge newly injected paths into session-wide set
+        for (const p of expansion.injectedPaths) sessionInjectedPaths.add(p)
+        process.stderr.write(`\x1b[90m  [file-expand] injected ${expansion.injectedPaths.size} file(s) into prompt\x1b[0m\n`)
       }
     }
 
@@ -1380,6 +1420,7 @@ async function runREPL(
           tokenBudget,
           contextMonitor,
           extraToolDefs: mcpToolDefs,
+          injectedPaths: sessionInjectedPaths,
         })
         stats.turns++
         stats.totalInputTokens += result.inputTokens
@@ -2394,10 +2435,12 @@ interface ProxyTurnOptions {
   contextMonitor?: ContextMonitor
   /** Extra tool definitions to merge (e.g., MCP server tools) */
   extraToolDefs?: Array<Record<string, unknown>>
+  /** Files already injected by file expansion — tool reads on these return dedup message */
+  injectedPaths?: Set<string>
 }
 
 async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: number; outputTokens: number }> {
-  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onStreamToken, onFileWrite, safeMode, retryTracker, loopDetector, tokenBudget, contextMonitor, extraToolDefs } = options
+  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onStreamToken, onFileWrite, safeMode, retryTracker, loopDetector, tokenBudget, contextMonitor, extraToolDefs, injectedPaths } = options
 
   const startTime = Date.now()
   let inputTokens = 0
@@ -2554,7 +2597,7 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
           return { success: true, output: `Waited ${seconds}s.` }
         }
 
-        const result = executeTool(name, args, cwd)
+        const result = executeTool(name, args, cwd, injectedPaths)
 
         // ── Retry intelligence: track success/failure ──
         if (retryTracker) {
