@@ -20,6 +20,8 @@ import { parseDoneCriteria, runGoalLoop } from '../harness/goal-loop.js'
 import { chatOnce } from '../providers/openai-compat.js'
 import { MissionController } from '../mission/index.js'
 import type { MissionEvent } from '../mission/index.js'
+import { decomposePrompt, executePlan } from '../planner/index.js'
+import type { PlanEvent } from '../planner/index.js'
 import {
   printBanner, printProviderInfo, printError,
   ensureNewline, setLastNewline, printToolUse, printToolResult,
@@ -41,6 +43,7 @@ interface RunOptions {
   dangerously?: boolean
   doneWhen?: string
   mission?: boolean
+  plan?: boolean
 }
 
 export function createRunCommand(): Command {
@@ -57,6 +60,7 @@ export function createRunCommand(): Command {
     .option('--dangerously', 'Skip permission prompts (use with caution)')
     .option('--done-when <criteria>', 'Goal-loop: repeat until criteria met (e.g., "tests pass", "/pattern/", "exit 0: cmd")')
     .option('--mission', 'Mission mode: autonomous plan→implement→validate cycle')
+    .option('--plan', 'Plan mode: decompose into tasks, execute main+side concurrently')
     .action(async (taskParts: string[], opts: RunOptions) => {
       const task = taskParts.join(' ').trim()
       const outputMode: OutputMode = opts.json ? 'json' : 'streaming'
@@ -182,6 +186,40 @@ export function createRunCommand(): Command {
             ? new Date(state.completedAt).getTime() - new Date(state.startedAt).getTime()
             : Date.now() - new Date(state.startedAt).getTime()
           console.log(`\x1b[90m  tokens: ${state.totalTokens.toLocaleString()} · ${(elapsed / 1000).toFixed(1)}s\x1b[0m`)
+          return
+        }
+
+        // Plan mode: decompose into tasks + concurrent execution
+        if (opts.plan) {
+          if (!resolved.baseURL) {
+            throw new Error('Plan mode requires a provider with baseURL configured.')
+          }
+
+          console.log(`\x1b[36m  plan: decomposing tasks...\x1b[0m`)
+          const plan = await decomposePrompt(task, {
+            apiKey: resolved.apiKey,
+            baseURL: resolved.baseURL,
+            model: resolved.model,
+          })
+
+          const mainCount = plan.tasks.filter(t => t.type === 'main').length
+          const sideCount = plan.tasks.filter(t => t.type === 'side').length
+          console.log(`\x1b[90m  ${plan.tasks.length} tasks: ${mainCount} main + ${sideCount} side\x1b[0m\n`)
+
+          const { result } = await executePlan(plan, {
+            apiKey: resolved.apiKey,
+            baseURL: resolved.baseURL,
+            model: resolved.model,
+            cwd: runCwd,
+          })
+
+          console.log()
+          if (result.success) {
+            console.log(`\x1b[32m  plan completed: ${result.completed}/${result.totalTasks} tasks\x1b[0m`)
+          } else {
+            console.log(`\x1b[31m  plan finished: ${result.completed} done, ${result.failed} failed, ${result.skipped} skipped\x1b[0m`)
+          }
+          console.log(`\x1b[90m  tokens: ${result.totalTokens.toLocaleString()} · ${(result.totalDurationMs / 1000).toFixed(1)}s\x1b[0m`)
           return
         }
 

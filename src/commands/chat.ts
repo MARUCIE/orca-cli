@@ -48,6 +48,8 @@ import { matchCognitive, formatCognitiveContext } from '../cognitive-skeleton.js
 import { PostmortemLog, NotesManager, PromptRepository, LearningJournal } from '../knowledge/index.js'
 import { MissionController } from '../mission/index.js'
 import type { MissionEvent } from '../mission/index.js'
+import { isMultiTaskPrompt, decomposePrompt, decomposeHeuristic, TaskTracker, executePlan } from '../planner/index.js'
+import type { PlanEvent, PlannedTask } from '../planner/index.js'
 
 interface ChatOptions {
   model?: string
@@ -205,7 +207,7 @@ async function runREPL(
     // Git workflow
     '/diff', '/git', '/commit', '/review', '/pr', '/undo',
     // Multi-model
-    '/council', '/race', '/pipeline', '/mission',
+    '/council', '/race', '/pipeline', '/mission', '/plan',
     // System
     '/config', '/init', '/hooks', '/mcp', '/jobs', '/cwd', '/mode', '/thread', '/threads',
     // Knowledge
@@ -867,6 +869,54 @@ async function runREPL(
           continue
         }
 
+        // Plan mode — decompose prompt into task checklist + execute
+        if ((handled as string) === 'plan') {
+          const planPrompt = input.replace(/^\/plan\s*/, '').trim()
+          if (!planPrompt) continue
+
+          const resolved = resolveProvider(config)
+          if (!resolved.baseURL) {
+            console.log('\x1b[31m  plan: no provider baseURL configured.\x1b[0m')
+            continue
+          }
+
+          console.log(`\x1b[36m  Decomposing tasks...\x1b[0m`)
+
+          try {
+            const plan = await decomposePrompt(planPrompt, {
+              apiKey: resolved.apiKey,
+              baseURL: resolved.baseURL,
+              model: resolved.model,
+            })
+
+            const mainCount = plan.tasks.filter(t => t.type === 'main').length
+            const sideCount = plan.tasks.filter(t => t.type === 'side').length
+            console.log(`\x1b[90m  ${plan.tasks.length} tasks: ${mainCount} main + ${sideCount} side\x1b[0m`)
+            if (plan.reasoning) {
+              console.log(`\x1b[90m  Strategy: ${plan.reasoning.slice(0, 100)}\x1b[0m`)
+            }
+            console.log()
+
+            const { tracker, result } = await executePlan(plan, {
+              apiKey: resolved.apiKey,
+              baseURL: resolved.baseURL,
+              model: resolved.model,
+              cwd,
+            })
+
+            console.log()
+            if (result.success) {
+              console.log(`\x1b[32m  Plan completed: ${result.completed}/${result.totalTasks} tasks\x1b[0m`)
+            } else {
+              console.log(`\x1b[31m  Plan finished: ${result.completed} done, ${result.failed} failed, ${result.skipped} skipped\x1b[0m`)
+            }
+            console.log(`\x1b[90m  tokens: ${result.totalTokens.toLocaleString()} · ${(result.totalDurationMs / 1000).toFixed(1)}s\x1b[0m`)
+          } catch (err) {
+            console.log(`\x1b[31m  plan error: ${err instanceof Error ? err.message : err}\x1b[0m`)
+          }
+          continue
+        }
+
         // 'not_command' falls through to treat as normal message
       }
     }
@@ -876,6 +926,12 @@ async function runREPL(
 
     lastPrompt = messageToSend
     inputHistory.push(messageToSend)
+
+    // Auto-detect multi-task prompts and suggest /plan
+    if (isMultiTaskPrompt(messageToSend) && !messageToSend.startsWith('/')) {
+      const taskCount = messageToSend.split(/\n\s*\d+\.\s+|\n\s*[-*]\s+|[；;]/).filter(s => s.trim().length > 5).length
+      console.log(`\x1b[90m  hint: detected ~${taskCount} tasks. Use /plan to auto-decompose and track.\x1b[0m`)
+    }
 
     // UserPromptSubmit hook
     if (hooks.hasHooks('UserPromptSubmit')) {
@@ -1167,6 +1223,7 @@ function handleSlashCommand(
       console.log(row('/commit   Create commit',      '/race     First answer wins'))
       console.log(row('/undo     Revert last write',  '/pipeline Plan-Code-Review'))
       console.log(row('/git      Run git command',    '/mission  Autonomous mission'))
+      console.log(row('',                             '/plan     Task decomposition'))
       console.log()
       console.log(`${d}  ${b}Knowledge${r}${d}                      ${d}│ ${b}System${r}`)
       console.log(row('/notes    Observations',       '/mcp      MCP servers'))
@@ -1368,6 +1425,15 @@ function handleSlashCommand(
         return 'handled'
       }
       return 'mission' as 'handled'
+    }
+
+    case '/plan': {
+      if (!arg) {
+        console.log('\x1b[33m  usage: /plan <tasks>  (decompose prompt into task checklist)\x1b[0m')
+        console.log('\x1b[90m  Auto-splits into main (sequential) + side (concurrent) tasks\x1b[0m')
+        return 'handled'
+      }
+      return 'plan' as 'handled'
     }
 
     case '/diff': {
