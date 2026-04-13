@@ -451,8 +451,8 @@ src/
 | Goal-loop (done-when) | No | Codex loop | No | No | Droid loop | **runGoalLoop** | Parity |
 | Validation contract first | No | No | No | No | **Yes** | **Yes** | Parity |
 | Knowledge management | Memory | No | No | No | No | **Notes/Postmortem/Prompts/Learn** | **LEAD** |
-| Git worktree isolation | **Yes** | No | No | No | Yes | Planned | **GAP** |
-| Sandbox (Seatbelt/bwrap) | **Yes** | **Yes** | No | No | Yes | Planned | **GAP** |
+| Git worktree isolation | **Yes** | No | No | No | Yes | **WorktreeManager + Mission** | Parity |
+| Sandbox (Seatbelt/bwrap) | **Yes** | **Yes** | No | No | Yes | **--safe → Seatbelt/bwrap** | Parity |
 | MCP server ecosystem | **Mature** | No | No | No | No | Basic | **GAP** |
 | IDE integration (VS Code) | **Yes** | **Yes** | **Yes** | **Yes** | No | No | **GAP** |
 | Hooks system | **Yes** | No | No | No | No | **8 events** | Parity |
@@ -462,20 +462,18 @@ src/
 
 **LEAD areas (6)**: Multi-model collaboration, task auto-decomposition, context protection, cognitive skeleton, knowledge management, CJK support
 
-**Parity areas (5)**: Mission mode, concurrent execution, goal-loop, validation contract, hooks
+**Parity areas (7)**: Mission mode, concurrent execution, goal-loop, validation contract, hooks, git worktree isolation, sandbox security
 
-**GAP areas (4)**: Git worktree isolation, sandbox security, MCP ecosystem, IDE integration
+**GAP areas (2)**: MCP ecosystem depth, IDE integration
 
 ### Priority Targets for v0.9.0
 
 | Priority | Feature | Competitor Ref | Estimated LOC |
 |---|---|---|---|
-| P0 | Git worktree agent teams | Claude Code | ~800 |
-| P0 | Seatbelt/bwrap sandbox | Codex CLI | ~600 |
-| P1 | MCP server discovery + auto-connect | Claude Code | ~500 |
-| P1 | VS Code extension skeleton | Amp | ~1000 |
-| P2 | DNA capsule inheritance | Factory Droid | ~400 |
-| P2 | Webhook gateway (Telegram/Discord) | Hermes | ~600 |
+| P0 | MCP server discovery + auto-connect | Claude Code | ~500 |
+| P0 | VS Code extension skeleton | Amp | ~1000 |
+| P1 | DNA capsule inheritance | Factory Droid | ~400 |
+| P1 | Webhook gateway (Telegram/Discord) | Hermes | ~600 |
 
 ### Achieved Milestones (v0.4.0 → v0.8.0)
 

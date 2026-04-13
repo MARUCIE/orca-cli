@@ -13,6 +13,8 @@ import { homedir } from 'node:os'
 import { createHash } from 'node:crypto'
 import { execSync } from 'node:child_process'
 import { startBackgroundJob } from './background-jobs.js'
+import { executeSandboxed } from './sandbox/index.js'
+import type { SandboxPolicy } from './sandbox/index.js'
 
 // ── Tool Definitions (OpenAI function calling format) ───────────
 
@@ -219,6 +221,11 @@ export const DANGEROUS_TOOLS = new Set([
 const TOOL_SCHEMA_BY_NAME = new Map(
   TOOL_DEFINITIONS.map((tool) => [tool.function.name, tool.function.parameters] as const),
 )
+
+/** Global sandbox toggle — set via --safe flag or config */
+let _sandboxEnabled = false
+export function setSandboxMode(enabled: boolean): void { _sandboxEnabled = enabled }
+export function isSandboxEnabled(): boolean { return _sandboxEnabled }
 
 export function executeTool(name: string, args: Record<string, unknown>, cwd: string): ToolResult {
   try {
@@ -491,6 +498,22 @@ function executeRunCommand(args: Record<string, unknown>, cwd: string): ToolResu
 
   const execCwd = args.cwd ? resolve(cwd, String(args.cwd)) : cwd
 
+  // Sandbox mode: wrap in platform-appropriate sandbox (Seatbelt/bwrap)
+  if (_sandboxEnabled) {
+    const policy: SandboxPolicy = {
+      allowRead: [execCwd, '/usr', '/bin', '/etc', '/tmp'],
+      allowWrite: [execCwd, '/tmp'],
+      allowNetwork: false,
+      allowExec: ['/bin/sh', '/usr/bin/env', '/usr/bin/git', '/usr/local/bin/node'],
+    }
+    const result = executeSandboxed(command, policy, execCwd)
+    return {
+      success: result.success,
+      output: smartTruncate(result.output, 10_000),
+    }
+  }
+
+  // Direct execution (default)
   try {
     const output = execSync(command, {
       cwd: execCwd,

@@ -33,7 +33,7 @@ import { mcpClient } from '../mcp-client.js'
 import { runCommandPicker } from '../command-picker.js'
 import { runCouncil, runRace, runPipeline, pickDiverseModels } from '../multi-model.js'
 import type { PipelineStage } from '../multi-model.js'
-import { TOOL_DEFINITIONS, executeTool, DANGEROUS_TOOLS } from '../tools.js'
+import { TOOL_DEFINITIONS, executeTool, DANGEROUS_TOOLS, setSandboxMode } from '../tools.js'
 import { autoVerify, formatVerifyOutput } from '../auto-verify.js'
 import { TokenBudgetManager } from '../token-budget.js'
 import { RetryTracker } from '../retry-intelligence.js'
@@ -354,6 +354,9 @@ async function runREPL(
   type PermMode = 'yolo' | 'auto' | 'plan'
   const PERM_MODES: PermMode[] = ['yolo', 'auto', 'plan']
   let currentPermMode: PermMode = opts.safe ? 'auto' : 'yolo'
+
+  // Sandbox mode: --safe enables OS-level sandboxing for run_command
+  if (opts.safe) setSandboxMode(true)
 
   // SOTA agent intelligence modules
   const tokenBudget = new TokenBudgetManager(currentModel)

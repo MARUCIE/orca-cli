@@ -23,6 +23,7 @@ import { chatOnce } from '../providers/openai-compat.js'
 import type { OpenAICompatOptions } from '../providers/openai-compat.js'
 import { spawnSubAgent, DELEGATE_TOOLS, READ_ONLY_TOOLS } from '../agent/sub-agent.js'
 import type { SubAgentResult } from '../agent/sub-agent.js'
+import { WorktreeManager } from '../agent/worktree.js'
 
 import type {
   Mission, MissionPlan, MissionState, MissionPhase,
@@ -46,6 +47,7 @@ export class MissionController {
   private apiOptions: OpenAICompatOptions
   private eventHandlers: MissionEventHandler[] = []
   private missionDir: string
+  private worktreeManager: WorktreeManager | null = null
 
   constructor(
     goal: string,
@@ -55,6 +57,8 @@ export class MissionController {
       workerModel?: string
       maxFeatureRetries?: number
       maxMilestoneRetries?: number
+      /** Run each worker in an isolated git worktree (requires git repo) */
+      useWorktree?: boolean
     },
   ) {
     const id = randomUUID().slice(0, 8)
@@ -73,6 +77,16 @@ export class MissionController {
     }
 
     mkdirSync(this.missionDir, { recursive: true })
+
+    // Initialize worktree manager if git repo and option enabled
+    if (options?.useWorktree) {
+      try {
+        execSync('git rev-parse --is-inside-work-tree', { cwd, stdio: 'pipe' })
+        this.worktreeManager = new WorktreeManager()
+      } catch {
+        // Not a git repo — fall back to shared directory
+      }
+    }
   }
 
   /** Subscribe to mission progress events */
@@ -275,6 +289,22 @@ export class MissionController {
 
     const workerPrompt = buildWorkerPrompt(feature, this.mission.plan!.contract)
 
+    // Determine working directory: worktree (isolated) or shared cwd
+    let workerCwd = this.mission.cwd
+    let worktreeAgent: import('../agent/worktree.js').WorktreeAgent | null = null
+
+    if (this.worktreeManager) {
+      try {
+        worktreeAgent = this.worktreeManager.create(this.mission.cwd, feature.title)
+        workerCwd = worktreeAgent.worktreePath
+        this.emit('feature_started', feature.id,
+          `Worktree: ${worktreeAgent.branch} → ${worktreeAgent.id}`,
+        )
+      } catch {
+        // Worktree creation failed — fall back to shared cwd
+      }
+    }
+
     const result: SubAgentResult = await spawnSubAgent(
       {
         task: workerPrompt,
@@ -282,7 +312,7 @@ export class MissionController {
         tools: DELEGATE_TOOLS,
         timeout: WORKER_TIMEOUT,
         maxTurns: 15,
-        cwd: this.mission.cwd,
+        cwd: workerCwd,
       },
       {
         model: this.mission.workerModel,
@@ -297,11 +327,26 @@ export class MissionController {
       feature.status = 'implemented'
       feature.lastOutput = result.output.slice(0, 500)
       this.mission.state.featuresImplemented++
+
+      // Merge worktree back to main branch on success
+      if (worktreeAgent && this.worktreeManager) {
+        const merge = this.worktreeManager.merge(worktreeAgent.id, this.mission.cwd)
+        if (!merge.success) {
+          this.emit('feature_completed', feature.id, `Implemented but merge conflict: ${merge.output.slice(0, 100)}`)
+        }
+        this.worktreeManager.cleanup(worktreeAgent.id, this.mission.cwd)
+      }
+
       this.emit('feature_completed', feature.id, `Implemented: ${feature.title}`)
     } else {
       feature.status = 'failed'
       feature.lastOutput = result.output.slice(0, 500)
       this.emit('feature_failed', feature.id, `Failed: ${feature.title} — ${result.output.slice(0, 200)}`)
+
+      // Cleanup worktree on failure
+      if (worktreeAgent && this.worktreeManager) {
+        this.worktreeManager.cleanup(worktreeAgent.id, this.mission.cwd)
+      }
 
       if (feature.attempts >= this.mission.maxFeatureRetries) {
         this.mission.state.featuresFailed++

@@ -113,7 +113,7 @@
       <div class="label">领先维度</div>
     </div>
     <div class="metric-card">
-      <div class="value" style="color: var(--warning);">4</div>
+      <div class="value" style="color: var(--warning);">2</div>
       <div class="label">待追赶 GAP</div>
     </div>
     <div class="metric-card">
@@ -865,8 +865,8 @@
       <tr><td>目标循环</td><td>--</td><td>Loop</td><td>Droid Loop</td><td><strong>runGoalLoop</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
       <tr><td>验证契约优先</td><td>--</td><td>--</td><td><strong>Yes</strong></td><td><strong>Yes</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
       <tr><td>Hook 系统</td><td><strong>Yes</strong></td><td>--</td><td>--</td><td><strong>8 events</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
-      <tr><td>Git Worktree 隔离</td><td><strong>Yes</strong></td><td>--</td><td>Yes</td><td>Planned</td><td><span class="badge badge-red">GAP</span></td></tr>
-      <tr><td>沙箱安全</td><td><strong>Yes</strong></td><td><strong>Yes</strong></td><td>Yes</td><td>Planned</td><td><span class="badge badge-red">GAP</span></td></tr>
+      <tr><td>Git Worktree 隔离</td><td><strong>Yes</strong></td><td>--</td><td>Yes</td><td><strong>WorktreeManager + Mission</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
+      <tr><td>沙箱安全</td><td><strong>Yes</strong></td><td><strong>Yes</strong></td><td>Yes</td><td><strong>--safe -> Seatbelt/bwrap</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
       <tr><td>MCP Server 生态</td><td><strong>Mature</strong></td><td>--</td><td>--</td><td>Basic</td><td><span class="badge badge-red">GAP</span></td></tr>
       <tr><td>IDE 集成</td><td><strong>Yes</strong></td><td><strong>Yes</strong></td><td>--</td><td>--</td><td><span class="badge badge-red">GAP</span></td></tr>
     </tbody>
@@ -876,12 +876,12 @@
   <table>
     <thead><tr><th>优先级</th><th>功能</th><th>对标</th><th>预估</th></tr></thead>
     <tbody>
-      <tr><td><span class="priority p0">P0</span></td><td>Git Worktree Agent Teams</td><td>Claude Code</td><td>~800 LOC</td></tr>
-      <tr><td><span class="priority p0">P0</span></td><td>Seatbelt / bwrap 沙箱</td><td>Codex CLI</td><td>~600 LOC</td></tr>
-      <tr><td><span class="priority p1">P1</span></td><td>MCP Server 发现 + 自动连接</td><td>Claude Code</td><td>~500 LOC</td></tr>
-      <tr><td><span class="priority p1">P1</span></td><td>VS Code Extension 骨架</td><td>Amp</td><td>~1000 LOC</td></tr>
-      <tr><td><span class="priority p2">P2</span></td><td>DNA Capsule 跨 Agent 继承</td><td>Factory Droid</td><td>~400 LOC</td></tr>
-      <tr><td><span class="priority p2">P2</span></td><td>Webhook Gateway</td><td>Hermes</td><td>~600 LOC</td></tr>
+      <tr><td><span class="badge badge-green">DONE</span></td><td>Git Worktree Agent Teams</td><td>Claude Code</td><td>v0.8.0 集成到 Mission Worker</td></tr>
+      <tr><td><span class="badge badge-green">DONE</span></td><td>Seatbelt / bwrap 沙箱</td><td>Codex CLI</td><td>v0.8.0 集成到 --safe 模式</td></tr>
+      <tr><td><span class="priority p0">P0</span></td><td>MCP Server 发现 + 自动连接</td><td>Claude Code</td><td>~500 LOC</td></tr>
+      <tr><td><span class="priority p0">P0</span></td><td>VS Code Extension 骨架</td><td>Amp</td><td>~1000 LOC</td></tr>
+      <tr><td><span class="priority p1">P1</span></td><td>DNA Capsule 跨 Agent 继承</td><td>Factory Droid</td><td>~400 LOC</td></tr>
+      <tr><td><span class="priority p1">P1</span></td><td>Webhook Gateway</td><td>Hermes</td><td>~600 LOC</td></tr>
     </tbody>
   </table>
 
