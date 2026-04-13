@@ -760,11 +760,38 @@ async function runREPL(
               const ep = resolveEndpoint(m)
               console.log(`\x1b[90m  │ ${m} → ${ep?.provider || '?'}\x1b[0m`)
             })
+            // Live progress: show per-model elapsed timer that updates in-place
+            const modelStatus = new Map<string, { done: boolean; ms: number }>()
+            models.forEach(m => modelStatus.set(m, { done: false, ms: 0 }))
+            const councilStart = Date.now()
+            let lastLineLen = 0
+
+            const renderProgress = () => {
+              const elapsed = Date.now() - councilStart
+              const parts = models.map(m => {
+                const s = modelStatus.get(m)!
+                const name = m.length > 18 ? m.slice(0, 16) + '..' : m
+                if (s.done) return `\x1b[32m✓ ${name} ${(s.ms / 1000).toFixed(1)}s\x1b[0m`
+                return `\x1b[90m● ${name} ${(elapsed / 1000).toFixed(0)}s\x1b[0m`
+              })
+              const line = `  ${parts.join('  ')}`
+              const clearLen = Math.max(lastLineLen, line.length + 10)
+              process.stderr.write(`\r${' '.repeat(clearLen)}\r${line}`)
+              lastLineLen = line.length
+            }
+
+            const progressTimer = setInterval(renderProgress, 500)
+
             const result = await runCouncil({
               prompt: mmPrompt, models, judgeModel: models[0]!, resolveEndpoint,
-              onModelStart: (m) => process.stdout.write(`\x1b[90m  ● ${m}...\x1b[0m`),
-              onModelDone: (m, ms) => console.log(` \x1b[32m${(ms/1000).toFixed(1)}s\x1b[0m`),
+              onModelStart: () => renderProgress(),
+              onModelDone: (m, ms) => {
+                modelStatus.set(m, { done: true, ms })
+                renderProgress()
+              },
             })
+            clearInterval(progressTimer)
+            process.stderr.write(`\r${' '.repeat(lastLineLen + 10)}\r`) // clear progress line
             console.log()
             for (const r of result.responses) {
               if (r.error) { console.log(`\x1b[31m  ✗ ${r.model}: ${r.error}\x1b[0m`) }
@@ -781,11 +808,37 @@ async function runREPL(
               continue
             }
             console.log(`\n\x1b[33m  ╭── Race: ${models.length} models ──╮\x1b[0m`)
+            const raceStatus = new Map<string, { done: boolean; ms: number; won: boolean }>()
+            models.forEach(m => raceStatus.set(m, { done: false, ms: 0, won: false }))
+            const raceStart = Date.now()
+            let raceLineLen = 0
+
+            const renderRaceProgress = () => {
+              const elapsed = Date.now() - raceStart
+              const parts = models.map(m => {
+                const s = raceStatus.get(m)!
+                const name = m.length > 16 ? m.slice(0, 14) + '..' : m
+                if (s.won) return `\x1b[32m★ ${name} ${(s.ms / 1000).toFixed(1)}s\x1b[0m`
+                if (s.done) return `\x1b[90m✓ ${name}\x1b[0m`
+                return `\x1b[90m◎ ${name} ${(elapsed / 1000).toFixed(0)}s\x1b[0m`
+              })
+              const line = `  ${parts.join('  ')}`
+              const clearLen = Math.max(raceLineLen, line.length + 10)
+              process.stderr.write(`\r${' '.repeat(clearLen)}\r${line}`)
+              raceLineLen = line.length
+            }
+
+            const raceTimer = setInterval(renderRaceProgress, 500)
             const result = await runRace({
               prompt: mmPrompt, models, resolveEndpoint,
-              onModelStart: (m) => process.stdout.write(`\x1b[90m  ◎ ${m}...\x1b[0m`),
-              onModelDone: (m, ms, won) => console.log(won ? ` \x1b[32m★ WINNER ${(ms/1000).toFixed(1)}s\x1b[0m` : ` \x1b[90m${(ms/1000).toFixed(1)}s\x1b[0m`),
+              onModelStart: () => renderRaceProgress(),
+              onModelDone: (m, ms, won) => {
+                raceStatus.set(m, { done: true, ms, won: won || false })
+                renderRaceProgress()
+              },
             })
+            clearInterval(raceTimer)
+            process.stderr.write(`\r${' '.repeat(raceLineLen + 10)}\r`)
             console.log(`\n\x1b[32m  Winner: ${result.winner.model} (${(result.winner.durationMs/1000).toFixed(1)}s)\x1b[0m\n  ${result.winner.text}\n`)
             if (result.cancelled.length > 0) console.log(`\x1b[90m  cancelled: ${result.cancelled.join(', ')}\x1b[0m`)
             console.log(`\x1b[90m  ─ ${(result.totalDurationMs/1000).toFixed(1)}s total ─\x1b[0m\n`)
