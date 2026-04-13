@@ -432,8 +432,8 @@ src/
 |---|---|
 | Version | 0.8.0 |
 | LOC | 16,722 |
-| Tests | 1151 (54 files) |
-| Modules | 14 directories |
+| Tests | 1156 (54 files) |
+| Modules | 15 directories (incl. src/ui/) |
 | Tools | 41+ |
 | Slash commands | 30+ |
 
@@ -454,7 +454,7 @@ src/
 | Git worktree isolation | **Yes** | No | No | No | Yes | **WorktreeManager + Mission** | Parity |
 | Sandbox (Seatbelt/bwrap) | **Yes** | **Yes** | No | No | Yes | **--safe → Seatbelt/bwrap** | Parity |
 | MCP server ecosystem | **Mature** | No | No | No | No | **Tool bridge + auto-inject** | Parity |
-| Terminal UI (ink/React TUI) | **Yes (ink)** | Raw ANSI | No | No | No | **ink + React 18 (CC-parity)** | Parity |
+| Terminal UI (ink/React TUI) | **Yes (ink)** | Raw ANSI | No | No | No | **ink 5 + React 18: 13 components, ChatSessionEmitter, markdown rendering, console interception** | Parity |
 | IDE integration (VS Code) | **Yes** | **Yes** | **Yes** | **Yes** | No | No | **GAP** |
 | Hooks system | **Yes** | No | No | No | No | **11 events (incl. MultiModelStart auto-preprocess)** | **LEAD** |
 | CJK-aware token estimation | No | No | No | No | No | **Yes** | **LEAD** |
