@@ -4,3 +4,10 @@ dist/
 .DS_Store
 .armature.json
 .omx/
+
+# AI-Fleet symlinks (local dev only, not portable)
+configs/sop-registry.json
+configs/dev-pipeline-registry.json
+configs/skill-groups.json
+knowledge/refs/design-systems
+knowledge/models/COGNITIVE_SKELETON.md
