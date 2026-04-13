@@ -17,6 +17,7 @@ import { getPricingForModel } from '../model-catalog.js'
 import type { OrcaConfig } from '../config.js'
 import { resolveConfig, resolveProvider } from '../config.js'
 import { parseDoneCriteria, runGoalLoop } from '../harness/goal-loop.js'
+import { chatOnce } from '../providers/openai-compat.js'
 import {
   printBanner, printProviderInfo, printError,
   ensureNewline, setLastNewline, printToolUse, printToolResult,
@@ -91,12 +92,27 @@ export function createRunCommand(): Command {
               },
             },
             async (iteration, feedback) => {
-              const iterTask = feedback
-                ? `${task}\n\nFeedback from previous iteration: ${feedback}`
+              const iterPrompt = feedback
+                ? `${task}\n\nIteration ${iteration}. Previous attempt did not meet the done criteria.\nFeedback: ${feedback}\nTry a different approach.`
                 : task
-              // TODO: wire executeTask to return output text for criteria checking
-              // For now, use a placeholder that runs the criteria command
-              return `Iteration ${iteration}: ${iterTask}`
+
+              // Call the LLM for each iteration
+              if (resolved.baseURL) {
+                try {
+                  const sysPrompt = config.systemPrompt || buildSystemPrompt(runCwd)
+                  const result = await chatOnce(
+                    { apiKey: resolved.apiKey, baseURL: resolved.baseURL, model: resolved.model, systemPrompt: sysPrompt },
+                    iterPrompt,
+                  )
+                  if (outputMode === 'streaming') {
+                    process.stdout.write(`\x1b[90m${result.text.slice(0, 500)}\x1b[0m\n`)
+                  }
+                  return result.text
+                } catch (err) {
+                  return `Error: ${err instanceof Error ? err.message : String(err)}`
+                }
+              }
+              return `(no provider baseURL configured — cannot execute)`
             },
           )
 

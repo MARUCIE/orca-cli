@@ -2,6 +2,26 @@
 
 This file is a historical release log. Version-specific counts and examples reflect the release date they were recorded, not the current repo head.
 
+## v0.7.1 — Knowledge Management + Goal-Loop Execution (2026-04-13)
+
+AI-Fleet documentation management system transplant + long task delivery.
+
+### Knowledge Management System (4 modules)
+- **NotesManager**: `/notes [list|add|search]` — tagged observations with keyword search
+- **PostmortemLog**: `/postmortem [list|search]` — structured error patterns with auto-matching
+- **PromptRepository**: `/prompts [list|find]` — versioned templates with usage/success tracking
+- **LearningJournal**: `/learn [rules|observe|status]` — auto-evolution: observation → promotion cycle
+
+### Context Guard (mandatory PostToolUse hook)
+- Fires after every tool use, auto-compacts at 60% utilization
+- Three-layer protection: PostToolUse 60% → Pre-Send 75% → 413 recovery
+
+### Goal-Loop Execution
+- `orca run --done-when` now calls LLM via chatOnce per iteration
+- Criteria: "tests pass" / "/regex/" / "exit 0: cmd" / "typecheck passes"
+
+Tests: 732 pass / 47 files.
+
 ## v0.6.2 — Output Intelligence + Cognitive Skeleton (2026-04-13)
 
 6 fixes from screenshot-based I/O analysis:
