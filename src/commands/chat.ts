@@ -799,13 +799,11 @@ async function runREPL(
     const costTag = costUsd > 0 ? `$${costUsd < 0.01 ? costUsd.toFixed(4) : costUsd.toFixed(2)}` : ''
     const footerParts = [modelShort, `ctx ${pct}%`, currentPermMode, branchTag, costTag].filter(Boolean)
 
-    // Status line + input box with dashed border
-    console.log(`\x1b[90m  ${'─'.repeat(borderWidth)}\x1b[0m`)
+    // Status line + clean input box
     console.log(`\x1b[90m  ${footerParts.join('  ·  ')}\x1b[0m`)
-    console.log(`\x1b[90m  ╭${'╌'.repeat(borderWidth - 2)}╮\x1b[0m`)
+    console.log(`\x1b[90m  ╭${'─'.repeat(borderWidth - 2)}╮\x1b[0m`)
 
-    // Prompt: left border + cursor, readline handles the rest
-    return `\x1b[90m  ╎\x1b[0m ${theme.prompt}❯\x1b[0m `
+    return `\x1b[90m  │\x1b[0m ${theme.prompt}❯\x1b[0m `
   }
 
   const promptUser = (): Promise<string | null> => new Promise((resolve) => {
@@ -907,7 +905,7 @@ async function runREPL(
 
     // Close input box bottom border
     const boxWidth = Math.min((process.stdout.columns || 80) - 4, 72)
-    console.log(`\x1b[90m  ╰${'╌'.repeat(boxWidth - 2)}╯\x1b[0m`)
+    console.log(`\x1b[90m  ╰${'─'.repeat(boxWidth - 2)}╯\x1b[0m`)
 
     if (input === null) break
     if (!input) continue
