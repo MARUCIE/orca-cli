@@ -1521,9 +1521,11 @@ async function runREPL(
     }
 
     // Progress indicator (thinking → working with elapsed time + token count)
-    const progress = new ProgressIndicator()
+    const turnStartTime = Date.now()
+    const progress = useInk ? null : new ProgressIndicator()
     let firstToken = false
-    progress.start()
+    if (progress) progress.start()
+    if (useInk) session.emitThinkingStart()
 
     try {
       if (resolved.baseURL && !abortController.signal.aborted) {
@@ -1537,15 +1539,18 @@ async function runREPL(
           abortSignal: abortController.signal,
           onFirstToken: () => {
             firstToken = true
-            const { elapsed } = progress.stop()
-            if (elapsed > 1000) {
-              process.stdout.write(`\x1b[90m  [${(elapsed / 1000).toFixed(1)}s to first token]\x1b[0m\n`)
+            if (progress) {
+              const { elapsed } = progress.stop()
+              if (elapsed > 1000) {
+                process.stdout.write(`\x1b[90m  [${(elapsed / 1000).toFixed(1)}s to first token]\x1b[0m\n`)
+              }
+              progress.start()
+              progress.markWorking()
             }
-            progress.start()
-            progress.markWorking()
+            if (useInk) session.emitThinkingEnd(Date.now() - turnStartTime)
           },
           onStreamToken: (text: string) => {
-            progress.addText(text)
+            if (progress) progress.addText(text)
           },
           onFileWrite: (path, oldContent) => { lastWrite = { path, oldContent } },
           safeMode: currentPermMode !== 'yolo',
@@ -1564,7 +1569,7 @@ async function runREPL(
         contextMonitor.recordUsage(result.inputTokens, result.outputTokens)
 
         // Track tok/s from this turn (output tokens / generation time)
-        const turnElapsed = progress.stop().elapsed
+        const turnElapsed = progress ? progress.stop().elapsed : (Date.now() - turnStartTime)
         if (turnElapsed > 0 && result.outputTokens > 0) {
           lastTokPerSec = result.outputTokens / (turnElapsed / 1000)
         }
@@ -1577,14 +1582,26 @@ async function runREPL(
           turnCost = (result.inputTokens / 1_000_000) * turnPricing[0]
                    + (result.outputTokens / 1_000_000) * turnPricing[1]
         }
-        printTurnSummary({
-          elapsedMs: turnElapsed,
-          inputTokens: result.inputTokens,
-          outputTokens: result.outputTokens,
-          costUsd: turnCost,
-          contextPct: turnBudget.utilizationPct,
-          tokPerSec: lastTokPerSec,
-        })
+        if (useInk) {
+          session.emitTurnSummary({
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            duration: turnElapsed,
+            toolCalls: 0,
+            costUsd: turnCost,
+            model: currentModel,
+          })
+          emitStatus()
+        } else {
+          printTurnSummary({
+            elapsedMs: turnElapsed,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            costUsd: turnCost,
+            contextPct: turnBudget.utilizationPct,
+            tokPerSec: lastTokPerSec,
+          })
+        }
 
         // Harness: context utilization warning with actionable detail
         const risk = contextMonitor.getRiskLevel()
@@ -1603,12 +1620,12 @@ async function runREPL(
         }
       } else if (!abortController.signal.aborted) {
         firstToken = true
-        progress.stop()
+        if (progress) progress.stop()
         await runSDKQuery({ prompt: messageToSend, resolved, config, outputMode, cwd })
         stats.turns++
       }
     } catch (err) {
-      progress.stop()
+      if (progress) progress.stop()
       if (!abortController.signal.aborted) {
         const errMsg = err instanceof Error ? err.message : String(err)
         const errStatus = (err as { status?: number; statusCode?: number })?.status
@@ -1651,7 +1668,7 @@ async function runREPL(
         }
       }
     } finally {
-      progress.stop()
+      if (progress) progress.stop()
       if (rawMode) {
         process.stdin.setRawMode(false)
         process.stdin.removeListener('data', escHandler)
