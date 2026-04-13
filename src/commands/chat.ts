@@ -1127,37 +1127,50 @@ function handleSlashCommand(
       return 'pick_model'
 
     case '/clear':
-      // Clear screen + reset conversation (keep system prompt)
+      // Reset conversation + context monitors + clear screen
       {
-        process.stdout.write('\x1b[2J\x1b[H') // ANSI: clear screen + move cursor to top
         const sysMsg = history.find(m => m.role === 'system')
         history.length = 0
         if (sysMsg) history.push(sysMsg)
         stats.turns = 0
         stats.totalInputTokens = 0
         stats.totalOutputTokens = 0
+        // Reset BOTH context monitor and token budget to zero
         harness?.contextMonitor.reset()
+        harness?.tokenBudget.reset()
+        // Clear screen LAST so the new prompt shows on a clean terminal
+        process.stdout.write('\x1b[2J\x1b[H')
         console.log('\x1b[90m  conversation cleared.\x1b[0m')
       }
       return 'handled'
 
     case '/compact':
-      // Keep system prompt + last 2 user/assistant pairs
+      // Smart compaction: drop old messages + truncate large ones
       {
         hooks.run('PreCompact', { event: 'PreCompact', cwd })
-        const sysMsg = history.find(m => m.role === 'system')
-        const convMsgs = history.filter(m => m.role !== 'system')
-        if (convMsgs.length <= 4) {
-          console.log(`\x1b[90m  nothing to compact (${convMsgs.length} messages, need >4).\x1b[0m`)
-          hooks.run('PostCompact', { event: 'PostCompact', cwd })
-          return 'handled' as const
+        if (harness?.tokenBudget) {
+          const result = harness.tokenBudget.smartCompact(history)
+          if (result.dropped > 0 || result.tokensFreed > 0) {
+            console.log(`\x1b[90m  ${result.summary}\x1b[0m`)
+            harness.contextMonitor.reset()
+          } else {
+            console.log(`\x1b[90m  ${result.summary}\x1b[0m`)
+          }
+        } else {
+          // Fallback: naive compaction
+          const sysMsg = history.find(m => m.role === 'system')
+          const convMsgs = history.filter(m => m.role !== 'system')
+          if (convMsgs.length <= 4) {
+            console.log(`\x1b[90m  nothing to compact (${convMsgs.length} messages).\x1b[0m`)
+          } else {
+            const keep = convMsgs.slice(-4)
+            const dropped = convMsgs.length - keep.length
+            history.length = 0
+            if (sysMsg) history.push(sysMsg)
+            history.push(...keep)
+            console.log(`\x1b[90m  compacted: kept last 2 turns, dropped ${dropped} messages.\x1b[0m`)
+          }
         }
-        const keep = convMsgs.slice(-4) // last 2 turns (user + assistant each)
-        const dropped = convMsgs.length - keep.length
-        history.length = 0
-        if (sysMsg) history.push(sysMsg)
-        history.push(...keep)
-        console.log(`\x1b[90m  compacted: kept last 2 turns, dropped ${dropped} messages.\x1b[0m`)
         hooks.run('PostCompact', { event: 'PostCompact', cwd })
       }
       return 'handled'

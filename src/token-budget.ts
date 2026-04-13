@@ -155,6 +155,13 @@ export class TokenBudgetManager {
     return this.cumulativeInput + this.cumulativeOutput
   }
 
+  /** Reset all counters (after /clear) */
+  reset(): void {
+    this.lastInputTokens = 0
+    this.cumulativeInput = 0
+    this.cumulativeOutput = 0
+  }
+
   /**
    * Smart compaction: aggressively free context while preserving recent state.
    *
