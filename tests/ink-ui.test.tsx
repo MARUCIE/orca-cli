@@ -245,6 +245,55 @@ describe('Footer', () => {
   })
 })
 
+describe('Banner', () => {
+  it('renders version and cwd', async () => {
+    const { Banner } = await import('../src/ui/components/Banner.js')
+    const { lastFrame } = render(
+      <Banner version="0.8.0" cwd="/Users/me/project" />,
+    )
+    expect(lastFrame()).toContain('Orca')
+    expect(lastFrame()).toContain('0.8.0')
+  })
+
+  it('renders orca pixel art', async () => {
+    const { Banner } = await import('../src/ui/components/Banner.js')
+    const { lastFrame } = render(
+      <Banner version="0.8.0" cwd="/tmp" />,
+    )
+    // Should contain some orca art characters
+    expect(lastFrame()).toContain('▄')
+    expect(lastFrame()).toContain('█')
+  })
+
+  it('renders config files when provided', async () => {
+    const { Banner } = await import('../src/ui/components/Banner.js')
+    const { lastFrame } = render(
+      <Banner version="0.8.0" cwd="/tmp" configFiles={['CLAUDE.md', 'package.json']} toolCount={41} hookCount={37} />,
+    )
+    expect(lastFrame()).toContain('CLAUDE.md')
+    expect(lastFrame()).toContain('41 tools')
+    expect(lastFrame()).toContain('37 hooks')
+  })
+})
+
+describe('MarkdownText', () => {
+  it('renders plain text', async () => {
+    const { MarkdownText } = await import('../src/ui/components/MarkdownText.js')
+    const { lastFrame } = render(
+      <MarkdownText>Hello world</MarkdownText>,
+    )
+    expect(lastFrame()).toContain('Hello world')
+  })
+
+  it('renders empty string without error', async () => {
+    const { MarkdownText } = await import('../src/ui/components/MarkdownText.js')
+    const { lastFrame } = render(
+      <MarkdownText>{''}</MarkdownText>,
+    )
+    expect(lastFrame()).toBe('')
+  })
+})
+
 describe('ChatSessionEmitter', () => {
   it('emitText fires text event', () => {
     const session = new ChatSessionEmitter()

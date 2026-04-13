@@ -24,6 +24,7 @@ import { TurnSummary } from './TurnSummary.js'
 import { PermissionPrompt } from './PermissionPrompt.js'
 import { MultiModelProgress } from './MultiModelProgress.js'
 import { Footer } from './Footer.js'
+import { MarkdownText } from './MarkdownText.js'
 
 interface Props {
   session: ChatSessionEmitter
@@ -224,11 +225,11 @@ export function App({ session, initialStatus }: Props): React.ReactElement {
               const color = block.level === 'error' ? 'red' : block.level === 'warn' ? 'yellow' : 'gray'
               return <Text key={block.id} color={color}>  {block.content}</Text>
             }
-            return <Text key={block.id}>{block.content}</Text>
+            return <MarkdownText key={block.id}>{block.content}</MarkdownText>
           }}
         </Static>
 
-        {/* Currently streaming text */}
+        {/* Currently streaming text (raw during stream, markdown on flush) */}
         {streamingText && <Text>{streamingText}</Text>}
 
         {/* Thinking spinner */}
