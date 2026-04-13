@@ -776,33 +776,29 @@ async function runREPL(
   // Used by tool-level read guard to prevent duplicate reads that explode context.
   const sessionInjectedPaths = new Set<string>()
 
-  const renderStatusAndPrompt = (): string => {
-    const budget = tokenBudget.getBudget(history)
-    const totalTokens = stats.totalInputTokens + stats.totalOutputTokens
+  // ── Status Bar (transitional: inline until ink Phase 2) ────────
 
-    // Estimate session cost from cumulative tokens
+  const getStatusText = (): string => {
+    const budget = tokenBudget.getBudget(history)
     const pricing = getPricingForModel(currentModel)
     let costUsd = 0
     if (pricing) {
       costUsd = (stats.totalInputTokens / 1_000_000) * pricing[0]
              + (stats.totalOutputTokens / 1_000_000) * pricing[1]
     }
-
-    const cols = process.stdout.columns || 80
-
-    // Compact footer: model · context% · mode · branch · session cost
     const modelShort = currentModel.length > 22 ? currentModel.slice(0, 20) + '..' : currentModel
     const pct = Math.min(100, budget.utilizationPct)
     const branchTag = gitBranch ? `(${gitBranch})` : ''
     const costTag = costUsd > 0 ? `$${costUsd < 0.01 ? costUsd.toFixed(4) : costUsd.toFixed(2)}` : ''
-    const footerParts = [modelShort, `ctx ${pct}%`, currentPermMode, branchTag, costTag].filter(Boolean)
+    return [modelShort, `ctx ${pct}%`, currentPermMode, branchTag, costTag].filter(Boolean).join('  ·  ')
+  }
 
-    // Status embedded in full-width separator: ──── model · ctx · mode ────
-    const statusText = ` ${footerParts.join('  ·  ')} `
+  const renderStatusAndPrompt = (): string => {
+    const cols = process.stdout.columns || 80
+    const statusText = ` ${getStatusText()} `
     const leftPad = 2
     const rightFill = Math.max(0, cols - leftPad - statusText.length)
     console.log(`\x1b[90m${'─'.repeat(leftPad)}${statusText}${'─'.repeat(rightFill)}\x1b[0m`)
-
     return `${theme.prompt}❯\x1b[0m `
   }
 
@@ -1658,7 +1654,7 @@ async function runREPL(
     }
   }
 
-  // Save history on any exit path
+  // Cleanup
   saveInputHistory(historyFile, inputHistory)
   rl.close()
 }
