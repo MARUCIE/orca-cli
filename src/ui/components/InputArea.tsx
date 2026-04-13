@@ -3,14 +3,15 @@
  *
  * Features:
  * - Rounded border box with accent color (CC-style)
- * - Multi-line editing (Shift+Enter or ``` fence mode)
- * - Command history (up/down arrows)
- * - Tab completion hint
+ * - Multi-line editing via newline character (\n) in buffer
+ * - Ctrl+J / Ctrl+Enter to insert newline
+ * - Command history (up/down arrows when on first line)
  * - Esc to abort during generation
  * - Minimum height for visual presence
+ * - Cursor position tracking for mid-text editing
  */
 
-import React, { useState, useCallback } from 'react'
+import React, { useState } from 'react'
 import { Box, Text, useInput, useStdout } from 'ink'
 
 interface Props {
@@ -28,17 +29,27 @@ export function InputArea({ onSubmit, onAbort, active, history = [] }: Props): R
   const { stdout } = useStdout()
   const cols = stdout?.columns || 80
   const [value, setValue] = useState('')
+  const [cursor, setCursor] = useState(0)
   const [historyIdx, setHistoryIdx] = useState(-1)
 
   useInput(
     (input, key) => {
       if (!active) return
 
-      if (key.return) {
+      // Enter: submit (Ctrl+J inserts newline)
+      if (key.return && !key.ctrl) {
         const trimmed = value.trim()
         onSubmit(trimmed)
         setValue('')
+        setCursor(0)
         setHistoryIdx(-1)
+        return
+      }
+
+      // Ctrl+J or Ctrl+Enter: insert newline
+      if ((key.ctrl && input === 'j') || (key.return && key.ctrl)) {
+        setValue(prev => prev.slice(0, cursor) + '\n' + prev.slice(cursor))
+        setCursor(prev => prev + 1)
         return
       }
 
@@ -48,41 +59,120 @@ export function InputArea({ onSubmit, onAbort, active, history = [] }: Props): R
       }
 
       if (key.backspace || key.delete) {
-        setValue(prev => prev.slice(0, -1))
+        if (cursor > 0) {
+          setValue(prev => prev.slice(0, cursor - 1) + prev.slice(cursor))
+          setCursor(prev => prev - 1)
+        }
         return
       }
 
       // Tab: no-op (reserved for completion)
       if (key.tab) return
 
-      if (key.upArrow && history.length > 0) {
-        const next = Math.min(historyIdx + 1, history.length - 1)
-        setHistoryIdx(next)
-        setValue(history[history.length - 1 - next] || '')
+      // Ctrl+A: beginning of line
+      if (key.ctrl && input === 'a') {
+        const lineStart = value.lastIndexOf('\n', cursor - 1) + 1
+        setCursor(lineStart)
         return
       }
 
-      if (key.downArrow) {
-        const next = historyIdx - 1
-        if (next < 0) {
-          setHistoryIdx(-1)
-          setValue('')
-        } else {
+      // Ctrl+E: end of line
+      if (key.ctrl && input === 'e') {
+        let lineEnd = value.indexOf('\n', cursor)
+        if (lineEnd === -1) lineEnd = value.length
+        setCursor(lineEnd)
+        return
+      }
+
+      // Left arrow
+      if (key.leftArrow) {
+        setCursor(prev => Math.max(0, prev - 1))
+        return
+      }
+
+      // Right arrow
+      if (key.rightArrow) {
+        setCursor(prev => Math.min(value.length, prev + 1))
+        return
+      }
+
+      // Up arrow: history when on first line, or move cursor up in multi-line
+      if (key.upArrow) {
+        const lineStart = value.lastIndexOf('\n', cursor - 1)
+        if (lineStart === -1 && history.length > 0) {
+          // On first line: navigate history
+          const next = Math.min(historyIdx + 1, history.length - 1)
           setHistoryIdx(next)
-          setValue(history[history.length - 1 - next] || '')
+          const hVal = history[history.length - 1 - next] || ''
+          setValue(hVal)
+          setCursor(hVal.length)
+        } else if (lineStart >= 0) {
+          // Move cursor to previous line
+          const prevLineStart = value.lastIndexOf('\n', lineStart - 1) + 1
+          const colOffset = cursor - lineStart - 1
+          setCursor(Math.min(prevLineStart + colOffset, lineStart))
         }
+        return
+      }
+
+      // Down arrow: history or move cursor down
+      if (key.downArrow) {
+        const nextNewline = value.indexOf('\n', cursor)
+        if (nextNewline === -1) {
+          // On last line: history backward
+          const next = historyIdx - 1
+          if (next < 0) {
+            setHistoryIdx(-1)
+            setValue('')
+            setCursor(0)
+          } else {
+            setHistoryIdx(next)
+            const hVal = history[history.length - 1 - next] || ''
+            setValue(hVal)
+            setCursor(hVal.length)
+          }
+        } else {
+          // Move cursor to next line
+          const lineStart = value.lastIndexOf('\n', cursor - 1) + 1
+          const colOffset = cursor - lineStart
+          const nextLineEnd = value.indexOf('\n', nextNewline + 1)
+          const nextLineLen = (nextLineEnd === -1 ? value.length : nextLineEnd) - (nextNewline + 1)
+          setCursor(nextNewline + 1 + Math.min(colOffset, nextLineLen))
+        }
+        return
+      }
+
+      // Ctrl+U: clear line
+      if (key.ctrl && input === 'u') {
+        setValue('')
+        setCursor(0)
         return
       }
 
       // Regular character input
       if (input && !key.ctrl && !key.meta) {
-        setValue(prev => prev + input)
+        setValue(prev => prev.slice(0, cursor) + input + prev.slice(cursor))
+        setCursor(prev => prev + input.length)
       }
     },
     { isActive: active },
   )
 
-  const innerWidth = Math.max(0, cols - 6) // account for border + padding
+  const lines = value.split('\n')
+  const isMultiLine = lines.length > 1
+
+  // Calculate cursor position for display
+  let charsBeforeCursor = 0
+  let cursorLine = 0
+  let cursorCol = 0
+  for (let i = 0; i < lines.length; i++) {
+    if (charsBeforeCursor + lines[i]!.length >= cursor) {
+      cursorLine = i
+      cursorCol = cursor - charsBeforeCursor
+      break
+    }
+    charsBeforeCursor += lines[i]!.length + 1 // +1 for \n
+  }
 
   return (
     <Box
@@ -92,14 +182,30 @@ export function InputArea({ onSubmit, onAbort, active, history = [] }: Props): R
       width={cols}
       minHeight={3}
     >
-      <Box>
-        <Text color="cyan" bold>{active ? '> ' : '  '}</Text>
-        <Text>{value}</Text>
-        {active && <Text color="cyan">|</Text>}
-        {active && !value && (
-          <Text dimColor> type a message or /help</Text>
-        )}
-      </Box>
+      {lines.map((line, i) => (
+        <Box key={i}>
+          {i === 0 ? (
+            <Text color="cyan" bold>{active ? '> ' : '  '}</Text>
+          ) : (
+            <Text color="gray">  </Text>
+          )}
+          {active && i === cursorLine ? (
+            <Text>
+              {line.slice(0, cursorCol)}
+              <Text color="cyan">|</Text>
+              {line.slice(cursorCol)}
+            </Text>
+          ) : (
+            <Text>{line}</Text>
+          )}
+          {active && i === 0 && !value && (
+            <Text dimColor> type a message or /help</Text>
+          )}
+        </Box>
+      ))}
+      {active && isMultiLine && (
+        <Text dimColor color="gray">  enter: send · ctrl+j: newline</Text>
+      )}
     </Box>
   )
 }

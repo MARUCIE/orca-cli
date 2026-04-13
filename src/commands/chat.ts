@@ -974,13 +974,17 @@ async function runREPL(
     // Multi-line input: ``` opens fence mode
     if (input.startsWith('```')) {
       const lines: string[] = [input]
-      const multiPrompt = (): Promise<string | null> => new Promise((resolve) => {
-        if (stdinEnded) { resolve(null); return }
-        rl.question('\x1b[90m  ...\x1b[0m ', (answer) => resolve(answer))
-        rl.once('close', () => resolve(null))
-      })
       while (true) {
-        const line = await multiPrompt()
+        let line: string | null
+        if (useInk) {
+          line = await session.waitForInput()
+        } else {
+          line = await new Promise<string | null>((resolve) => {
+            if (stdinEnded) { resolve(null); return }
+            rl.question('\x1b[90m  ...\x1b[0m ', (answer) => resolve(answer))
+            rl.once('close', () => resolve(null))
+          })
+        }
         if (line === null) break
         lines.push(line)
         if (line.trim() === '```') break
@@ -1118,7 +1122,7 @@ async function runREPL(
           },
           getProvider: () => resolved.provider,
           getChoices,
-        }, { lastWrite }, { tokenBudget, contextMonitor }, modeRegistry, threadManager)
+        }, { lastWrite }, { tokenBudget, contextMonitor }, modeRegistry, threadManager, useInk ? session : undefined)
         if (handled === 'exit') {
           saveInputHistory(historyFile, inputHistory)
           mcpClient.disconnectAll()
@@ -1519,26 +1523,38 @@ async function runREPL(
     // Abort controller for Esc/Ctrl+C during generation
     const abortController = new AbortController()
 
-    // Listen for Esc key (0x1b) to interrupt generation
-    const rawMode = process.stdin.isTTY
-    if (rawMode) {
-      process.stdin.setRawMode(true)
-      process.stdin.resume()
-    }
-    const escHandler = (data: Buffer) => {
-      const key = data[0]
-      if (key === 0x1b || key === 0x03) { // Esc or Ctrl+C
-        abortController.abort()
-        if (rawMode) {
-          process.stdin.setRawMode(false)
-          process.stdin.removeListener('data', escHandler)
-        }
-        ensureNewline()
-        console.log('\x1b[90m  [interrupted]\x1b[0m')
+    // Listen for Esc/Ctrl+C to interrupt generation
+    let rawMode = false
+    let escHandler: ((data: Buffer) => void) | null = null
+
+    if (useInk) {
+      // In ink mode: InputArea emits abort event via session
+      const abortHandler = () => abortController.abort()
+      session.once('abort', abortHandler)
+      // Cleanup after turn completes
+      escHandler = null // no stdin handler needed
+    } else {
+      // Legacy mode: raw stdin Esc handler
+      rawMode = process.stdin.isTTY || false
+      if (rawMode) {
+        process.stdin.setRawMode(true)
+        process.stdin.resume()
       }
-    }
-    if (rawMode) {
-      process.stdin.on('data', escHandler)
+      escHandler = (data: Buffer) => {
+        const key = data[0]
+        if (key === 0x1b || key === 0x03) { // Esc or Ctrl+C
+          abortController.abort()
+          if (rawMode) {
+            process.stdin.setRawMode(false)
+            process.stdin.removeListener('data', escHandler!)
+          }
+          ensureNewline()
+          console.log('\x1b[90m  [interrupted]\x1b[0m')
+        }
+      }
+      if (rawMode) {
+        process.stdin.on('data', escHandler)
+      }
     }
 
     // Progress indicator (thinking → working with elapsed time + token count)
@@ -1690,7 +1706,7 @@ async function runREPL(
       }
     } finally {
       if (progress) progress.stop()
-      if (rawMode) {
+      if (rawMode && escHandler) {
         process.stdin.setRawMode(false)
         process.stdin.removeListener('data', escHandler)
       }
@@ -1792,6 +1808,7 @@ function handleSlashCommand(
   harness?: { tokenBudget: TokenBudgetManager; contextMonitor: ContextMonitor },
   modeRegistry?: ModeRegistry,
   threadManager?: ThreadManager,
+  session?: import('../ui/session.js').ChatSessionEmitter,
 ): 'exit' | 'handled' | 'pick_model' | 'not_command' {
   const parts = input.split(/\s+/)
   const cmd = parts[0]!.toLowerCase()
@@ -1806,34 +1823,61 @@ function handleSlashCommand(
     case '/help':
     case '/h':
     case '/?': {
-      const d = '\x1b[90m', b = '\x1b[1m', r = '\x1b[0m'
-      const row = (l: string, ri: string) => `${d}  ${l.padEnd(28)}${d}│${r} ${d}${ri}${r}`
-      console.log()
-      console.log(`${d}  ${b}Session${r}${d}                       ${d}│ ${b}Model${r}`)
-      console.log(row('/clear    Clear history',      '/model    Show/switch model'))
-      console.log(row('/compact  Smart compaction',   '/models   List all models'))
-      console.log(row('/status   Session overview',   '/effort   Thinking effort'))
-      console.log(row('/cost     Token breakdown',    '/providers List providers'))
-      console.log(row('/save     Save session',       '/mode     Behavioral profiles'))
-      console.log()
-      console.log(`${d}  ${b}Git${r}${d}                            ${d}│ ${b}Multi-Model${r}`)
-      console.log(row('/diff     Show git diff',      '/council  N models + judge'))
-      console.log(row('/commit   Create commit',      '/race     First answer wins'))
-      console.log(row('/undo     Revert last write',  '/pipeline Plan-Code-Review'))
-      console.log(row('/git      Run git command',    '/mission  Autonomous mission'))
-      console.log(row('',                             '/plan     Task decomposition'))
-      console.log()
-      console.log(`${d}  ${b}Knowledge${r}${d}                      ${d}│ ${b}System${r}`)
-      console.log(row('/notes    Observations',       '/mcp      MCP servers'))
-      console.log(row('/postmortem Error patterns',   '/hooks    Registered hooks'))
-      console.log(row('/prompts  Template library',   '/doctor   Health check'))
-      console.log(row('/learn    Evolution rules',    '/thread   Conversation memory'))
-      console.log()
-      console.log(`${d}  ${b}Tips${r}`)
-      console.log(row('!cmd      Shell escape',       'Ctrl+L   Clear screen'))
-      console.log(row('Tab       Auto-complete',      'Ctrl+Z   Undo last write'))
-      console.log(row('/         Command picker',     'Shift+Tab Mode cycle'))
-      console.log(r)
+      if (session) {
+        // ink mode: emit markdown help text
+        session.emitText([
+          '**Session**                  | **Model**',
+          '`/clear`   Clear history     | `/model`    Show/switch model',
+          '`/compact` Smart compaction  | `/models`   List all models',
+          '`/status`  Session overview  | `/effort`   Thinking effort',
+          '`/cost`    Token breakdown   | `/providers` List providers',
+          '`/save`    Save session      | `/mode`     Behavioral profiles',
+          '',
+          '**Git**                      | **Multi-Model**',
+          '`/diff`    Show git diff     | `/council`  N models + judge',
+          '`/commit`  Create commit     | `/race`     First answer wins',
+          '`/undo`    Revert last write | `/pipeline` Plan-Code-Review',
+          '`/git`     Run git command   | `/mission`  Autonomous mission',
+          '                             | `/plan`     Task decomposition',
+          '',
+          '**Knowledge**                | **System**',
+          '`/notes`   Observations      | `/mcp`      MCP servers',
+          '`/postmortem` Error patterns | `/hooks`    Registered hooks',
+          '`/prompts` Template library  | `/doctor`   Health check',
+          '`/learn`   Evolution rules   | `/thread`   Conversation memory',
+          '',
+          '**Tips**: `!cmd` shell escape · `Tab` auto-complete · `/` command picker · `Ctrl+J` newline',
+        ].join('\n'))
+      } else {
+        const d = '\x1b[90m', b = '\x1b[1m', r = '\x1b[0m'
+        const row = (l: string, ri: string) => `${d}  ${l.padEnd(28)}${d}│${r} ${d}${ri}${r}`
+        console.log()
+        console.log(`${d}  ${b}Session${r}${d}                       ${d}│ ${b}Model${r}`)
+        console.log(row('/clear    Clear history',      '/model    Show/switch model'))
+        console.log(row('/compact  Smart compaction',   '/models   List all models'))
+        console.log(row('/status   Session overview',   '/effort   Thinking effort'))
+        console.log(row('/cost     Token breakdown',    '/providers List providers'))
+        console.log(row('/save     Save session',       '/mode     Behavioral profiles'))
+        console.log()
+        console.log(`${d}  ${b}Git${r}${d}                            ${d}│ ${b}Multi-Model${r}`)
+        console.log(row('/diff     Show git diff',      '/council  N models + judge'))
+        console.log(row('/commit   Create commit',      '/race     First answer wins'))
+        console.log(row('/undo     Revert last write',  '/pipeline Plan-Code-Review'))
+        console.log(row('/git      Run git command',    '/mission  Autonomous mission'))
+        console.log(row('',                             '/plan     Task decomposition'))
+        console.log()
+        console.log(`${d}  ${b}Knowledge${r}${d}                      ${d}│ ${b}System${r}`)
+        console.log(row('/notes    Observations',       '/mcp      MCP servers'))
+        console.log(row('/postmortem Error patterns',   '/hooks    Registered hooks'))
+        console.log(row('/prompts  Template library',   '/doctor   Health check'))
+        console.log(row('/learn    Evolution rules',    '/thread   Conversation memory'))
+        console.log()
+        console.log(`${d}  ${b}Tips${r}`)
+        console.log(row('!cmd      Shell escape',       'Ctrl+L   Clear screen'))
+        console.log(row('Tab       Auto-complete',      'Ctrl+Z   Undo last write'))
+        console.log(row('/         Command picker',     'Shift+Tab Mode cycle'))
+        console.log(r)
+      }
       return 'handled'
     }
 
@@ -1890,9 +1934,13 @@ function handleSlashCommand(
         // Reset BOTH context monitor and token budget to zero
         harness?.contextMonitor.reset()
         harness?.tokenBudget.reset()
-        // Clear screen LAST so the new prompt shows on a clean terminal
-        process.stdout.write('\x1b[2J\x1b[H')
-        console.log('\x1b[90m  conversation cleared.\x1b[0m')
+        if (session) {
+          session.emitClear()
+          session.emitSystemMessage('conversation cleared.', 'info')
+        } else {
+          process.stdout.write('\x1b[2J\x1b[H')
+          console.log('\x1b[90m  conversation cleared.\x1b[0m')
+        }
       }
       return 'handled'
 
@@ -2625,6 +2673,10 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
   let gotFirstToken = false
   const md = new StreamMarkdown()
 
+  // Streaming tok/s tracking for real-time StatusBar updates
+  let streamTokenCount = 0
+  let lastTokUpdate = startTime
+
   for await (const event of streamChat(
     { apiKey: resolved.apiKey, baseURL: resolved.baseURL!, model: resolved.model, systemPrompt: config.systemPrompt },
     prompt,
@@ -2677,7 +2729,13 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
               }
             }
 
-            const allowed = await askPermission(name, preview)
+            let allowed: boolean
+            if (emitterOpt) {
+              // ink mode: route through session emitter → PermissionPrompt component
+              allowed = await emitterOpt.emitPermissionRequest({ toolName: name, preview })
+            } else {
+              allowed = await askPermission(name, preview)
+            }
             if (!allowed) {
               return { success: false, output: 'User denied permission.' }
             }
@@ -2718,20 +2776,33 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
           console.log(`\x1b[90m  sub-agent done (${(result.duration / 1000).toFixed(1)}s, ${result.tokensUsed} tokens)\x1b[0m`)
           return { success: result.success, output: result.output }
 
-        // ask_user — prompt user for input via readline
+        // ask_user — prompt user for input
         } else if (name === 'ask_user') {
           const question = String(args.question || 'What would you like to do?')
-          const options = args.options as string[] | undefined
-          console.log(`\n\x1b[36m  ? ${question}\x1b[0m`)
-          if (options && options.length > 0) {
-            options.forEach((o, i) => console.log(`\x1b[90m    ${i + 1}. ${o}\x1b[0m`))
+          const optionsList = args.options as string[] | undefined
+
+          if (emitterOpt) {
+            // ink mode: emit the question as system message, then wait for input via session
+            emitterOpt.emitSystemMessage(`? ${question}`, 'info')
+            if (optionsList && optionsList.length > 0) {
+              optionsList.forEach((o, i) => emitterOpt.emitSystemMessage(`  ${i + 1}. ${o}`, 'info'))
+            }
+            emitterOpt.emitPromptReady()
+            const answer = await emitterOpt.waitForInput()
+            return { success: true, output: answer?.trim() || '(no response)' }
+          } else {
+            // legacy mode: readline
+            console.log(`\n\x1b[36m  ? ${question}\x1b[0m`)
+            if (optionsList && optionsList.length > 0) {
+              optionsList.forEach((o, i) => console.log(`\x1b[90m    ${i + 1}. ${o}\x1b[0m`))
+            }
+            const { createInterface } = await import('node:readline')
+            const askRl = createInterface({ input: process.stdin, output: process.stdout })
+            const answer = await new Promise<string>((res) => {
+              askRl.question('\x1b[90m  > \x1b[0m', (a) => { askRl.close(); res(a.trim()) })
+            })
+            return { success: true, output: answer || '(no response)' }
           }
-          const { createInterface } = await import('node:readline')
-          const askRl = createInterface({ input: process.stdin, output: process.stdout })
-          const answer = await new Promise<string>((res) => {
-            askRl.question('\x1b[90m  > \x1b[0m', (a) => { askRl.close(); res(a.trim()) })
-          })
-          return { success: true, output: answer || '(no response)' }
 
         // MCP tools — async server communication
         } else if (name === 'mcp_list_resources') {
@@ -2876,8 +2947,25 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
         }
         if (event.text) {
           responseText += event.text
+          streamTokenCount++
           if (emitterOpt) {
             emitterOpt.emitText(event.text)
+            // Update tok/s on StatusBar every 500ms during streaming
+            const now = Date.now()
+            if (now - lastTokUpdate >= 500) {
+              const elapsed = (now - startTime) / 1000
+              if (elapsed > 0) {
+                emitterOpt.emitStatusUpdate({
+                  model: resolved.model,
+                  contextPct: tokenBudget?.getBudget(history).utilizationPct ?? 0,
+                  permMode: (config.permissionMode as 'yolo' | 'auto' | 'plan') ?? 'yolo',
+                  costUsd: 0,
+                  tokPerSec: Math.round(streamTokenCount / elapsed),
+                  turns: 0,
+                })
+              }
+              lastTokUpdate = now
+            }
           } else {
             md.push(event.text)
           }

@@ -51,6 +51,51 @@ interface OutputBlock {
   level?: 'info' | 'warn' | 'error'
 }
 
+/** Active tool call with animated spinner — lives outside <Static> so it can re-render */
+function ActiveToolCall({ start, startTime }: { start: ToolStartInfo; startTime: number }): React.ReactElement {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => setElapsed(Date.now() - startTime), 100)
+    return () => clearInterval(timer)
+  }, [startTime])
+
+  const label = start.label || summarizeToolArgs(start.args)
+  const shortLabel = label.length > 60 ? label.slice(0, 57) + '...' : label
+
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="single"
+      borderLeft
+      borderRight={false}
+      borderTop={false}
+      borderBottom={false}
+      borderColor="cyan"
+      paddingLeft={1}
+      marginLeft={1}
+    >
+      <Box>
+        <Text color="yellow" bold>{start.name}</Text>
+        {shortLabel ? <Text dimColor> {shortLabel}</Text> : null}
+      </Box>
+      <Box>
+        <Text color="cyan">{'⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[Math.floor(elapsed / 80) % 10]}</Text>
+        <Text dimColor> {(elapsed / 1000).toFixed(1)}s</Text>
+      </Box>
+    </Box>
+  )
+}
+
+function summarizeToolArgs(args: Record<string, unknown>): string {
+  if ('path' in args) return String(args.path)
+  if ('command' in args) {
+    const cmd = String(args.command)
+    return cmd.length > 50 ? cmd.slice(0, 47) + '...' : cmd
+  }
+  if ('query' in args) return String(args.query).slice(0, 50)
+  return ''
+}
+
 export function App({ session, initialStatus, banner }: Props): React.ReactElement {
   const { stdout } = useStdout()
   const rows = stdout?.rows || 24
@@ -65,6 +110,7 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
   const [lastTurnSummary, setLastTurnSummary] = useState<TurnSummaryInfo | null>(null)
   const [permRequest, setPermRequest] = useState<{ toolName: string; preview: string; resolve: (b: boolean) => void } | null>(null)
   const [multiModelState, setMultiModelState] = useState<{ command: string; models: ModelProgress[] } | null>(null)
+  const [activeTool, setActiveTool] = useState<{ id: string; start: ToolStartInfo; startTime: number } | null>(null)
 
   // Batched text streaming: accumulate tokens, flush at 20fps
   const textBuffer = useRef('')
@@ -108,20 +154,17 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
             }
             return ''
           })
-          setBlocks(b => [...b, { id: blockId(), type: 'tool', content: '', toolStart: event.info }])
+          // Keep active tool in dynamic area (not Static) so spinner animates
+          setActiveTool({ id: blockId(), start: event.info, startTime: Date.now() })
           break
 
         case 'tool_end':
-          // Update the last tool block with result
-          setBlocks(b => {
-            const copy = [...b]
-            for (let i = copy.length - 1; i >= 0; i--) {
-              if (copy[i]!.type === 'tool' && copy[i]!.toolStart?.name === event.info.name && !copy[i]!.toolEnd) {
-                copy[i] = { ...copy[i]!, toolEnd: event.info }
-                break
-              }
+          // Move completed tool from active area into Static blocks
+          setActiveTool(prev => {
+            if (prev) {
+              setBlocks(b => [...b, { id: prev.id, type: 'tool', content: '', toolStart: prev.start, toolEnd: event.info }])
             }
-            return copy
+            return null
           })
           break
 
@@ -253,8 +296,13 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
         {/* Currently streaming text (raw during stream, markdown on flush) */}
         {streamingText && <Text>{streamingText}</Text>}
 
+        {/* Active tool call with spinner (not in Static — re-renders) */}
+        {activeTool && (
+          <ActiveToolCall start={activeTool.start} startTime={activeTool.startTime} />
+        )}
+
         {/* Thinking spinner */}
-        <ThinkingSpinner active={thinking} />
+        <ThinkingSpinner active={thinking && !activeTool} />
 
         {/* Multi-model progress */}
         {multiModelState && (

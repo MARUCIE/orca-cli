@@ -68,8 +68,14 @@ export class ChatSessionEmitter extends EventEmitter {
     this.emitUI({ type: 'system_message', text, level })
   }
 
-  emitPermissionRequest(request: PermissionRequest): void {
-    this.emitUI({ type: 'permission_request', request })
+  /** Emit permission request and wait for UI response. Returns true if allowed. */
+  emitPermissionRequest(req: { toolName: string; preview: string }): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      this.emitUI({
+        type: 'permission_request',
+        request: { toolName: req.toolName, preview: req.preview, resolve },
+      })
+    })
   }
 
   emitMultiModelProgress(command: string, models: ModelProgress[]): void {

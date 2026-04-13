@@ -331,4 +331,31 @@ describe('ChatSessionEmitter', () => {
     expect(specific).toEqual(['text'])
     expect(wildcard).toEqual(['*'])
   })
+
+  it('emitPermissionRequest returns promise resolved by UI', async () => {
+    const session = new ChatSessionEmitter()
+    // Listen and auto-approve
+    session.on('permission_request', (e: { request: { resolve: (b: boolean) => void } }) => {
+      e.request.resolve(true)
+    })
+    const result = await session.emitPermissionRequest({ toolName: 'write_file', preview: 'test' })
+    expect(result).toBe(true)
+  })
+
+  it('emitPermissionRequest returns false when denied', async () => {
+    const session = new ChatSessionEmitter()
+    session.on('permission_request', (e: { request: { resolve: (b: boolean) => void } }) => {
+      e.request.resolve(false)
+    })
+    const result = await session.emitPermissionRequest({ toolName: 'run_command', preview: 'rm -rf' })
+    expect(result).toBe(false)
+  })
+
+  it('emitClear fires clear event', () => {
+    const session = new ChatSessionEmitter()
+    const events: string[] = []
+    session.on('*', (e: { type: string }) => events.push(e.type))
+    session.emitClear()
+    expect(events).toContain('clear')
+  })
 })
