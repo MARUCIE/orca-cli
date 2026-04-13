@@ -119,6 +119,28 @@ function getModelMaxOutput(model: string): number {
   return 16384 // safe fallback
 }
 
+const MODEL_CONTEXT_WINDOW: Array<[string, number]> = [
+  ['claude-opus', 200_000],
+  ['claude-sonnet', 200_000],
+  ['gpt-5', 256_000],
+  ['gpt-4.1', 1_000_000],
+  ['gpt-4o', 128_000],
+  ['gemini-3', 2_000_000],
+  ['gemini-2', 1_000_000],
+  ['gemma', 128_000],
+  ['grok', 256_000],
+  ['qwen', 128_000],
+  ['kimi', 256_000],
+]
+
+function getModelContextWindow(model: string): number {
+  const lower = model.toLowerCase()
+  for (const [prefix, window] of MODEL_CONTEXT_WINDOW) {
+    if (lower.includes(prefix)) return window
+  }
+  return 128_000 // safe fallback
+}
+
 let proxyWarningShown = false
 
 async function createOpenAIClient(apiKey: string, baseURL: string) {
@@ -196,6 +218,10 @@ export async function* streamChat(
   let totalInputTokens = 0
   let totalOutputTokens = 0
 
+  // Context window for budget checks (conservative estimate)
+  const modelContextWindow = getModelContextWindow(options.model)
+  const MAX_TOOL_RESULT_CHARS = 4000 // truncate individual tool results beyond this
+
   try {
     for (let round = 0; /* no limit — loop until task completes, error, or abort */ ; round++) {
       // Check abort signal between rounds
@@ -204,6 +230,32 @@ export async function* streamChat(
         yield { type: 'done' }
         return
       }
+
+      // Pre-round context budget check: estimate messages size and truncate if needed
+      // This prevents 413 errors by ensuring we never send more than the context window
+      const estimatedChars = messages.reduce((sum, m) => {
+        const c = m.content as string | null | undefined
+        return sum + (typeof c === 'string' ? c.length : 0)
+      }, 0)
+      const estimatedTokens = Math.ceil(estimatedChars / 3) // conservative estimate
+      if (estimatedTokens > modelContextWindow * 0.75) {
+        // Truncate oldest tool results to free space (keep system + last 4 messages)
+        const keepCount = 4
+        let freed = 0
+        for (let i = 1; i < messages.length - keepCount; i++) {
+          const msg = messages[i]!
+          const content = msg.content as string | null
+          if ((msg.role === 'tool' || msg.role === 'assistant') && typeof content === 'string' && content.length > 200) {
+            const oldLen = content.length
+            msg.content = content.slice(0, 150) + `\n[truncated: ${Math.ceil(oldLen / 3)} tokens freed for context budget]`
+            freed += oldLen - (msg.content as string).length
+          }
+        }
+        if (freed > 0) {
+          yield { type: 'text', text: `\n[context-guard: truncated ${Math.ceil(freed / 3)} tokens from older messages]\n` }
+        }
+      }
+
       // Build request params
       const params: Record<string, unknown> = {
         model: options.model,
@@ -297,10 +349,23 @@ export async function* streamChat(
           const result = await toolCallbacks.onToolCall(tc.name, args)
           yield { type: 'tool_result', toolName: tc.name, toolSuccess: result.success, toolOutput: result.output }
 
+          // Truncate large tool results to prevent context explosion
+          // A single read_file of 300 lines = ~12K chars = ~3K tokens
+          // 6 such reads = 72K chars = 18K tokens → easily overflows 200K window
+          let toolContent = result.output
+          if (toolContent.length > MAX_TOOL_RESULT_CHARS) {
+            const lines = toolContent.split('\n')
+            const headLines = Math.min(40, Math.floor(lines.length / 2))
+            const tailLines = Math.min(20, Math.floor(lines.length / 4))
+            toolContent = lines.slice(0, headLines).join('\n')
+              + `\n\n[... ${lines.length - headLines - tailLines} lines truncated for context budget ...]\n\n`
+              + lines.slice(-tailLines).join('\n')
+          }
+
           messages.push({
             role: 'tool',
             tool_call_id: tc.id,
-            content: result.output,
+            content: toolContent,
           })
         }
 
