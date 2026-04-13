@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process'
 import { basename } from 'node:path'
 import type { OrcaConfig } from '../config.js'
 import { resolveConfig, resolveProvider, getGlobalConfigPath, listProviders, initProjectConfig } from '../config.js'
-import { existsSync, appendFileSync, mkdirSync as fsMkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'node:fs'
+import { existsSync, appendFileSync, mkdirSync as fsMkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync, statSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import {
   printRichBanner, printBanner, printProviderInfo, printProjectContext, printError,
@@ -50,6 +50,61 @@ import { MissionController } from '../mission/index.js'
 import type { MissionEvent } from '../mission/index.js'
 import { isMultiTaskPrompt, decomposePrompt, decomposeHeuristic, TaskTracker, executePlan } from '../planner/index.js'
 import type { PlanEvent, PlannedTask } from '../planner/index.js'
+
+// ── File Reference Expansion ──────────────────────────────────────
+// Detect file:///path, /absolute/path, ~/path in prompts,
+// read the file content, and inject it so the LLM can see local files.
+
+function expandFileReferences(prompt: string, cwd: string): string {
+  const home = process.env.HOME || ''
+  let expanded = prompt
+
+  // Pattern 1: file:///path/to/file
+  const fileUrlRegex = /file:\/\/\/([\S]+)/g
+  let match: RegExpExecArray | null
+  while ((match = fileUrlRegex.exec(prompt)) !== null) {
+    const filePath = '/' + match[1]!
+    const content = tryReadFile(filePath)
+    if (content !== null) {
+      const truncated = content.length > 15_000 ? content.slice(0, 15_000) + '\n[... truncated]' : content
+      expanded = expanded.replace(match[0], `${match[0]}\n\n<file path="${filePath}">\n${truncated}\n</file>`)
+    }
+  }
+
+  // Pattern 2: bare path at start of prompt or after whitespace — only if it looks like a real file
+  // Match /absolute/path or ~/path with file extension
+  const barePathRegex = /(?:^|\s)((?:\/[\w./-]+|~\/[\w./-]+)\.(?:html|md|ts|js|json|txt|py|go|rs|css|yaml|yml|toml|xml|csv|sql|sh))\b/g
+  while ((match = barePathRegex.exec(prompt)) !== null) {
+    let filePath = match[1]!.trim()
+    if (filePath.startsWith('~') && home) {
+      filePath = home + filePath.slice(1)
+    }
+    // Only expand if not already expanded (no <file> tag nearby)
+    if (expanded.includes(`<file path="${filePath}">`)) continue
+    const content = tryReadFile(filePath)
+    if (content !== null) {
+      const truncated = content.length > 15_000 ? content.slice(0, 15_000) + '\n[... truncated]' : content
+      expanded = expanded.replace(match[1]!, `${match[1]}\n\n<file path="${filePath}">\n${truncated}\n</file>`)
+    }
+  }
+
+  return expanded
+}
+
+function tryReadFile(filePath: string): string | null {
+  try {
+    if (!existsSync(filePath)) return null
+    const stat = statSync(filePath)
+    // Skip directories, binary files, and huge files
+    if (stat.isDirectory()) return null
+    if (stat.size > 500_000) return null // 500KB max
+    return readFileSync(filePath, 'utf-8')
+  } catch {
+    return null
+  }
+}
+
+// ── Chat Options ─────────────────────────────────────────────────
 
 interface ChatOptions {
   model?: string
@@ -731,8 +786,11 @@ async function runREPL(
 
         // Multi-model commands — route each model to its provider
         if ((handled as string) === 'council' || (handled as string) === 'race' || (handled as string) === 'pipeline') {
-          const mmPrompt = input.replace(/^\/(council|race|pipeline)\s*/, '').trim()
+          let mmPrompt = input.replace(/^\/(council|race|pipeline)\s*/, '').trim()
           if (!mmPrompt) continue
+
+          // Expand file references in multi-model prompts
+          mmPrompt = expandFileReferences(mmPrompt, cwd)
 
           // Import routing functions
           const { resolveModelEndpoint, findAggregator } = await import('../config.js')
@@ -989,7 +1047,7 @@ async function runREPL(
       }
     }
 
-    const messageToSend = (input === '/retry' || input === '/r') ? lastPrompt : input
+    let messageToSend = (input === '/retry' || input === '/r') ? lastPrompt : input
     if (!messageToSend) continue
 
     lastPrompt = messageToSend
@@ -1007,6 +1065,16 @@ async function runREPL(
       if (!hookResult.continue) {
         console.log(`\x1b[33m  hook blocked prompt: ${hookResult.stopReason || ''}\x1b[0m`)
         continue
+      }
+    }
+
+    // File reference expansion: read local files referenced in prompt
+    // Detects file:///path, /absolute/path, ~/home/path patterns
+    {
+      const expanded = expandFileReferences(messageToSend, cwd)
+      if (expanded !== messageToSend) {
+        messageToSend = expanded
+        process.stderr.write(`\x1b[90m  [file-expand] injected file content into prompt\x1b[0m\n`)
       }
     }
 
