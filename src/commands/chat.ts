@@ -932,14 +932,38 @@ async function runREPL(
       progress.stop()
       if (!abortController.signal.aborted) {
         const errMsg = err instanceof Error ? err.message : String(err)
-        // Auto-recover from 413 (context too large): compact and retry once
+        // Auto-recover from 413 (context too large): compact and retry
         if (errMsg.includes('413') || errMsg.includes('context_length') || errMsg.includes('too large')) {
-          process.stderr.write(`\x1b[33m  [auto-recovery] context overflow detected, compacting and retrying...\x1b[0m\n`)
-          const compact = tokenBudget.smartCompact(history, 1) // aggressive: keep only 1 turn
-          if (compact.dropped > 0) {
+          process.stderr.write(`\x1b[33m  [auto-recovery] context overflow — compacting and retrying...\x1b[0m\n`)
+          const compact = tokenBudget.smartCompact(history, 1)
+          if (compact.dropped > 0 || compact.tokensFreed > 0) {
             process.stderr.write(`\x1b[33m  [auto-compact] ${compact.summary}\x1b[0m\n`)
-            // Reset context monitor after aggressive compact
             contextMonitor.reset()
+            tokenBudget.reset()
+          }
+          // Retry: re-send the last user message after compaction
+          const lastUserMsg = history.filter(m => m.role === 'user').pop()
+          if (lastUserMsg && resolved.baseURL) {
+            process.stderr.write(`\x1b[36m  [retry] re-sending after compact...\x1b[0m\n`)
+            try {
+              const { chatOnce: retryChat } = await import('../providers/openai-compat.js')
+              const sysPrompt = history.find(m => m.role === 'system')?.content || ''
+              const retryResult = await retryChat(
+                { apiKey: resolved.apiKey, baseURL: resolved.baseURL, model: currentModel, systemPrompt: sysPrompt },
+                lastUserMsg.content,
+              )
+              // Stream the retry result
+              process.stdout.write(retryResult.text)
+              process.stdout.write('\n')
+              stats.turns++
+              stats.totalInputTokens += retryResult.inputTokens
+              stats.totalOutputTokens += retryResult.outputTokens
+              tokenBudget.recordUsage(retryResult.inputTokens, retryResult.outputTokens)
+              contextMonitor.recordUsage(retryResult.inputTokens, retryResult.outputTokens)
+              history.push({ role: 'assistant', content: retryResult.text })
+            } catch (retryErr) {
+              printError(`Retry failed: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`)
+            }
           }
         } else {
           printError(errMsg)
