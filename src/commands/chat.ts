@@ -49,6 +49,8 @@ import { PostmortemLog, NotesManager, PromptRepository, LearningJournal } from '
 import { MissionController } from '../mission/index.js'
 import type { MissionEvent } from '../mission/index.js'
 import { isMultiTaskPrompt, decomposePrompt, decomposeHeuristic, TaskTracker, executePlan } from '../planner/index.js'
+import { preprocessFile } from '../preprocess/index.js'
+import { detectFormat } from '../preprocess/index.js'
 import type { PlanEvent, PlannedTask } from '../planner/index.js'
 
 // ── File Reference Expansion (L0 Input Normalization) ─────────────
@@ -133,12 +135,36 @@ function resolveFilePath(p: string, home: string, cwd: string): string | null {
   return null
 }
 
+/**
+ * Read and preprocess a file — converts non-text formats to Markdown.
+ * Uses markitdown/pandoc/ffmpeg for PDF, DOCX, HTML, images, audio, video.
+ * Text/code files pass through as-is.
+ */
 function tryReadFile(filePath: string): string | null {
   try {
     if (!existsSync(filePath)) return null
     const stat = statSync(filePath)
     if (stat.isDirectory()) return null
-    if (stat.size > 500_000) return null // 500KB max
+    if (stat.size > 50 * 1024 * 1024) return null // 50MB max
+
+    const format = detectFormat(filePath)
+
+    // Text/code: read directly (fast, no conversion needed)
+    if (format.category === 'text' || format.converter === 'passthrough') {
+      if (stat.size > 500_000) return null // 500KB max for text
+      return readFileSync(filePath, 'utf-8')
+    }
+
+    // Non-text: preprocess through pipeline (convert to Markdown)
+    const result = preprocessFile(filePath)
+    if (result.success) {
+      const savings = result.savingsRatio > 1.5 ? ` (${result.savingsRatio.toFixed(1)}x smaller)` : ''
+      process.stderr.write(`\x1b[90m  [preprocess] ${result.fileName}: ${result.method} → ${(result.convertedSize / 1024).toFixed(1)}KB${savings}\x1b[0m\n`)
+      return result.markdown
+    }
+
+    // Fallback: try reading as text
+    if (stat.size > 500_000) return null
     return readFileSync(filePath, 'utf-8')
   } catch {
     return null
