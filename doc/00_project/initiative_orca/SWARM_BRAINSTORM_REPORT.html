@@ -85,11 +85,12 @@
 <div class="header">
   <div class="header-inner">
     <h1>Orca 生态系统 SOTA 差距分析</h1>
-    <div class="subtitle">蜂群头脑风暴报告 -- 3 个研究 Agent 并行综合（含 v0.4.0 ~ v0.6.0 闭环）</div>
+    <div class="subtitle">蜂群头脑风暴报告 -- v0.3.0 基线 → v0.7.1 全量闭合（含知识管理 + 上下文保护 + 目标循环）</div>
     <div class="meta-row">
-      <span>v0.3.0 基线 -> v0.6.0 现状</span>
+      <span>v0.3.0 基线 → v0.7.1 现状</span>
       <span>2026-04-12 ~ 2026-04-13</span>
       <span>对标: AI-Fleet / Claude Code / Codex / Amp / KiloCode / Hermes</span>
+      <span>732 测试 · 70 源码文件 · 21K LOC</span>
     </div>
   </div>
 </div>
@@ -99,24 +100,24 @@
   <h2>概要结论</h2>
   <div class="exec-summary">
     <p><strong>v0.3.0 基线</strong>：Orca CLI 拥有扎实基础（41 个工具、10 个钩子事件、多模型 council/race/pipeline、493 个测试用例），但对标 SOTA 级编码代理在 6 个关键维度存在结构性差距。</p>
-    <p><strong>v0.6.0 现状</strong>：经过 3 轮迭代（v0.4.0 差距闭环、v0.5.0 MCP+模式+发现、v0.6.0 接入+记忆），<strong>全部 6 个差距已关闭</strong>，生产就绪度从 70-75% 提升至 92-95%。新增 26 个源码文件、175 个测试用例。</p>
+    <p><strong>v0.7.1 现状</strong>：经过 7 轮迭代，<strong>全部 SOTA 差距已关闭</strong>。新增核心差异化：知识管理体系（4 模块）、上下文三层保护、认知骨架（9 场景）、目标循环交付、多模型路由修复。生产就绪度 <strong>95%+</strong>。</p>
   </div>
 
   <div class="metric-grid">
     <div class="metric-card">
-      <div class="value" style="color: var(--success);">92-95%</div>
+      <div class="value" style="color: var(--success);">95%+</div>
       <div class="label">生产就绪度（v0.3.0: 70-75%）</div>
     </div>
     <div class="metric-card">
-      <div class="value" style="color: var(--success);">0 / 6</div>
-      <div class="label">关键差距（全部已关闭）</div>
+      <div class="value" style="color: var(--success);">0</div>
+      <div class="label">SOTA 差距（全部关闭）</div>
     </div>
     <div class="metric-card">
-      <div class="value">668</div>
-      <div class="label">测试用例通过（v0.3.0: 493）</div>
+      <div class="value">732</div>
+      <div class="label">测试用例（v0.3.0: 493）</div>
     </div>
     <div class="metric-card">
-      <div class="value">v0.6.0</div>
+      <div class="value">v0.7.1</div>
       <div class="label">当前版本</div>
     </div>
   </div>
@@ -775,9 +776,9 @@
 </div>
 
 <footer>
-    <p>Orca CLI v0.7.0 -- SOTA 差距分析报告（含 v0.4.0 ~ v0.7.0 全量闭合 + 知识管理体系）</p>
+    <p>Orca CLI v0.7.1 -- SOTA 差距分析报告（v0.3.0 → v0.7.1 全量闭合）</p>
     <p>Maurice | maurice_wen@proton.me</p>
-    <p style="font-size:12px; margin-top:8px;">初始生成 2026-04-12 | v0.7.0 最终更新 2026-04-13 | 732 测试全绿 | 知识管理 + 上下文保护 + 目标循环</p>
+    <p style="font-size:12px; margin-top:8px;">初始生成 2026-04-12 | v0.7.1 最终更新 2026-04-13 | 732 测试 · 70 源码文件 · 21K LOC · 10 commits</p>
 </footer>
 
 </body>
