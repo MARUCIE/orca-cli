@@ -285,14 +285,8 @@ export class HookManager {
     const total = this.totalHooks
     if (total === 0) return
 
-    // Group by event, show count per event (no total — banner already shows it)
-    const summary: string[] = []
-    for (const [event, defs] of Object.entries(this.hooks)) {
-      if (defs && defs.length > 0) {
-        summary.push(`${event}:${defs.length}`)
-      }
-    }
-    console.log(`\x1b[90m  ${summary.join(' · ')}\x1b[0m`)
+    const events = Object.entries(this.hooks).filter(([, defs]) => defs && defs.length > 0).length
+    console.log(`\x1b[90m  hooks: ${total} across ${events} events\x1b[0m`)
   }
 }
 

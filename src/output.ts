@@ -35,7 +35,7 @@ const RST = '\x1b[0m'
 
 // ── Banner ──────────────────────────────────────────────────────────
 
-const VERSION = '0.7.1'
+const VERSION = '0.8.0'
 
 // Orca — cute killer whale with dorsal fin, eye patch, body, belly, and iconic tail flukes
 // Tail section: body narrows → peduncle → flukes fork up/down (whale signature)
@@ -423,8 +423,8 @@ function truncateLine(s: string, max: number): string {
  */
 export function printSeparator(): void {
   const cols = process.stdout.columns || 80
-  const width = cols - 2
-  console.log(`\x1b[90m${'·'.repeat(width)}\x1b[0m`)
+  const width = Math.min(cols - 4, 72)
+  console.log(`\n\x1b[90m  ${'─'.repeat(width)}\x1b[0m`)
 }
 
 export type ThinkingEffort = 'low' | 'medium' | 'high' | 'max'
@@ -461,76 +461,34 @@ export interface StatusLineInfo {
  * Context % comes from TokenBudgetManager.getBudget() — not estimated here.
  */
 export function printStatusLine(info: StatusLineInfo): void {
-  const cols = process.stdout.columns || 80
-
-  // Context bar — driven by budget data, not local estimation
+  // Context bar — compact 6-char bar
   const pct = Math.min(100, info.contextPct)
-  const barLen = 8
+  const barLen = 6
   const filled = Math.round((pct / 100) * barLen)
   const empty = barLen - filled
   let barColor = '\x1b[32m'  // green
   if (pct >= 60) barColor = '\x1b[31m'       // red
-  else if (pct >= 50) barColor = '\x1b[33m'  // yellow (orange tier)
+  else if (pct >= 50) barColor = '\x1b[33m'  // orange
   else if (pct >= 40) barColor = '\x1b[33m'  // yellow
-  // Overflow indicator: when context is at capacity
   const overflowMark = info.contextPct >= 95 ? '\x1b[31;1m!\x1b[0m' : ''
   const bar = `${barColor}${'█'.repeat(filled)}${'░'.repeat(empty)}\x1b[0m${overflowMark}`
 
-  // Git branch
-  const gitPart = info.gitBranch ? ` \x1b[90mgit:(\x1b[32m${info.gitBranch}\x1b[90m)\x1b[0m` : ''
+  // Model — truncate long names
+  const modelShort = info.model.length > 22 ? info.model.slice(0, 20) + '..' : info.model
 
-  // Project name (last directory component)
-  const project = info.cwd.split('/').filter(Boolean).pop() || '~'
-
-  // Mode (Shift+Tab to cycle)
-  const modeColors: Record<string, string> = {
-    yolo: '\x1b[33m', auto: '\x1b[36m', plan: '\x1b[32m',
-  }
+  // Mode tag — colored dot
+  const modeColors: Record<string, string> = { yolo: '\x1b[33m', auto: '\x1b[36m', plan: '\x1b[32m' }
   const modeColor = modeColors[info.mode] || '\x1b[90m'
-  const modeTag = `${modeColor}▸▸ ${info.mode}${RST}`
 
-  // Thinking effort indicator — compact single symbol
-  const effortDisplay: Record<ThinkingEffort, string> = {
-    low:    '\x1b[90mlow\x1b[0m',
-    medium: '\x1b[33mmed\x1b[0m',
-    high:   '\x1b[36mhigh\x1b[0m',
-    max:    '\x1b[35mmax\x1b[0m',
-  }
-  const effort = info.effort || 'high'
-  const effortTag = effortDisplay[effort]
+  // Git branch
+  const gitPart = info.gitBranch ? `\x1b[90m(\x1b[32m${info.gitBranch}\x1b[90m)\x1b[0m` : ''
 
-  // Model short
-  const modelShort = info.model.length > 20 ? info.model.slice(0, 18) + '..' : info.model
+  // Cost — only show if non-zero
+  const costPart = info.costUsd && info.costUsd > 0 ? `  ${formatCost(info.costUsd)}` : ''
 
-  // Context tokens display: "12K / 200K" format
-  const fmtK = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${Math.round(n / 1000)}K` : String(n)
-  const ctxStr = `${fmtK(info.contextTokens)}/${fmtK(info.contextWindow)}`
-
-  // Cost display
-  const costStr = info.costUsd && info.costUsd > 0 ? ` ${theme.dim}|${RST} ${formatCost(info.costUsd)}` : ''
-
-  // Tok/s display
-  const tpsStr = info.tokPerSec && info.tokPerSec > 0 ? ` ${theme.dim}${Math.round(info.tokPerSec)} tok/s${RST}` : ''
-
-  // Cumulative token display: input/output split + total
-  const tokenParts: string[] = []
-  if (info.inputTokens && info.outputTokens) {
-    tokenParts.push(`\x1b[90min:${fmtK(info.inputTokens)} out:${fmtK(info.outputTokens)}\x1b[0m`)
-  }
-  tokenParts.push(`\x1b[90mtotal\x1b[0m ${info.totalTokens.toLocaleString()}`)
-  const tokenStr = tokenParts.join(' ')
-
-  // Line 1: ◇ ORCA | model | ████░░░░ 15% (12K/200K) | project git:(branch)
-  const left1 = `${theme.accent}◇${RST} \x1b[1;37mORCA${RST} ${theme.dim}|${RST} ${modelShort} ${theme.dim}|${RST} ${bar} ${pct}% ${theme.dim}(${ctxStr})${RST} ${theme.dim}|${RST} ${theme.accent}${project}${RST}${gitPart}`
-  console.log(`${left1}`)
-
-  // Line 2: ▸▸ yolo | high | $0.42 · 38 tok/s           in:1.2M out:234K total:1.4M
-  const left2 = `${modeTag} \x1b[90m|\x1b[0m ${effortTag}${costStr}${tpsStr}`
-  // Strip ANSI for width calculation
-  const plainLeft2 = left2.replace(/\x1b\[[0-9;]*m/g, '')
-  const plainToken = tokenStr.replace(/\x1b\[[0-9;]*m/g, '')
-  const pad = Math.max(1, cols - plainLeft2.length - plainToken.length - 1)
-  console.log(`${left2}${' '.repeat(pad)}${tokenStr}`)
+  // Single compact line:
+  //   model  ██████ 42%  yolo  (main)  $0.12
+  console.log(`  \x1b[1;37m${modelShort}\x1b[0m  ${bar} \x1b[90m${pct}%\x1b[0m  ${modeColor}${info.mode}\x1b[0m  ${gitPart}${costPart ? `\x1b[90m${costPart}\x1b[0m` : ''}`)
 }
 
 // ── Progress Indicator ──────────────────────────────────────────────
@@ -875,13 +833,13 @@ export function printUsageSummary(usage: UsageSummary): void {
     ctxBar = renderContextBar(usage.contextChars)
   }
 
-  console.log(chalk.gray(`\n  ─ ${parts.join(' · ')}${ctxBar} ─`))
+  console.log(chalk.gray(`\n  ── ${parts.join(' · ')}${ctxBar}`))
 
   // Budget warning
   if (usage.budgetUsd && usage.sessionCostUsd) {
     const pct = Math.round((usage.sessionCostUsd / usage.budgetUsd) * 100)
     if (pct >= 90) {
-      console.log(chalk.red(`  ⚠ budget: $${usage.sessionCostUsd.toFixed(4)} / $${usage.budgetUsd.toFixed(2)} (${pct}%) — approaching limit`))
+      console.log(chalk.red(`  budget: $${usage.sessionCostUsd.toFixed(4)} / $${usage.budgetUsd.toFixed(2)} (${pct}%)`))
     } else if (pct >= 70) {
       console.log(chalk.yellow(`  budget: $${usage.sessionCostUsd.toFixed(4)} / $${usage.budgetUsd.toFixed(2)} (${pct}%)`))
     }
@@ -928,12 +886,20 @@ export function printSessionSummary(session: SessionSummary): void {
   const cost = estimateCost(session.model, session.totalInputTokens, session.totalOutputTokens)
   const duration = (session.durationMs / 1000).toFixed(0)
 
-  console.log(chalk.gray('\n  ─────────────────────────────────'))
-  console.log(chalk.gray(`  session: ${session.turns} turns · ${formatTokens(totalTokens)} tokens · ${duration}s`))
-  if (cost > 0) {
-    console.log(chalk.gray(`  cost: $${cost.toFixed(4)}`))
-  }
-  console.log(chalk.gray('  ─────────────────────────────────\n'))
+  const parts = [
+    `${session.turns} turns`,
+    `${formatTokens(totalTokens)} tokens`,
+    `${duration}s`,
+  ]
+  if (cost > 0) parts.push(`$${cost.toFixed(4)}`)
+  const content = parts.join(' · ')
+  const width = Math.max(content.length + 4, 28)
+
+  console.log()
+  console.log(chalk.gray(`  ╭─ Session ${'─'.repeat(Math.max(0, width - 11))}╮`))
+  console.log(chalk.gray(`  │ ${content.padEnd(width - 2)}│`))
+  console.log(chalk.gray(`  ╰${'─'.repeat(width)}╯`))
+  console.log()
 }
 
 // ── Cost Estimation ─────────────────────────────────────────────────

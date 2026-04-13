@@ -46,6 +46,8 @@ import { ModeRegistry } from '../modes/index.js'
 import { ThreadManager } from '../memory/threads.js'
 import { matchCognitive, formatCognitiveContext } from '../cognitive-skeleton.js'
 import { PostmortemLog, NotesManager, PromptRepository, LearningJournal } from '../knowledge/index.js'
+import { MissionController } from '../mission/index.js'
+import type { MissionEvent } from '../mission/index.js'
 
 interface ChatOptions {
   model?: string
@@ -203,7 +205,7 @@ async function runREPL(
     // Git workflow
     '/diff', '/git', '/commit', '/review', '/pr', '/undo',
     // Multi-model
-    '/council', '/race', '/pipeline',
+    '/council', '/race', '/pipeline', '/mission',
     // System
     '/config', '/init', '/hooks', '/mcp', '/jobs', '/cwd', '/mode', '/thread', '/threads',
     // Knowledge
@@ -794,6 +796,77 @@ async function runREPL(
           continue
         }
 
+        // Mission mode — multi-step autonomous execution
+        if ((handled as string) === 'mission') {
+          const missionGoal = input.replace(/^\/mission\s*/, '').trim()
+          if (!missionGoal) continue
+
+          const resolved = resolveProvider(config)
+          if (!resolved.baseURL) {
+            console.log('\x1b[31m  mission: no provider baseURL configured.\x1b[0m')
+            continue
+          }
+          const controller = new MissionController(missionGoal, cwd, {
+            apiKey: resolved.apiKey,
+            baseURL: resolved.baseURL,
+            model: resolved.model,
+          })
+
+          // Event handler for real-time progress
+          controller.onEvent((event: MissionEvent) => {
+            const colors: Record<string, string> = {
+              plan_created: '\x1b[36m',
+              milestone_started: '\x1b[35m',
+              milestone_passed: '\x1b[32m',
+              milestone_failed: '\x1b[31m',
+              feature_started: '\x1b[90m',
+              feature_completed: '\x1b[32m',
+              feature_failed: '\x1b[33m',
+              validation_started: '\x1b[36m',
+              validation_passed: '\x1b[32m',
+              validation_failed: '\x1b[31m',
+              mission_completed: '\x1b[32m',
+              mission_failed: '\x1b[31m',
+              mission_aborted: '\x1b[33m',
+            }
+            const color = colors[event.type] || '\x1b[90m'
+            console.log(`${color}  [mission] ${event.message}\x1b[0m`)
+          })
+
+          console.log(`\n\x1b[36m  ╭── Mission: ${controller.getState().id} ──╮\x1b[0m`)
+          console.log(`\x1b[90m  │ Goal: ${missionGoal.slice(0, 60)}${missionGoal.length > 60 ? '...' : ''}\x1b[0m`)
+          console.log(`\x1b[90m  │ Phase 1: Planning...\x1b[0m`)
+
+          try {
+            const plan = await controller.plan()
+            console.log(`\x1b[90m  │ ${plan.milestones.length} milestones, ${plan.features.length} features\x1b[0m`)
+            console.log(`\x1b[90m  │ Estimated runs: ~${plan.estimatedRuns}\x1b[0m`)
+
+            // Show plan summary
+            for (const [i, ms] of plan.milestones.entries()) {
+              const featureNames = ms.featureIds
+                .map(fid => plan.features.find(f => f.id === fid)?.title || fid)
+                .map(t => t.slice(0, 50))
+              console.log(`\x1b[90m  │ M${i + 1}: ${ms.title}\x1b[0m`)
+              for (const fn of featureNames) {
+                console.log(`\x1b[90m  │   - ${fn}\x1b[0m`)
+              }
+            }
+            console.log(`\x1b[90m  │ Phase 2: Executing...\x1b[0m`)
+
+            const state = await controller.execute()
+
+            console.log(`\x1b[90m  ╰── Mission ${state.phase} ──╯\x1b[0m`)
+            console.log()
+            console.log(controller.getSummary())
+            console.log()
+          } catch (err) {
+            controller.abort()
+            console.log(`\x1b[31m  mission error: ${err instanceof Error ? err.message : err}\x1b[0m`)
+          }
+          continue
+        }
+
         // 'not_command' falls through to treat as normal message
       }
     }
@@ -1080,31 +1153,31 @@ function handleSlashCommand(
     case '/h':
     case '/?': {
       const d = '\x1b[90m', b = '\x1b[1m', r = '\x1b[0m'
-      const row = (l: string, ri: string) => `${d}  ${l.padEnd(38)}${ri}${r}`
+      const row = (l: string, ri: string) => `${d}  ${l.padEnd(28)}${d}│${r} ${d}${ri}${r}`
       console.log()
-      console.log(`${d}  ${b}Session${r}${d}                                ${b}Model${r}`)
-      console.log(row('/clear    Clear history',          '/model    Show/switch model'))
-      console.log(row('/compact  Keep last 2 turns',      '/models   List all models'))
-      console.log(row('/status   Session overview',       '/mode     Behavioral profiles'))
-      console.log(row('/cost     Token cost breakdown',   '/effort   Thinking: low/med/high/max'))
-      console.log(row('/save     Save session',           '/providers List providers'))
+      console.log(`${d}  ${b}Session${r}${d}                       ${d}│ ${b}Model${r}`)
+      console.log(row('/clear    Clear history',      '/model    Show/switch model'))
+      console.log(row('/compact  Smart compaction',   '/models   List all models'))
+      console.log(row('/status   Session overview',   '/effort   Thinking effort'))
+      console.log(row('/cost     Token breakdown',    '/providers List providers'))
+      console.log(row('/save     Save session',       '/mode     Behavioral profiles'))
       console.log()
-      console.log(`${d}  ${b}Git${r}${d}                                    ${b}Multi-Model${r}`)
-      console.log(row('/diff     Show git diff',          '/council  N models + judge'))
-      console.log(row('/commit   Create commit',          '/race     First answer wins'))
-      console.log(row('/undo     Revert last write',      '/pipeline Plan-Code-Review'))
-      console.log(row('/git      Run git command',        '/thread   Conversation memory'))
+      console.log(`${d}  ${b}Git${r}${d}                            ${d}│ ${b}Multi-Model${r}`)
+      console.log(row('/diff     Show git diff',      '/council  N models + judge'))
+      console.log(row('/commit   Create commit',      '/race     First answer wins'))
+      console.log(row('/undo     Revert last write',  '/pipeline Plan-Code-Review'))
+      console.log(row('/git      Run git command',    '/mission  Autonomous mission'))
       console.log()
-      console.log(`${d}  ${b}Knowledge${r}${d}                                ${b}System${r}`)
-      console.log(row('/notes    Observations + tags',    '/mcp      MCP servers'))
-      console.log(row('/postmortem Error patterns',       '/hooks    Registered hooks'))
-      console.log(row('/prompts  Template library',       '/doctor   Health check'))
-      console.log(row('/learn    Auto-evolution rules',   '/mode     Behavioral profiles'))
+      console.log(`${d}  ${b}Knowledge${r}${d}                      ${d}│ ${b}System${r}`)
+      console.log(row('/notes    Observations',       '/mcp      MCP servers'))
+      console.log(row('/postmortem Error patterns',   '/hooks    Registered hooks'))
+      console.log(row('/prompts  Template library',   '/doctor   Health check'))
+      console.log(row('/learn    Evolution rules',    '/thread   Conversation memory'))
       console.log()
       console.log(`${d}  ${b}Tips${r}`)
-      console.log(row('!cmd      Shell command',          'Ctrl+L    Clear screen'))
-      console.log(row('Tab       Auto-complete',          'Ctrl+Z    Undo last write'))
-      console.log(row('/         Command picker',         'Shift+Tab Mode cycle'))
+      console.log(row('!cmd      Shell escape',       'Ctrl+L   Clear screen'))
+      console.log(row('Tab       Auto-complete',      'Ctrl+Z   Undo last write'))
+      console.log(row('/         Command picker',     'Shift+Tab Mode cycle'))
       console.log(r)
       return 'handled'
     }
@@ -1286,6 +1359,15 @@ function handleSlashCommand(
         return 'handled'
       }
       return 'pipeline' as 'handled'
+    }
+
+    case '/mission': {
+      if (!arg) {
+        console.log('\x1b[33m  usage: /mission <goal>  (multi-step autonomous task execution)\x1b[0m')
+        console.log('\x1b[90m  Droid-style: plan → decompose → implement → validate → iterate\x1b[0m')
+        return 'handled'
+      }
+      return 'mission' as 'handled'
     }
 
     case '/diff': {

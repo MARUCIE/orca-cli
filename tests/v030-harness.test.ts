@@ -222,11 +222,8 @@ describe('hook banner consistency', () => {
     spy.mockRestore()
     const output = lines.join('\n')
 
-    // Should NOT contain a leading total like "2 hooks · ..."
-    // Should contain the per-event breakdown
-    expect(output).toContain('PreToolUse:1')
-    expect(output).toContain('PostToolUse:1')
-    expect(output).not.toMatch(/^\s*2 hooks/)
+    // Should show compact summary: "hooks: N across M events"
+    expect(output).toContain('hooks: 2 across 2 events')
 
     try { rmSync(hookDir, { recursive: true, force: true }) } catch { /* */ }
     try { rmSync(fakeHome, { recursive: true, force: true }) } catch { /* */ }

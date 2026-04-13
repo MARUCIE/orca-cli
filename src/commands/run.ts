@@ -18,6 +18,8 @@ import type { OrcaConfig } from '../config.js'
 import { resolveConfig, resolveProvider } from '../config.js'
 import { parseDoneCriteria, runGoalLoop } from '../harness/goal-loop.js'
 import { chatOnce } from '../providers/openai-compat.js'
+import { MissionController } from '../mission/index.js'
+import type { MissionEvent } from '../mission/index.js'
 import {
   printBanner, printProviderInfo, printError,
   ensureNewline, setLastNewline, printToolUse, printToolResult,
@@ -38,6 +40,7 @@ interface RunOptions {
   cwd?: string
   dangerously?: boolean
   doneWhen?: string
+  mission?: boolean
 }
 
 export function createRunCommand(): Command {
@@ -53,6 +56,7 @@ export function createRunCommand(): Command {
     .option('--cwd <dir>', 'Working directory')
     .option('--dangerously', 'Skip permission prompts (use with caution)')
     .option('--done-when <criteria>', 'Goal-loop: repeat until criteria met (e.g., "tests pass", "/pattern/", "exit 0: cmd")')
+    .option('--mission', 'Mission mode: autonomous plan→implement→validate cycle')
     .action(async (taskParts: string[], opts: RunOptions) => {
       const task = taskParts.join(' ').trim()
       const outputMode: OutputMode = opts.json ? 'json' : 'streaming'
@@ -122,6 +126,62 @@ export function createRunCommand(): Command {
             console.log(`\x1b[31m  goal-loop: ${result.reason} after ${result.iterations} iteration(s)\x1b[0m`)
             console.log(`\x1b[90m  ${result.lastOutput}\x1b[0m`)
           }
+          return
+        }
+
+        // Mission mode: plan → implement → validate cycle
+        if (opts.mission) {
+          if (!resolved.baseURL) {
+            throw new Error('Mission mode requires a provider with baseURL configured.')
+          }
+          const controller = new MissionController(task, runCwd, {
+            apiKey: resolved.apiKey,
+            baseURL: resolved.baseURL,
+            model: resolved.model,
+          })
+
+          controller.onEvent((event: MissionEvent) => {
+            const icons: Record<string, string> = {
+              plan_created: '\x1b[36m[plan]\x1b[0m',
+              milestone_started: '\x1b[35m[milestone]\x1b[0m',
+              milestone_passed: '\x1b[32m[PASS]\x1b[0m',
+              milestone_failed: '\x1b[31m[FAIL]\x1b[0m',
+              feature_started: '\x1b[90m[feature]\x1b[0m',
+              feature_completed: '\x1b[32m[done]\x1b[0m',
+              feature_failed: '\x1b[33m[fail]\x1b[0m',
+              validation_started: '\x1b[36m[validate]\x1b[0m',
+              validation_passed: '\x1b[32m[PASS]\x1b[0m',
+              validation_failed: '\x1b[31m[FAIL]\x1b[0m',
+              mission_completed: '\x1b[32m[MISSION]\x1b[0m',
+              mission_failed: '\x1b[31m[MISSION]\x1b[0m',
+              mission_aborted: '\x1b[33m[ABORT]\x1b[0m',
+            }
+            const icon = icons[event.type] || '\x1b[90m[?]\x1b[0m'
+            if (outputMode === 'json') {
+              emitJson({ type: 'mission_event', event: event.type, message: event.message })
+            } else {
+              console.log(`  ${icon} ${event.message}`)
+            }
+          })
+
+          console.log(`\x1b[36m  mission: planning...\x1b[0m`)
+          const plan = await controller.plan()
+          console.log(`\x1b[90m  ${plan.milestones.length} milestones, ${plan.features.length} features, ~${plan.estimatedRuns} runs\x1b[0m`)
+          console.log(`\x1b[36m  mission: executing...\x1b[0m\n`)
+
+          const state = await controller.execute()
+
+          console.log()
+          if (state.phase === 'completed') {
+            console.log(`\x1b[32m  mission completed: ${state.featuresValidated} features validated, ${state.totalRuns} runs\x1b[0m`)
+          } else {
+            console.log(`\x1b[31m  mission ${state.phase}: ${state.error || 'unknown error'}\x1b[0m`)
+          }
+
+          const elapsed = state.completedAt
+            ? new Date(state.completedAt).getTime() - new Date(state.startedAt).getTime()
+            : Date.now() - new Date(state.startedAt).getTime()
+          console.log(`\x1b[90m  tokens: ${state.totalTokens.toLocaleString()} · ${(elapsed / 1000).toFixed(1)}s\x1b[0m`)
           return
         }
 
