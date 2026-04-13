@@ -480,6 +480,15 @@ export function createChatCommand(): Command {
             // Interactive REPL: load hooks early so banner can show actual count
             hooks.load(cwd)
             const configFiles = detectConfigFiles(cwd)
+
+            // Start heavy init (MCP, provider) BEFORE animation so it runs in parallel
+            const earlyInit = (async () => {
+              mcpClient.loadConfigs(cwd)
+              if (mcpClient.configuredCount > 0) {
+                await mcpClient.connectAll()
+              }
+            })().catch(() => {})
+
             await printRichBanner({
               provider: resolved.provider,
               model: resolved.model,
@@ -488,6 +497,7 @@ export function createChatCommand(): Command {
               toolCount: TOOL_DEFINITIONS.length,
               hookCount: hooks.totalHooks || undefined,
               mode: opts.safe ? 'auto' : 'yolo',
+              loadingPromise: earlyInit,
             })
           }
         }

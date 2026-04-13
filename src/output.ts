@@ -104,8 +104,10 @@ export async function printRichBanner(opts: {
   toolCount?: number
   hookCount?: number
   mode?: 'yolo' | 'auto' | 'plan'
+  /** Optional promise — animation continues until this resolves (covers loading time) */
+  loadingPromise?: Promise<unknown>
 }): Promise<void> {
-  const { provider, model, cwd, configFiles, toolCount, hookCount, mode } = opts
+  const { provider, model, cwd, configFiles, toolCount, hookCount, mode, loadingPromise } = opts
   const shortCwd = abbreviatePath(cwd)
   const cols = process.stdout.columns || 80
   const artHeight = ORCA_ART.length
@@ -136,31 +138,40 @@ export async function printRichBanner(opts: {
       console.log(`${pad}${line}`)
     }
 
-    // Swimming animation: body-wave undulation + drift from right to left
-    // Each line gets a phase-shifted sine offset — simulates the S-curve
-    // of a whale's swimming stroke (head leads, wave propagates to tail)
-    const totalFrames = 20
+    // Swimming animation: body-wave undulation + drift from right to left.
+    // Phase 1 (frames 0–minFrames): swim in from right, ease-out drift to endPad.
+    // Phase 2 (frames minFrames+): if loadingPromise hasn't resolved, keep swimming
+    //   in place at endPad until loading finishes. This covers MCP/provider init.
+    const minFrames = 20
     const frameDuration = 60
-    const bodyWaveAmp = 3  // how far each line can deviate from its neighbors
-    const phaseSpread = 0.45  // phase difference between adjacent lines (wave tightness)
+    const bodyWaveAmp = 3
+    const phaseSpread = 0.45
+    const maxFrames = 200  // safety cap: 12s max animation
 
-    for (let frame = 0; frame < totalFrames; frame++) {
-      const progress = frame / totalFrames
-      // Ease-out drift from startPad to endPad
-      const ease = 1 - Math.pow(1 - progress, 2)
+    // Track loading completion
+    let loadingDone = !loadingPromise
+    if (loadingPromise) {
+      loadingPromise.then(() => { loadingDone = true }).catch(() => { loadingDone = true })
+    }
+
+    let frame = 0
+    while (frame < minFrames || (!loadingDone && frame < maxFrames)) {
+      // Phase 1: drift from startPad to endPad
+      // Phase 2: stay at endPad, keep swimming in place
+      const driftProgress = Math.min(1, frame / minFrames)
+      const ease = 1 - Math.pow(1 - driftProgress, 2)
       const drift = startPad + (endPad - startPad) * ease
-      // Overall oscillation (damped)
-      const t = progress * Math.PI * 5  // 2.5 swim-stroke cycles
-      const globalWave = Math.sin(t) * amplitude * (1 - progress * 0.7)
 
-      // Move cursor up to top of art
+      // Oscillation: undamped in phase 2 (still swimming), damped in phase 1
+      const t = (frame / minFrames) * Math.PI * 5
+      const dampFactor = frame < minFrames ? (1 - driftProgress * 0.7) : 0.4
+      const globalWave = Math.sin(t) * amplitude * dampFactor
+
       process.stdout.write(`\x1b[${artHeight}A`)
 
-      // Redraw each line with body-wave deformation
       for (let i = 0; i < ORCA_ART.length; i++) {
         const baseShift = Math.round(drift + globalWave)
-        // Body wave: tail lines flex more than head lines
-        const tailFactor = 0.3 + (i / artHeight) * 0.7  // 0.3 at head → 1.0 at tail
+        const tailFactor = 0.3 + (i / artHeight) * 0.7
         const bodyWave = Math.round(Math.sin(t + i * phaseSpread) * bodyWaveAmp * tailFactor)
         const totalShift = Math.max(0, Math.min(maxPad, baseShift + bodyWave))
         const pad = ' '.repeat(totalShift)
@@ -168,6 +179,7 @@ export async function printRichBanner(opts: {
       }
 
       await new Promise(r => setTimeout(r, frameDuration))
+      frame++
     }
 
     // Final settle: ease into left position with one last gentle wave
