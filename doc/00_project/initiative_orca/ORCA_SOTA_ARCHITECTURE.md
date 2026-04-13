@@ -457,10 +457,11 @@ src/
 | IDE integration (VS Code) | **Yes** | **Yes** | **Yes** | **Yes** | No | No | **GAP** |
 | Hooks system | **Yes** | No | No | No | No | **8 events** | Parity |
 | CJK-aware token estimation | No | No | No | No | No | **Yes** | **LEAD** |
+| Universal file preprocessing | No | No | No | No | No | **L0→L2 any-format→MD** | **LEAD** |
 
 ### Gap Summary
 
-**LEAD areas (6)**: Multi-model collaboration, task auto-decomposition, context protection, cognitive skeleton, knowledge management, CJK support
+**LEAD areas (7)**: Multi-model collaboration, task auto-decomposition, context protection, cognitive skeleton, knowledge management, CJK support, universal file preprocessing
 
 **Parity areas (8)**: Mission mode, concurrent execution, goal-loop, validation contract, hooks, git worktree isolation, sandbox security, MCP tool bridge
 
@@ -492,6 +493,7 @@ src/
 | v0.8.0 Nuclear compact | DONE | >100% utilization → drop all except system + last user |
 | v0.8.0 UI/UX overhaul | DONE | Box-drawing, compact status, clean help |
 | v0.8.0 915 tests | DONE | 50 files, all passing |
+| v0.8.0 Universal file preprocessing | DONE | L0 detect (70+ ext) → L1 convert (markitdown/pandoc/ffmpeg) → L2 smart truncate |
 
 ---
 

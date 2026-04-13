@@ -85,7 +85,7 @@
 <div class="header">
   <div class="header-inner">
     <h1>Orca 生态系统 SOTA 差距分析</h1>
-    <div class="subtitle">蜂群头脑风暴报告 -- v0.3.0 基线 → v0.8.0（含 Mission Mode + Task Planner + Nuclear Compact）</div>
+    <div class="subtitle">蜂群头脑风暴报告 -- v0.3.0 基线 → v0.8.0（含 Mission Mode + Task Planner + Nuclear Compact + Universal Preprocessing）</div>
     <div class="meta-row">
       <span>v0.3.0 基线 → v0.8.0 现状</span>
       <span>2026-04-12 ~ 2026-04-13</span>
@@ -100,7 +100,7 @@
   <h2>概要结论</h2>
   <div class="exec-summary">
     <p><strong>v0.3.0 基线</strong>：Orca CLI 拥有扎实基础（41 个工具、10 个钩子事件、多模型 council/race/pipeline、493 个测试用例），但对标 SOTA 级编码代理在 6 个关键维度存在结构性差距。</p>
-    <p><strong>v0.8.0 现状</strong>：经过 9 轮迭代，原有 SOTA 差距全部关闭，并在 <strong>6 个维度建立差异化领先</strong>：Mission Mode（Droid 架构）、Task Planner（自动拆分+并发）、Nuclear Compact（核弹级上下文保护）、认知骨架、知识管理、CJK 感知。剩余 4 个 GAP 待 v0.9.0 关闭。</p>
+    <p><strong>v0.8.0 现状</strong>：经过 9 轮迭代，原有 SOTA 差距全部关闭，并在 <strong>7 个维度建立差异化领先</strong>：Mission Mode（Droid 架构）、Task Planner（自动拆分+并发）、Nuclear Compact（核弹级上下文保护）、认知骨架、知识管理、CJK 感知、Universal File Preprocessing（任意格式→Markdown 预处理）。仅剩 IDE 集成 1 个 GAP 待 v0.9.0 关闭。</p>
   </div>
 
   <div class="metric-grid">
@@ -109,7 +109,7 @@
       <div class="label">当前版本</div>
     </div>
     <div class="metric-card">
-      <div class="value" style="color: var(--success);">6</div>
+      <div class="value" style="color: var(--success);">7</div>
       <div class="label">领先维度</div>
     </div>
     <div class="metric-card">
@@ -860,6 +860,7 @@
       <tr><td>认知骨架</td><td>--</td><td>--</td><td>--</td><td><strong>9 场景 x 4 心智模型</strong></td><td><span class="badge badge-green">LEAD</span></td></tr>
       <tr><td>知识管理</td><td>Memory</td><td>--</td><td>--</td><td><strong>笔记 / 复盘 / 提示库 / 学习</strong></td><td><span class="badge badge-green">LEAD</span></td></tr>
       <tr><td>CJK Token 估算</td><td>--</td><td>--</td><td>--</td><td><strong>中日韩 1.5 字/token</strong></td><td><span class="badge badge-green">LEAD</span></td></tr>
+      <tr><td>万能文件预处理</td><td>--</td><td>--</td><td>--</td><td><strong>L0 检测 → L1 转换 → L2 截断（70+ 格式）</strong></td><td><span class="badge badge-green">LEAD</span></td></tr>
       <tr><td>Mission 多步自治</td><td>Sub-agents</td><td>Tasks</td><td><strong>Droid</strong></td><td><strong>Mission Mode</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
       <tr><td>并发任务执行</td><td>--</td><td>--</td><td>Worker Pool</td><td><strong>executePlan()</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
       <tr><td>目标循环</td><td>--</td><td>Loop</td><td>Droid Loop</td><td><strong>runGoalLoop</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
@@ -911,7 +912,7 @@
       <div class="label">测试用例（v0.3.0: 493）</div>
     </div>
     <div class="metric-card">
-      <div class="value" style="color: var(--success);">6 LEAD</div>
+      <div class="value" style="color: var(--success);">7 LEAD</div>
       <div class="label">竞品领先维度</div>
     </div>
   </div>
