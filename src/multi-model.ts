@@ -90,10 +90,11 @@ export function pickDiverseModels(count: number, providerModels?: string[]): str
  * Call chatOnce with a resolved ModelEndpoint.
  * This is the single point where model→provider routing happens.
  */
-async function callModel(endpoint: ModelEndpoint, prompt: string) {
+async function callModel(endpoint: ModelEndpoint, prompt: string, signal?: AbortSignal) {
   return chatOnce(
     { apiKey: endpoint.apiKey, baseURL: endpoint.baseURL, model: endpoint.model },
     prompt,
+    signal,
   )
 }
 
@@ -250,7 +251,7 @@ export async function runRace(opts: {
       }
 
       try {
-        const result = await callModel(endpoint, prompt)
+        const result = await callModel(endpoint, prompt, abortControllers[idx]!.signal)
         const resp: ModelResponse = {
           model, text: result.text, durationMs: Date.now() - t0,
           inputTokens: result.inputTokens, outputTokens: result.outputTokens,

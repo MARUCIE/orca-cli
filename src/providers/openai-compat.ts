@@ -366,6 +366,7 @@ export async function* streamChat(
 export async function chatOnce(
   options: OpenAICompatOptions,
   prompt: string,
+  signal?: AbortSignal,
 ): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
   const client = await createOpenAIClient(options.apiKey, options.baseURL)
 
@@ -381,7 +382,7 @@ export async function chatOnce(
       model: options.model,
       messages,
       max_tokens: options.maxTokens || getModelMaxOutput(options.model),
-    }),
+    }, signal ? { signal } : undefined),
     options.model,
   )
 

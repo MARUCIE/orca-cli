@@ -80,12 +80,16 @@ describe('ThreadManager: conversation persistence', () => {
 
   it('26.7 lists threads in updatedAt descending order', () => {
     const t1 = manager.create('First')
-    // Ensure t2 has a later updatedAt by appending a message
     const t2 = manager.create('Second')
-    manager.append(t2.id, [{ role: 'user', content: 'bump timestamp' }])
+    // Force t2 to have a later updatedAt by writing a future timestamp
+    const t2Record = manager.load(t2.id)!
+    t2Record.updatedAt = new Date(Date.now() + 1000).toISOString()
+    const { writeFileSync } = require('node:fs')
+    const { join } = require('node:path')
+    writeFileSync(join(manager.getThreadsDir(), `${t2.id}.json`), JSON.stringify(t2Record, null, 2))
     const list = manager.list(20)
     const ids = list.map(t => t.id)
-    // t2 was updated more recently, should appear before t1
+    // t2 has a later updatedAt, should appear before t1
     expect(ids.indexOf(t2.id)).toBeLessThan(ids.indexOf(t1.id))
   })
 

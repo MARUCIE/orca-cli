@@ -2,6 +2,39 @@
 
 This file is a historical release log. Version-specific counts and examples reflect the release date they were recorded, not the current repo head.
 
+## v0.6.1 — SOTA UX Overhaul (2026-04-13)
+
+Three rounds of UX improvements based on 2-agent swarm audit
+(internal deep audit + competitor analysis: Claude Code/Codex/Amp/Aider/Cursor).
+
+### UX Round 1 — Core Feedback
+- **Progress indicator**: chars/4 token estimation (was text.length), distinct Working spinner (◐◓◑◒)
+- **Tool display**: ms precision for sub-second (<1s shows "120ms"), error results in yellow
+- **StatusLine**: dot separator (·), cleaner effort tags, ANSI-aware right-alignment
+- **Banner**: 20 frames (was 54, ~1.2s vs ~4s), `ORCA_NO_ANIMATION=1` skip, cursor restore safety
+- **Cost**: model-based pricing in /cost, serve, run (was hardcoded or $0)
+- **Context monitor**: uses last API inputTokens (was cumulative), consistent with statusline
+- **MCP**: /mcp enable/disable per-server toggle
+
+### UX Round 2 — SOTA Feature Parity
+- **Inline diff**: edit_file results show colored +/- diff with folding (>12 lines)
+- **Shell mode**: `!command` direct execution from prompt (like Amp's $ prefix)
+- **Tool folding**: run_command shows first line + "(N lines)" for long output
+
+### UX Round 3 — Polish
+- **Color themes**: `ORCA_THEME` env var with 5 presets (default/dark/ocean/warm/mono)
+- **/help**: dual-column layout ~20 lines (was 60+), includes !cmd and /thread
+- **Theme-aware**: statusline, banner, prompt icon use theme accent colors
+
+### Fixes
+- Background job test isolation via ORCA_HOME (no more ~/.orca/ pollution)
+- TokenBudgetManager prefers API-reported inputTokens over chars/4 estimate
+- /cost uses actual model pricing table (was $3/$15 hardcoded)
+- serve.ts/run.ts compute costUsd from pricing (was always 0)
+- write_file/edit_file preview truncated to 80 chars (was unbounded)
+
+---
+
 ## v0.6.0 — Mode Wiring + Guidance Injection + Thread Memory (2026-04-13)
 
 Completes full integration: /mode slash command, AGENTS.md guidance in system prompt,
