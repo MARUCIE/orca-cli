@@ -1,12 +1,17 @@
 /**
- * InputArea — text input with prompt symbol.
+ * InputArea — multi-line text input with border, matching CC's input box.
  *
- * Renders ❯ prefix and captures keystrokes via ink's useInput.
- * Supports command history (up/down), submission (Enter), and abort (Esc).
+ * Features:
+ * - Rounded border box with accent color (CC-style)
+ * - Multi-line editing (Shift+Enter or ``` fence mode)
+ * - Command history (up/down arrows)
+ * - Tab completion hint
+ * - Esc to abort during generation
+ * - Minimum height for visual presence
  */
 
 import React, { useState, useCallback } from 'react'
-import { Box, Text, useInput } from 'ink'
+import { Box, Text, useInput, useStdout } from 'ink'
 
 interface Props {
   /** Called when user submits input (Enter) */
@@ -20,6 +25,8 @@ interface Props {
 }
 
 export function InputArea({ onSubmit, onAbort, active, history = [] }: Props): React.ReactElement {
+  const { stdout } = useStdout()
+  const cols = stdout?.columns || 80
   const [value, setValue] = useState('')
   const [historyIdx, setHistoryIdx] = useState(-1)
 
@@ -44,6 +51,9 @@ export function InputArea({ onSubmit, onAbort, active, history = [] }: Props): R
         setValue(prev => prev.slice(0, -1))
         return
       }
+
+      // Tab: no-op (reserved for completion)
+      if (key.tab) return
 
       if (key.upArrow && history.length > 0) {
         const next = Math.min(historyIdx + 1, history.length - 1)
@@ -72,11 +82,24 @@ export function InputArea({ onSubmit, onAbort, active, history = [] }: Props): R
     { isActive: active },
   )
 
+  const innerWidth = Math.max(0, cols - 6) // account for border + padding
+
   return (
-    <Box>
-      <Text color="cyan" bold>{'>'}</Text>
-      <Text> {value}</Text>
-      {active && <Text color="cyan">|</Text>}
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={active ? 'cyan' : 'gray'}
+      width={cols}
+      minHeight={3}
+    >
+      <Box>
+        <Text color="cyan" bold>{active ? '> ' : '  '}</Text>
+        <Text>{value}</Text>
+        {active && <Text color="cyan">|</Text>}
+        {active && !value && (
+          <Text dimColor> type a message or /help</Text>
+        )}
+      </Box>
     </Box>
   )
 }

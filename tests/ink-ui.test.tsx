@@ -213,6 +213,38 @@ describe('CommandPicker', () => {
   })
 })
 
+describe('Footer', () => {
+  it('shows interrupt hint when generating', async () => {
+    const { Footer } = await import('../src/ui/components/Footer.js')
+    const { lastFrame } = render(
+      <Footer isGenerating={true} isInputActive={false} permMode="yolo" />,
+    )
+    expect(lastFrame()).toContain('esc')
+    expect(lastFrame()).toContain('interrupt')
+  })
+
+  it('shows send/help hints when input is active', async () => {
+    const { Footer } = await import('../src/ui/components/Footer.js')
+    const { lastFrame } = render(
+      <Footer isGenerating={false} isInputActive={true} permMode="auto" />,
+    )
+    expect(lastFrame()).toContain('enter')
+    expect(lastFrame()).toContain('send')
+    expect(lastFrame()).toContain('/help')
+    expect(lastFrame()).toContain('auto')
+  })
+
+  it('renders nothing when idle', async () => {
+    const { Footer } = await import('../src/ui/components/Footer.js')
+    const { lastFrame } = render(
+      <Footer isGenerating={false} isInputActive={false} permMode="yolo" />,
+    )
+    // No shortcuts when idle
+    expect(lastFrame()).not.toContain('esc')
+    expect(lastFrame()).not.toContain('enter')
+  })
+})
+
 describe('ChatSessionEmitter', () => {
   it('emitText fires text event', () => {
     const session = new ChatSessionEmitter()

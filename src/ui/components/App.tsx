@@ -23,6 +23,7 @@ import { ToolCallBlock } from './ToolCallBlock.js'
 import { TurnSummary } from './TurnSummary.js'
 import { PermissionPrompt } from './PermissionPrompt.js'
 import { MultiModelProgress } from './MultiModelProgress.js'
+import { Footer } from './Footer.js'
 
 interface Props {
   session: ChatSessionEmitter
@@ -266,6 +267,13 @@ export function App({ session, initialStatus }: Props): React.ReactElement {
 
       {/* Fixed status bar at bottom */}
       <StatusBar status={status} />
+
+      {/* Footer: keyboard shortcuts */}
+      <Footer
+        isGenerating={thinking}
+        isInputActive={inputActive && !permRequest}
+        permMode={status.permMode}
+      />
     </Box>
   )
 }

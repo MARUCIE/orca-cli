@@ -1,5 +1,8 @@
 /**
- * ToolCallBlock — displays a tool invocation and its result.
+ * ToolCallBlock — tool invocation display with CC-style border.
+ *
+ * Shows tool name + args summary, then result status + duration.
+ * Uses a subtle left-border accent for visual grouping.
  */
 
 import React from 'react'
@@ -14,21 +17,35 @@ interface Props {
 export function ToolCallBlock({ start, end }: Props): React.ReactElement {
   const label = start.label || summarizeArgs(start.args)
   const shortLabel = label.length > 60 ? label.slice(0, 57) + '...' : label
+  const borderColor = end ? (end.success ? 'green' : 'red') : 'gray'
 
   return (
-    <Box flexDirection="column" marginLeft={2}>
+    <Box
+      flexDirection="column"
+      borderStyle="single"
+      borderLeft
+      borderRight={false}
+      borderTop={false}
+      borderBottom={false}
+      borderColor={borderColor}
+      paddingLeft={1}
+      marginLeft={1}
+    >
       <Box>
-        <Text dimColor>  . </Text>
-        <Text color="yellow">{start.name}</Text>
-        {shortLabel && <Text dimColor>({shortLabel})</Text>}
-        {end && (
-          <>
-            <Text> </Text>
-            <Text color={end.success ? 'green' : 'red'}>{end.success ? 'ok' : 'err'}</Text>
-            <Text dimColor> {(end.durationMs / 1000).toFixed(1)}s</Text>
-          </>
-        )}
+        <Text color="yellow" bold>{start.name}</Text>
+        {shortLabel ? <Text dimColor> {shortLabel}</Text> : null}
       </Box>
+      {end && (
+        <Box>
+          <Text color={end.success ? 'green' : 'red'}>
+            {end.success ? 'ok' : 'error'}
+          </Text>
+          <Text dimColor> {(end.durationMs / 1000).toFixed(1)}s</Text>
+          {!end.success && end.output && (
+            <Text color="red"> {end.output.slice(0, 80)}</Text>
+          )}
+        </Box>
+      )}
     </Box>
   )
 }
