@@ -45,6 +45,7 @@ import { ContextMonitor, LoopDetector, classifyError } from '../harness/index.js
 import { ModeRegistry } from '../modes/index.js'
 import { ThreadManager } from '../memory/threads.js'
 import { matchCognitive, formatCognitiveContext } from '../cognitive-skeleton.js'
+import { PostmortemLog } from '../knowledge/index.js'
 
 interface ChatOptions {
   model?: string
@@ -889,6 +890,8 @@ async function runREPL(
           safeMode: currentPermMode !== 'yolo',
           retryTracker,
           loopDetector,
+          tokenBudget,
+          contextMonitor,
         })
         stats.turns++
         stats.totalInputTokens += result.inputTokens
@@ -1705,10 +1708,12 @@ interface ProxyTurnOptions {
   safeMode?: boolean
   retryTracker?: RetryTracker
   loopDetector?: LoopDetector
+  tokenBudget?: TokenBudgetManager
+  contextMonitor?: ContextMonitor
 }
 
 async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: number; outputTokens: number }> {
-  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onStreamToken, onFileWrite, safeMode, retryTracker, loopDetector } = options
+  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onStreamToken, onFileWrite, safeMode, retryTracker, loopDetector, tokenBudget, contextMonitor } = options
 
   const startTime = Date.now()
   let inputTokens = 0
@@ -1892,6 +1897,18 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
               result.output += `\n[loop-detector] ESCALATE — this tool has failed 3+ times on the same target. Stop and ask the user for guidance.`
               process.stderr.write(`\x1b[31m  [harness] loop detected: ${name} failed 3+ times — escalating to user\x1b[0m\n`)
             }
+
+            // Postmortem auto-match: search error patterns for known fixes
+            try {
+              const pmLog = new PostmortemLog()
+              const matches = pmLog.match(result.output)
+              if (matches.length > 0) {
+                const ctx = pmLog.formatForContext(matches)
+                result.output += `\n${ctx}`
+                process.stderr.write(`\x1b[90m  [postmortem] matched ${matches.length} known fix(es)\x1b[0m\n`)
+                for (const m of matches) pmLog.markApplied(m.id)
+              }
+            } catch { /* postmortem search is best-effort */ }
           }
         }
 
@@ -1912,6 +1929,19 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
             event: 'PostToolUse', toolName: name, toolInput: args,
             toolOutput: result.output, toolSuccess: result.success, cwd,
           })
+        }
+
+        // Built-in context guard (mandatory, not user-configurable)
+        // Fires after every tool use to prevent context explosion
+        if (tokenBudget) {
+          const guardBudget = tokenBudget.getBudget(history)
+          if (guardBudget.utilizationPct >= 60) {
+            const compactResult = tokenBudget.smartCompact(history)
+            if (compactResult.dropped > 0) {
+              process.stderr.write(`\x1b[33m  [context-guard] auto-compact: ${compactResult.summary}\x1b[0m\n`)
+              if (contextMonitor) contextMonitor.reset()
+            }
+          }
         }
 
         return result

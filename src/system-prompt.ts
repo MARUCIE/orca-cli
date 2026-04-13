@@ -8,6 +8,7 @@ import { TOOL_DEFINITIONS } from './tools.js'
 import { loadProjectContext, formatContextForPrompt, loadSkills } from './context.js'
 import { discoverGuidance, formatGuidanceForPrompt } from './agents-discovery.js'
 import { getFirstPrinciplesPrompt } from './cognitive-skeleton.js'
+import { LearningJournal } from './knowledge/index.js'
 
 export function buildSystemPrompt(cwd: string): string {
   // Generate tool list from actual definitions
@@ -78,6 +79,15 @@ ${(() => {
   try {
     const guidance = discoverGuidance(cwd)
     return formatGuidanceForPrompt(guidance)
+  } catch {
+    return ''
+  }
+})()}
+
+${(() => {
+  try {
+    const journal = new LearningJournal()
+    return journal.formatRulesForPrompt()
   } catch {
     return ''
   }
