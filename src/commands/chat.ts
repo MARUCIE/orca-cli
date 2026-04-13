@@ -479,26 +479,31 @@ export function createChatCommand(): Command {
           } else {
             // Interactive REPL: load hooks early so banner can show actual count
             hooks.load(cwd)
-            const configFiles = detectConfigFiles(cwd)
 
-            // Start heavy init (MCP, provider) BEFORE animation so it runs in parallel
-            const earlyInit = (async () => {
-              mcpClient.loadConfigs(cwd)
-              if (mcpClient.configuredCount > 0) {
-                await mcpClient.connectAll()
-              }
-            })().catch(() => {})
+            // In ink mode, banner is rendered by the ink App component — skip legacy ANSI banner
+            const willUseInk = process.stdout.isTTY && !opts.json && !process.env.ORCA_NO_INK
+            if (!willUseInk) {
+              const configFiles = detectConfigFiles(cwd)
 
-            await printRichBanner({
-              provider: resolved.provider,
-              model: resolved.model,
-              cwd,
-              configFiles: configFiles.length > 0 ? configFiles : undefined,
-              toolCount: TOOL_DEFINITIONS.length,
-              hookCount: hooks.totalHooks || undefined,
-              mode: opts.safe ? 'auto' : 'yolo',
-              loadingPromise: earlyInit,
-            })
+              // Start heavy init (MCP, provider) BEFORE animation so it runs in parallel
+              const earlyInit = (async () => {
+                mcpClient.loadConfigs(cwd)
+                if (mcpClient.configuredCount > 0) {
+                  await mcpClient.connectAll()
+                }
+              })().catch(() => {})
+
+              await printRichBanner({
+                provider: resolved.provider,
+                model: resolved.model,
+                cwd,
+                configFiles: configFiles.length > 0 ? configFiles : undefined,
+                toolCount: TOOL_DEFINITIONS.length,
+                hookCount: hooks.totalHooks || undefined,
+                mode: opts.safe ? 'auto' : 'yolo',
+                loadingPromise: earlyInit,
+              })
+            }
           }
         }
 
@@ -568,6 +573,9 @@ async function runREPL(
   const { createInterface } = await import('node:readline')
   const { homedir: getHomedir } = await import('node:os')
 
+  // Decide UI mode early — ink for TTY, legacy for pipes/JSON/env override
+  const useInk = process.stdout.isTTY && outputMode !== 'json' && !process.env.ORCA_NO_INK
+
   // Enable input history (up/down arrow) with persistent file
   const historyFile = join(getHomedir(), '.orca', 'repl_history')
   let savedHistory: string[] = []
@@ -611,72 +619,77 @@ async function runREPL(
   process.stdin.setMaxListeners(20)
   process.stdout.setMaxListeners(20)
 
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    history: savedHistory,
-    historySize: 100,
-    completer,
-  })
+  // In ink mode, readline is not used — ink's useInput handles all keystrokes.
+  // Create readline only for legacy mode; ink mode gets a no-op stub.
+  const rl = useInk
+    ? { question: () => {}, close: () => {}, prompt: () => {}, on: () => {} } as unknown as ReturnType<typeof createInterface>
+    : createInterface({
+        input: process.stdin,
+        output: process.stdout,
+        history: savedHistory,
+        historySize: 100,
+        completer,
+      })
 
-  // Ctrl+L to clear screen + live slash hint
-  let lastHintLen = 0
-  rl.on('SIGCONT', () => { /* resume after bg */ })
-  rl.on('line', () => { lastHintLen = 0 }) // clear hint state on submit
+  if (!useInk) {
+    // Ctrl+L to clear screen + live slash hint
+    let lastHintLen = 0
+    rl.on('SIGCONT', () => { /* resume after bg */ })
+    rl.on('line', () => { lastHintLen = 0 }) // clear hint state on submit
 
-  // Keyboard shortcuts
-  process.stdin.on('keypress', (_ch: string, key: { name?: string; ctrl?: boolean; shift?: boolean; meta?: boolean; sequence?: string }) => {
-    // Ctrl+L: clear screen
-    if (key && key.ctrl && key.name === 'l') {
-      process.stdout.write('\x1b[2J\x1b[H')
-      rl.prompt()
-      return
-    }
-
-    // Shift+Tab: cycle permission mode (yolo → auto → plan → yolo)
-    if (key && key.name === 'tab' && key.shift) {
-      const idx = PERM_MODES.indexOf(currentPermMode)
-      currentPermMode = PERM_MODES[(idx + 1) % PERM_MODES.length]!
-      const modeColors: Record<PermMode, string> = {
-        yolo: '\x1b[33m', auto: '\x1b[36m', plan: '\x1b[32m',
+    // Keyboard shortcuts (legacy mode only — ink handles these via useInput)
+    process.stdin.on('keypress', (_ch: string, key: { name?: string; ctrl?: boolean; shift?: boolean; meta?: boolean; sequence?: string }) => {
+      // Ctrl+L: clear screen
+      if (key && key.ctrl && key.name === 'l') {
+        process.stdout.write('\x1b[2J\x1b[H')
+        rl.prompt()
+        return
       }
-      process.stderr.write(`\r\x1b[2K${modeColors[currentPermMode]}  mode: ${currentPermMode}\x1b[0m\n`)
-      rl.prompt(true)
-      return
-    }
 
-    // Ctrl+Z: quick undo (same as /undo)
-    if (key && key.ctrl && key.name === 'z') {
-      if (lastWrite?.path) {
-        const { path: undoPath, oldContent } = lastWrite
-        try {
-          if (oldContent === null) {
-            unlinkSync(undoPath)
-            process.stderr.write(`\r\x1b[2K\x1b[90m  undo: deleted ${undoPath}\x1b[0m\n`)
-          } else {
-            writeFileSync(undoPath, oldContent, 'utf-8')
-            process.stderr.write(`\r\x1b[2K\x1b[90m  undo: restored ${undoPath}\x1b[0m\n`)
-          }
-          lastWrite = { path: '', oldContent: null }
-        } catch { /* ignore */ }
+      // Shift+Tab: cycle permission mode (yolo → auto → plan → yolo)
+      if (key && key.name === 'tab' && key.shift) {
+        const idx = PERM_MODES.indexOf(currentPermMode)
+        currentPermMode = PERM_MODES[(idx + 1) % PERM_MODES.length]!
+        const modeColors: Record<PermMode, string> = {
+          yolo: '\x1b[33m', auto: '\x1b[36m', plan: '\x1b[32m',
+        }
+        process.stderr.write(`\r\x1b[2K${modeColors[currentPermMode]}  mode: ${currentPermMode}\x1b[0m\n`)
+        rl.prompt(true)
+        return
       }
-      return
-    }
 
-    // Slash command hint: when user types exactly '/', show all commands
-    const line = (rl as unknown as { line: string }).line
-    if (line === '/' && lastHintLen === 0) {
-      // Print command menu below the prompt (no cursor tricks — works in all terminals)
-      const cols = process.stdout.columns || 80
-      const cmdsPerRow = Math.floor(cols / 16)
-      const rows: string[] = []
-      for (let i = 0; i < SLASH_COMMANDS.length; i += cmdsPerRow) {
-        rows.push(SLASH_COMMANDS.slice(i, i + cmdsPerRow).map(c => `\x1b[36m${c.padEnd(15)}\x1b[0m`).join(' '))
+      // Ctrl+Z: quick undo (same as /undo)
+      if (key && key.ctrl && key.name === 'z') {
+        if (lastWrite?.path) {
+          const { path: undoPath, oldContent } = lastWrite
+          try {
+            if (oldContent === null) {
+              unlinkSync(undoPath)
+              process.stderr.write(`\r\x1b[2K\x1b[90m  undo: deleted ${undoPath}\x1b[0m\n`)
+            } else {
+              writeFileSync(undoPath, oldContent, 'utf-8')
+              process.stderr.write(`\r\x1b[2K\x1b[90m  undo: restored ${undoPath}\x1b[0m\n`)
+            }
+            lastWrite = { path: '', oldContent: null }
+          } catch { /* ignore */ }
+        }
+        return
       }
-      process.stdout.write(`\n${rows.join('\n')}\n\x1b[90m  tab to complete · type to filter\x1b[0m\n`)
-      lastHintLen = 1
-    }
-  })
+
+      // Slash command hint: when user types exactly '/', show all commands
+      const line = (rl as unknown as { line: string }).line
+      if (line === '/' && lastHintLen === 0) {
+        const cols = process.stdout.columns || 80
+        const cmdsPerRow = Math.floor(cols / 16)
+        const rows: string[] = []
+        for (let i = 0; i < SLASH_COMMANDS.length; i += cmdsPerRow) {
+          rows.push(SLASH_COMMANDS.slice(i, i + cmdsPerRow).map(c => `\x1b[36m${c.padEnd(15)}\x1b[0m`).join(' '))
+        }
+        process.stdout.write(`\n${rows.join('\n')}\n\x1b[90m  tab to complete · type to filter\x1b[0m\n`)
+        lastHintLen = 1
+      }
+    })
+  }
 
   let stdinEnded = false
   rl.on('close', () => { stdinEnded = true })
@@ -800,8 +813,7 @@ async function runREPL(
     }
   }
 
-  // Choose renderer based on environment
-  const useInk = process.stdout.isTTY && outputMode !== 'json' && !process.env.ORCA_NO_INK
+  // Choose renderer (useInk determined at top of runREPL)
   let inkInstance: { unmount: () => void; waitUntilExit: () => Promise<void>; clear: () => void } | null = null
 
   if (useInk) {
