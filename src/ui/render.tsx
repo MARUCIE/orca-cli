@@ -38,11 +38,15 @@ export function renderInkApp(
   const origError = console.error.bind(console)
   const origStderrWrite = process.stderr.write.bind(process.stderr)
 
+  // Filter out startup noise that's already rendered by the Banner component
+  const STARTUP_NOISE = /^(hooks:|\/help|config |Orca v|\d+ tools|▸ |MCP:|provider:|hint:)/
+  const shouldFilter = (text: string): boolean => STARTUP_NOISE.test(text)
+
   // Intercept console.log → emit as system_message (info)
   console.log = (...args: unknown[]) => {
     const text = args.map(a => typeof a === 'string' ? a : String(a)).join(' ')
     const clean = stripAnsi(text).trim()
-    if (clean) {
+    if (clean && !shouldFilter(clean)) {
       session.emitSystemMessage(clean, 'info')
     }
   }
@@ -60,7 +64,7 @@ export function renderInkApp(
   process.stderr.write = ((chunk: string | Uint8Array, ...rest: unknown[]): boolean => {
     const text = typeof chunk === 'string' ? chunk : chunk.toString()
     const clean = stripAnsi(text).trim()
-    if (clean) {
+    if (clean && !shouldFilter(clean)) {
       session.emitSystemMessage(clean, 'warn')
     }
     return true

@@ -877,7 +877,7 @@ async function runREPL(
   // ── Progressive Loading: prompt first, heavy init in background ──
   // Hooks: sync file reads (fast, <50ms)
   hooks.load(cwd)
-  if (hooks.totalHooks > 0) hooks.printStatus()
+  if (!useInk && hooks.totalHooks > 0) hooks.printStatus()
 
   // MCP + Provider + SessionStart: async background (slow, 10-60s)
   let mcpToolDefs: Array<Record<string, unknown>> = []
@@ -923,12 +923,13 @@ async function runREPL(
 
   logInfo('chat session started', { cwd, model: currentModel, provider: resolved.provider })
 
-  const startupWarning = getAgenticWarning(currentModel)
-  if (startupWarning) {
-    console.log(`\x1b[33m  ${startupWarning}\x1b[0m`)
+  if (!useInk) {
+    const startupWarning = getAgenticWarning(currentModel)
+    if (startupWarning) {
+      console.log(`\x1b[33m  ${startupWarning}\x1b[0m`)
+    }
+    console.log('\x1b[90m  /help for commands. Ctrl+C to quit.\x1b[0m\n')
   }
-
-  console.log('\x1b[90m  /help for commands. Ctrl+C to quit.\x1b[0m\n')
 
   // Input history collector for persistence
   const inputHistory: string[] = []
