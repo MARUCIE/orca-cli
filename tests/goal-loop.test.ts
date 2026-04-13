@@ -170,3 +170,188 @@ describe('runGoalLoop: criteria-driven autonomous execution', () => {
     expect(feedbacks[1]).toContain('did not meet criteria')
   })
 })
+
+// ── 4. Deep Edge Cases ─────────────────────────────────────────────
+
+describe('parseDoneCriteria - edge cases', () => {
+  it('handles "build passes" case insensitive', () => {
+    const c = parseDoneCriteria('Build Passes')
+    expect(c.type).toBe('command')
+    expect(c.value).toBe('npm run build')
+  })
+
+  it('handles "type check" two words', () => {
+    const c = parseDoneCriteria('type check')
+    expect(c.type).toBe('command')
+    expect(c.value).toBe('npx tsc --noEmit')
+  })
+
+  it('trims leading/trailing whitespace', () => {
+    const c = parseDoneCriteria('   lint passes   ')
+    expect(c.type).toBe('command')
+  })
+
+  it('single "/" is not parsed as regex', () => {
+    const c = parseDoneCriteria('/')
+    expect(c.type).toBe('regex') // fallback to default regex
+    expect(c.value).toBe('/')
+  })
+
+  it('"exit 0:" with complex command', () => {
+    const c = parseDoneCriteria('exit 0: docker compose up -d && curl localhost:3000')
+    expect(c.type).toBe('command')
+    expect(c.value).toContain('docker compose')
+  })
+})
+
+describe('evaluateCriteria - edge cases', () => {
+  it('regex with special characters in pattern', () => {
+    const criteria: DoneCriteria = { type: 'regex', value: '\\d+ tests? passed' }
+    const result = evaluateCriteria(criteria, '42 tests passed', '/tmp')
+    expect(result.passed).toBe(true)
+  })
+
+  it('regex is case insensitive (flag i)', () => {
+    const criteria: DoneCriteria = { type: 'regex', value: 'pass' }
+    const result = evaluateCriteria(criteria, 'PASS', '/tmp')
+    expect(result.passed).toBe(true)
+  })
+
+  it('invalid regex returns graceful error', () => {
+    const criteria: DoneCriteria = { type: 'regex', value: '[unclosed(' }
+    const result = evaluateCriteria(criteria, 'test', '/tmp')
+    expect(result.passed).toBe(false)
+    expect(result.output).toContain('Invalid regex')
+  })
+
+  it('command captures stdout on success', () => {
+    const criteria: DoneCriteria = { type: 'command', value: 'echo "hello world"' }
+    const result = evaluateCriteria(criteria, '', '/tmp')
+    expect(result.passed).toBe(true)
+    expect(result.output).toContain('hello world')
+  })
+
+  it('command truncates long output', () => {
+    const criteria: DoneCriteria = { type: 'command', value: `printf '${'X'.repeat(600)}'` }
+    const result = evaluateCriteria(criteria, '', '/tmp')
+    expect(result.output.length).toBeLessThanOrEqual(500)
+  })
+
+  it('judge type is explicitly not implemented', () => {
+    const criteria: DoneCriteria = { type: 'judge', value: 'Is the code correct?' }
+    const result = evaluateCriteria(criteria, 'some output', '/tmp')
+    expect(result.passed).toBe(false)
+    expect(result.output).toContain('not yet implemented')
+  })
+})
+
+describe('runGoalLoop - callbacks', () => {
+  it('calls onIterationStart with correct iteration numbers', async () => {
+    const starts: [number, number][] = []
+    const config: GoalLoopConfig = {
+      maxIterations: 5,
+      doneCriteria: { type: 'regex', value: 'ok' },
+      cwd: '/tmp',
+      onIterationStart: (i, max) => starts.push([i, max]),
+    }
+
+    let n = 0
+    await runGoalLoop(config, async () => {
+      n++
+      return n >= 2 ? 'ok' : 'nope'
+    })
+
+    expect(starts).toEqual([[1, 5], [2, 5]])
+  })
+
+  it('calls onIterationDone with pass/fail result', async () => {
+    const dones: [number, boolean][] = []
+    const config: GoalLoopConfig = {
+      maxIterations: 5,
+      doneCriteria: { type: 'regex', value: 'PASS' },
+      cwd: '/tmp',
+      onIterationDone: (i, passed) => dones.push([i, passed]),
+    }
+
+    let n = 0
+    await runGoalLoop(config, async () => {
+      n++
+      return n >= 3 ? 'PASS' : 'fail'
+    })
+
+    expect(dones[0]).toEqual([1, false])
+    expect(dones[1]).toEqual([2, false])
+    expect(dones[2]).toEqual([3, true])
+  })
+
+  it('calls onComplete with final result', async () => {
+    let final: GoalLoopResult | null = null
+    const config: GoalLoopConfig = {
+      maxIterations: 1,
+      doneCriteria: { type: 'regex', value: 'done' },
+      cwd: '/tmp',
+      onComplete: (r) => { final = r },
+    }
+
+    await runGoalLoop(config, async () => 'done')
+    expect(final).toBeTruthy()
+    expect(final!.success).toBe(true)
+    expect(final!.reason).toBe('criteria_met')
+  })
+
+  it('onComplete called on error too', async () => {
+    let final: GoalLoopResult | null = null
+    const config: GoalLoopConfig = {
+      maxIterations: 3,
+      doneCriteria: { type: 'regex', value: 'x' },
+      cwd: '/tmp',
+      onComplete: (r) => { final = r },
+    }
+
+    await runGoalLoop(config, async () => { throw new Error('boom') })
+    expect(final!.success).toBe(false)
+    expect(final!.reason).toBe('error')
+  })
+})
+
+describe('runGoalLoop - command criteria in loop', () => {
+  it('uses real shell command to check done condition', async () => {
+    const { mkdirSync, writeFileSync, rmSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+    const dir = join(tmpdir(), `gl-cmd-${Date.now()}`)
+    mkdirSync(dir, { recursive: true })
+
+    const marker = join(dir, 'done.txt')
+    const config: GoalLoopConfig = {
+      maxIterations: 5,
+      doneCriteria: { type: 'command', value: `test -f "${marker}"` },
+      cwd: dir,
+    }
+
+    let n = 0
+    const result = await runGoalLoop(config, async () => {
+      n++
+      if (n === 2) writeFileSync(marker, 'ok')
+      return `iter ${n}`
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.iterations).toBe(2)
+
+    try { rmSync(dir, { recursive: true, force: true }) } catch {}
+  })
+})
+
+describe('runGoalLoop - duration tracking', () => {
+  it('records totalDurationMs', async () => {
+    const config: GoalLoopConfig = {
+      maxIterations: 1,
+      doneCriteria: { type: 'regex', value: 'x' },
+      cwd: '/tmp',
+    }
+    const result = await runGoalLoop(config, async () => 'x')
+    expect(result.totalDurationMs).toBeGreaterThanOrEqual(0)
+    expect(typeof result.totalDurationMs).toBe('number')
+  })
+})
