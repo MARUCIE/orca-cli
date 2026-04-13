@@ -709,27 +709,37 @@
     </tbody>
   </table>
 
-  <h3>P0-B: 发送前上下文保护</h3>
+  <h3>P0-B: 四层上下文保护（防 413 全链路）</h3>
   <table>
-    <thead><tr><th>组件</th><th>问题</th><th>修复</th></tr></thead>
+    <thead><tr><th>层级</th><th>位置</th><th>触发条件</th><th>行为</th></tr></thead>
     <tbody>
       <tr>
-        <td>发送前检查</td>
-        <td>无 — 610K 直接发到 200K 窗口</td>
-        <td><span class="badge badge-green">已修复</span> API 调用前检查，>75% 自动压缩</td>
+        <td><strong>L1 内部截断</strong></td>
+        <td>streamChat tool_result 写入时</td>
+        <td>单个结果 > 4000 chars</td>
+        <td><span class="badge badge-green">截断</span> head 40 行 + tail 20 行</td>
       </tr>
       <tr>
-        <td><code>smartCompact()</code></td>
-        <td>200 字符阈值保留几乎所有消息</td>
-        <td><span class="badge badge-green">已修复</span> 激进策略：丢弃所有旧消息，截断 >2000 字符的大消息</td>
+        <td><strong>L2 内部预算</strong></td>
+        <td>streamChat 每轮 API 调用前</td>
+        <td>messages 估算 > 75% window</td>
+        <td><span class="badge badge-green">截断</span> 旧 tool_result 到 150 chars</td>
       </tr>
       <tr>
-        <td>413 错误恢复</td>
-        <td>无 — 直接报错</td>
-        <td><span class="badge badge-green">已修复</span> 捕获 413 → 激进压缩 → 允许重试</td>
+        <td><strong>L3 外部 guard</strong></td>
+        <td>runProxyTurn PostToolUse 后</td>
+        <td>history > 60% budget</td>
+        <td><span class="badge badge-green">compact</span> 丢弃旧消息</td>
+      </tr>
+      <tr>
+        <td><strong>L4 恢复</strong></td>
+        <td>catch 413 错误</td>
+        <td>API 返回 413</td>
+        <td><span class="badge badge-green">恢复</span> 激进 compact + 重试</td>
       </tr>
     </tbody>
   </table>
+  <p style="font-size: 13px; color: var(--gray-500);">根因：之前只有 L3+L4，但 L1/L2 缺失导致 streamChat 内部 messages 膨胀到 320K 时外部 guard 完全不可见。v0.7.1 修复后四层全覆盖。</p>
 
   <h3>v0.7.0 已完成（P1/P2）</h3>
   <table>

@@ -40,6 +40,7 @@ export OPENROUTER_API_KEY=...    # OpenRouter (aggregator)
 orca chat                                    # interactive REPL
 orca chat "explain this codebase"            # one-shot
 orca run "fix the failing tests"             # task execution
+orca run "add tests" --done-when "tests pass"  # goal-loop: repeat until criteria met
 orca council "SQL or NoSQL for this?" -n 5   # 5 models + judge
 orca race "write a CSV parser"               # first model wins
 orca pipeline "build REST API" --stages 5    # plan→code→review→fix→verify
@@ -282,10 +283,10 @@ Tested: 732 tests across 47 files, 10/10 SOTA benchmark.
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Orca CLI  v0.6.0                                   │
-│  13,000+ LOC · 63 source files · 732 tests          │
+│  Orca CLI  v0.7.1                                   │
+│  21K LOC · 70 source files · 732 tests              │
 ├─────────────────────────────────────────────────────┤
-│  New in v0.6.0 — Mode Wiring + Threads + Guidance   │
+│  New in v0.7.x — Knowledge + Context Guard + Goals  │
 │  /mode command · thread memory · guidance injection  │
 ├─────────────────────────────────────────────────────┤
 │  v0.5.0 — MCP Server + Modes + Discovery            │
