@@ -51,57 +51,103 @@ import type { MissionEvent } from '../mission/index.js'
 import { isMultiTaskPrompt, decomposePrompt, decomposeHeuristic, TaskTracker, executePlan } from '../planner/index.js'
 import type { PlanEvent, PlannedTask } from '../planner/index.js'
 
-// ── File Reference Expansion ──────────────────────────────────────
-// Detect file:///path, /absolute/path, ~/path in prompts,
-// read the file content, and inject it so the LLM can see local files.
+// ── File Reference Expansion (L0 Input Normalization) ─────────────
+// Matches Claude Code's path-expand hook + Codex stdin pipe pattern.
+//
+// Three modes:
+//   1. Bare path (entire prompt is a path) → read + "What would you like to do?"
+//   2. file:///URL or embedded path → read + inject <file> tag inline
+//   3. Stdin pipe (handled in createChatCommand before REPL) → prepend content
+//
+// Design: Claude Code auto-reads bare paths via UserPromptSubmit hook.
+// Orca does the same here, plus handles file:/// for council/race.
 
 function expandFileReferences(prompt: string, cwd: string): string {
   const home = process.env.HOME || ''
-  let expanded = prompt
+  const trimmed = prompt.trim()
 
-  // Pattern 1: file:///path/to/file
+  // Mode 1: Bare path — entire prompt is just a file path
+  // Claude Code behavior: read file, ask "what would you like to do?"
+  const barePath = resolveFilePath(trimmed, home, cwd)
+  if (barePath && !trimmed.includes(' ') && tryReadFile(barePath) !== null) {
+    const content = tryReadFile(barePath)!
+    const truncated = truncateFileContent(content)
+    return `<file path="${barePath}">\n${truncated}\n</file>\n\nThe user shared this file. Analyze it and ask what they'd like to do with it.`
+  }
+
+  let expanded = prompt
+  const injected = new Set<string>()
+
+  // Mode 2a: file:///path/to/file URLs
   const fileUrlRegex = /file:\/\/\/([\S]+)/g
   let match: RegExpExecArray | null
   while ((match = fileUrlRegex.exec(prompt)) !== null) {
-    const filePath = '/' + match[1]!
+    const filePath = '/' + match[1]!.replace(/['")\]}>，。；]$/, '') // strip trailing punctuation
+    if (injected.has(filePath)) continue
     const content = tryReadFile(filePath)
     if (content !== null) {
-      const truncated = content.length > 15_000 ? content.slice(0, 15_000) + '\n[... truncated]' : content
-      expanded = expanded.replace(match[0], `${match[0]}\n\n<file path="${filePath}">\n${truncated}\n</file>`)
+      injected.add(filePath)
+      const truncated = truncateFileContent(content)
+      expanded += `\n\n<file path="${filePath}">\n${truncated}\n</file>`
     }
   }
 
-  // Pattern 2: bare path at start of prompt or after whitespace — only if it looks like a real file
-  // Match /absolute/path or ~/path with file extension
-  const barePathRegex = /(?:^|\s)((?:\/[\w./-]+|~\/[\w./-]+)\.(?:html|md|ts|js|json|txt|py|go|rs|css|yaml|yml|toml|xml|csv|sql|sh))\b/g
+  // Mode 2b: bare paths with file extensions (/abs/path.ext or ~/path.ext)
+  const barePathRegex = /(?:^|\s)((?:\/[\w.@/-]+|~\/[\w.@/-]+)\.(?:html|htm|md|ts|tsx|js|jsx|json|txt|py|go|rs|css|scss|yaml|yml|toml|xml|csv|sql|sh|zsh|bash|swift|kt|java|c|cpp|h|rb|php|vue|svelte))\b/g
   while ((match = barePathRegex.exec(prompt)) !== null) {
     let filePath = match[1]!.trim()
-    if (filePath.startsWith('~') && home) {
-      filePath = home + filePath.slice(1)
-    }
-    // Only expand if not already expanded (no <file> tag nearby)
-    if (expanded.includes(`<file path="${filePath}">`)) continue
+    filePath = resolveFilePath(filePath, home, cwd) || filePath
+    if (injected.has(filePath)) continue
     const content = tryReadFile(filePath)
     if (content !== null) {
-      const truncated = content.length > 15_000 ? content.slice(0, 15_000) + '\n[... truncated]' : content
-      expanded = expanded.replace(match[1]!, `${match[1]}\n\n<file path="${filePath}">\n${truncated}\n</file>`)
+      injected.add(filePath)
+      const truncated = truncateFileContent(content)
+      expanded += `\n\n<file path="${filePath}">\n${truncated}\n</file>`
+    }
+  }
+
+  // Mode 2c: relative paths (./path or path/to/file.ext)
+  const relPathRegex = /(?:^|\s)(\.\/[\w.@/-]+\.(?:html|md|ts|js|json|txt|py|go|rs|css|yaml|yml|toml))\b/g
+  while ((match = relPathRegex.exec(prompt)) !== null) {
+    const filePath = join(cwd, match[1]!.trim())
+    if (injected.has(filePath)) continue
+    const content = tryReadFile(filePath)
+    if (content !== null) {
+      injected.add(filePath)
+      const truncated = truncateFileContent(content)
+      expanded += `\n\n<file path="${filePath}">\n${truncated}\n</file>`
     }
   }
 
   return expanded
 }
 
+function resolveFilePath(p: string, home: string, cwd: string): string | null {
+  let resolved = p
+  if (resolved.startsWith('file:///')) resolved = '/' + resolved.slice(8)
+  if (resolved.startsWith('~') && home) resolved = home + resolved.slice(1)
+  if (!resolved.startsWith('/')) resolved = join(cwd, resolved)
+  try {
+    if (existsSync(resolved) && !statSync(resolved).isDirectory()) return resolved
+  } catch {}
+  return null
+}
+
 function tryReadFile(filePath: string): string | null {
   try {
     if (!existsSync(filePath)) return null
     const stat = statSync(filePath)
-    // Skip directories, binary files, and huge files
     if (stat.isDirectory()) return null
     if (stat.size > 500_000) return null // 500KB max
     return readFileSync(filePath, 'utf-8')
   } catch {
     return null
   }
+}
+
+function truncateFileContent(content: string): string {
+  if (content.length <= 20_000) return content
+  return content.slice(0, 20_000) + `\n[... truncated at 20KB, original ${(content.length / 1024).toFixed(0)}KB]`
 }
 
 // ── Chat Options ─────────────────────────────────────────────────
@@ -134,8 +180,27 @@ export function createChatCommand(): Command {
     .option('--effort <level>', 'Thinking effort: low, medium, high (default), max')
     .option('-c, --continue', 'Resume the most recent saved session')
     .action(async (promptParts: string[], opts: ChatOptions) => {
-      const prompt = promptParts.join(' ').trim()
+      let prompt = promptParts.join(' ').trim()
       const outputMode: OutputMode = opts.json ? 'json' : 'streaming'
+
+      // Stdin pipe support: cat file | orca chat "prompt"
+      // If stdin is piped (not TTY), read it as context
+      if (!process.stdin.isTTY && prompt) {
+        try {
+          const chunks: Buffer[] = []
+          for await (const chunk of process.stdin) chunks.push(chunk as Buffer)
+          const stdinContent = Buffer.concat(chunks).toString('utf-8').trim()
+          if (stdinContent) {
+            const truncated = stdinContent.length > 20_000
+              ? stdinContent.slice(0, 20_000) + '\n[... truncated]'
+              : stdinContent
+            prompt = `<stdin>\n${truncated}\n</stdin>\n\n${prompt}`
+            if (outputMode === 'streaming') {
+              process.stderr.write(`\x1b[90m  [stdin] ${(stdinContent.length / 1024).toFixed(1)}KB piped\x1b[0m\n`)
+            }
+          }
+        } catch { /* stdin read failed — continue with prompt only */ }
+      }
 
       try {
         const config = resolveConfig({

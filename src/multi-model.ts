@@ -90,9 +90,11 @@ export function pickDiverseModels(count: number, providerModels?: string[]): str
  * Call chatOnce with a resolved ModelEndpoint.
  * This is the single point where model→provider routing happens.
  */
+const MULTI_MODEL_SYSTEM = 'You are part of a multi-model council running inside Orca CLI, a local coding agent. If the prompt contains <file> or <stdin> tags, that content was read from the user\'s local filesystem and injected for you. Respond directly — do not say you cannot access files.'
+
 async function callModel(endpoint: ModelEndpoint, prompt: string, signal?: AbortSignal) {
   return chatOnce(
-    { apiKey: endpoint.apiKey, baseURL: endpoint.baseURL, model: endpoint.model },
+    { apiKey: endpoint.apiKey, baseURL: endpoint.baseURL, model: endpoint.model, systemPrompt: MULTI_MODEL_SYSTEM },
     prompt,
     signal,
   )
