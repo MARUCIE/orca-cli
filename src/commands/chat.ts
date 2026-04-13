@@ -19,7 +19,7 @@ import {
   streamToken, ensureNewline, setLastNewline, printToolUse, printToolResult,
   printUsageSummary, printSessionSummary, emitJson,
   askPermission, printDiffPreview,
-  printSeparator, printStatusLine,
+  printSeparator, printStatusLine, printTurnSummary,
   ProgressIndicator, theme,
 } from '../output.js'
 import type { OutputMode } from '../output.js'
@@ -673,23 +673,19 @@ async function runREPL(
              + (stats.totalOutputTokens / 1_000_000) * pricing[1]
     }
 
-    printSeparator()
-    printStatusLine({
-      model: currentModel,
-      provider: resolved.provider,
-      mode: currentPermMode,
-      contextPct: budget.utilizationPct,
-      contextWindow: budget.contextWindow,
-      contextTokens: budget.historyTokensEst,
-      totalTokens,
-      inputTokens: stats.totalInputTokens,
-      outputTokens: stats.totalOutputTokens,
-      costUsd,
-      tokPerSec: lastTokPerSec,
-      cwd,
-      gitBranch,
-      effort: currentEffort,
-    })
+    // Clean prompt: dotted border + model hint, then ❯
+    const cols = process.stdout.columns || 80
+    const borderWidth = Math.min(cols - 4, 72)
+
+    // Compact footer: model · context% · mode · branch · session cost
+    const modelShort = currentModel.length > 22 ? currentModel.slice(0, 20) + '..' : currentModel
+    const pct = Math.min(100, budget.utilizationPct)
+    const branchTag = gitBranch ? `(${gitBranch})` : ''
+    const costTag = costUsd > 0 ? `$${costUsd < 0.01 ? costUsd.toFixed(4) : costUsd.toFixed(2)}` : ''
+    const footerParts = [modelShort, `ctx ${pct}%`, currentPermMode, branchTag, costTag].filter(Boolean)
+
+    console.log(`\x1b[90m  ${'─'.repeat(borderWidth)}\x1b[0m`)
+    console.log(`\x1b[90m  ${footerParts.join('  ·  ')}\x1b[0m`)
 
     return `${theme.prompt}❯\x1b[0m `
   }
@@ -1396,6 +1392,23 @@ async function runREPL(
         if (turnElapsed > 0 && result.outputTokens > 0) {
           lastTokPerSec = result.outputTokens / (turnElapsed / 1000)
         }
+
+        // Turn summary — time, tokens, cost, context %
+        const turnBudget = tokenBudget.getBudget(history)
+        const turnPricing = getPricingForModel(currentModel)
+        let turnCost = 0
+        if (turnPricing) {
+          turnCost = (result.inputTokens / 1_000_000) * turnPricing[0]
+                   + (result.outputTokens / 1_000_000) * turnPricing[1]
+        }
+        printTurnSummary({
+          elapsedMs: turnElapsed,
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
+          costUsd: turnCost,
+          contextPct: turnBudget.utilizationPct,
+          tokPerSec: lastTokPerSec,
+        })
 
         // Harness: context utilization warning with actionable detail
         const risk = contextMonitor.getRiskLevel()

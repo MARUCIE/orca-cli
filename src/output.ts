@@ -496,6 +496,46 @@ export function printStatusLine(info: StatusLineInfo): void {
   console.log(`\x1b[90m  ${'·'.repeat(borderWidth)}\x1b[0m`)
 }
 
+// ── Turn Summary ───────────────────────────────────────────────────
+
+export interface TurnSummaryInfo {
+  /** Turn elapsed time in ms */
+  elapsedMs: number
+  /** Input tokens this turn */
+  inputTokens: number
+  /** Output tokens this turn */
+  outputTokens: number
+  /** Turn cost estimate in USD */
+  costUsd: number
+  /** Context utilization after this turn (0-100) */
+  contextPct: number
+  /** Tokens per second */
+  tokPerSec: number
+}
+
+/**
+ * Print a compact turn summary after each model response.
+ *
+ * Format:
+ *   ↩ 3.2s · ↓420 ↑1.2K tokens · $0.003 · ctx 28%  · 52 tok/s
+ */
+export function printTurnSummary(info: TurnSummaryInfo): void {
+  const sec = (info.elapsedMs / 1000).toFixed(1)
+  const fmtTok = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n)
+  const cost = info.costUsd >= 0.01 ? `$${info.costUsd.toFixed(2)}` : `$${info.costUsd.toFixed(4)}`
+  const tps = info.tokPerSec > 0 ? `${Math.round(info.tokPerSec)} tok/s` : ''
+
+  const parts = [
+    `${sec}s`,
+    `\u2193${fmtTok(info.inputTokens)} \u2191${fmtTok(info.outputTokens)}`,
+    cost,
+    `ctx ${Math.round(info.contextPct)}%`,
+  ]
+  if (tps) parts.push(tps)
+
+  console.log(`\n\x1b[90m  \u21a9 ${parts.join('  \u00b7  ')}\x1b[0m`)
+}
+
 // ── Progress Indicator ──────────────────────────────────────────────
 
 function formatElapsed(ms: number): string {
