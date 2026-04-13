@@ -794,6 +794,49 @@ async function runREPL(
   const { ChatSessionEmitter } = await import('../ui/session.js')
   const session = new ChatSessionEmitter()
 
+  // Handle UI commands (keyboard shortcuts from ink InputArea)
+  session.onCommand((command) => {
+    switch (command) {
+      case 'mode-cycle': {
+        const idx = PERM_MODES.indexOf(currentPermMode)
+        currentPermMode = PERM_MODES[(idx + 1) % PERM_MODES.length]!
+        session.emitSystemMessage(`mode: ${currentPermMode}`, 'info')
+        session.emitStatusUpdate(getStatusInfo())
+        break
+      }
+      case 'undo': {
+        if (lastWrite?.path) {
+          const { path: undoPath, oldContent } = lastWrite
+          try {
+            if (oldContent === null) {
+              unlinkSync(undoPath)
+              session.emitSystemMessage(`undo: deleted ${undoPath}`, 'info')
+            } else {
+              writeFileSync(undoPath, oldContent, 'utf-8')
+              session.emitSystemMessage(`undo: restored ${undoPath}`, 'info')
+            }
+            lastWrite = { path: '', oldContent: null }
+          } catch { /* ignore */ }
+        } else {
+          session.emitSystemMessage('nothing to undo.', 'info')
+        }
+        break
+      }
+      case 'clear-screen': {
+        // UI already clears blocks; business logic resets conversation state
+        const sys = history.find(m => m.role === 'system')
+        history.length = 0
+        if (sys) history.push(sys)
+        stats.turns = 0
+        stats.totalInputTokens = 0
+        stats.totalOutputTokens = 0
+        contextMonitor.reset()
+        tokenBudget.reset()
+        break
+      }
+    }
+  })
+
   const getStatusInfo = (): import('../ui/types.js').StatusInfo => {
     const budget = tokenBudget.getBudget(history)
     const pricing = getPricingForModel(currentModel)

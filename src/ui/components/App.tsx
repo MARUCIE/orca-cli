@@ -26,6 +26,35 @@ import { MultiModelProgress } from './MultiModelProgress.js'
 import { Footer } from './Footer.js'
 import { MarkdownText } from './MarkdownText.js'
 import { Banner } from './Banner.js'
+import { CommandPicker } from './CommandPicker.js'
+import type { CommandDef } from './CommandPicker.js'
+
+const SLASH_COMMANDS: CommandDef[] = [
+  { name: '/help', description: 'Show all commands' },
+  { name: '/clear', description: 'Clear conversation' },
+  { name: '/compact', description: 'Smart compaction' },
+  { name: '/status', description: 'Session overview' },
+  { name: '/cost', description: 'Token breakdown' },
+  { name: '/model', description: 'Show/switch model' },
+  { name: '/models', description: 'List all models' },
+  { name: '/effort', description: 'Thinking effort' },
+  { name: '/mode', description: 'Behavioral profiles' },
+  { name: '/diff', description: 'Show git diff' },
+  { name: '/commit', description: 'Create commit' },
+  { name: '/undo', description: 'Revert last write' },
+  { name: '/council', description: 'Multi-model council' },
+  { name: '/race', description: 'First answer wins' },
+  { name: '/pipeline', description: 'Plan-Code-Review' },
+  { name: '/mission', description: 'Autonomous mission' },
+  { name: '/plan', description: 'Task decomposition' },
+  { name: '/notes', description: 'Observations' },
+  { name: '/mcp', description: 'MCP servers' },
+  { name: '/hooks', description: 'Registered hooks' },
+  { name: '/doctor', description: 'Health check' },
+  { name: '/save', description: 'Save session' },
+  { name: '/thread', description: 'Conversation memory' },
+  { name: '/providers', description: 'List providers' },
+]
 
 export interface BannerInfo {
   version: string
@@ -111,6 +140,11 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
   const [permRequest, setPermRequest] = useState<{ toolName: string; preview: string; resolve: (b: boolean) => void } | null>(null)
   const [multiModelState, setMultiModelState] = useState<{ command: string; models: ModelProgress[] } | null>(null)
   const [activeTool, setActiveTool] = useState<{ id: string; start: ToolStartInfo; startTime: number } | null>(null)
+  const [inputValue, setInputValue] = useState('')
+
+  // Command picker state
+  const showPicker = inputActive && inputValue.startsWith('/') && inputValue.length > 0
+  const pickerFilter = inputValue.slice(1) // strip leading /
 
   // Batched text streaming: accumulate tokens, flush at 20fps
   const textBuffer = useRef('')
@@ -247,17 +281,52 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
     return () => { session.removeListener('*', handler) }
   }, [session])
 
+  // Input value tracking (for command picker)
+  const handleInputChange = useCallback((val: string) => {
+    setInputValue(val)
+  }, [])
+
+  // Command picker selection
+  const handleCommandSelect = useCallback((command: string) => {
+    // Submit the selected command
+    setInputHistory(prev => [...prev, command])
+    setInputActive(false)
+    setInputValue('')
+    session.submitInput(command)
+  }, [session])
+
+  const handleCommandCancel = useCallback(() => {
+    setInputValue('')
+  }, [])
+
   // Input submission
   const handleSubmit = useCallback((text: string) => {
     if (text) {
       setInputHistory(prev => [...prev, text])
     }
     setInputActive(false)
+    setInputValue('')
     session.submitInput(text || null)
   }, [session])
 
   const handleAbort = useCallback(() => {
     session.emitAbort()
+  }, [session])
+
+  const handleClear = useCallback(() => {
+    session.emitCommand('clear-screen')
+    setBlocks([])
+    setStreamingText('')
+    textBuffer.current = ''
+    setLastTurnSummary(null)
+  }, [session])
+
+  const handleModeCycle = useCallback(() => {
+    session.emitCommand('mode-cycle')
+  }, [session])
+
+  const handleUndo = useCallback(() => {
+    session.emitCommand('undo')
   }, [session])
 
   return (
@@ -325,12 +394,28 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
         )}
       </Box>
 
+      {/* Command picker (above input box, like autocomplete dropdown) */}
+      {showPicker && (
+        <CommandPicker
+          commands={SLASH_COMMANDS}
+          filter={pickerFilter}
+          onSelect={handleCommandSelect}
+          onCancel={handleCommandCancel}
+          active={showPicker}
+        />
+      )}
+
       {/* Input area */}
       <Box>
         <InputArea
           onSubmit={handleSubmit}
           onAbort={handleAbort}
+          onClear={handleClear}
+          onModeCycle={handleModeCycle}
+          onUndo={handleUndo}
+          onChange={handleInputChange}
           active={inputActive && !permRequest}
+          pickerActive={showPicker}
           history={inputHistory}
         />
       </Box>

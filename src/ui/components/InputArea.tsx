@@ -11,7 +11,7 @@
  * - Cursor position tracking for mid-text editing
  */
 
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import { Box, Text, useInput, useStdout } from 'ink'
 
 interface Props {
@@ -19,22 +19,43 @@ interface Props {
   onSubmit: (text: string) => void
   /** Called when user presses Esc */
   onAbort?: () => void
+  /** Called on Ctrl+L (clear screen) */
+  onClear?: () => void
+  /** Called on Shift+Tab (mode cycle) */
+  onModeCycle?: () => void
+  /** Called on Ctrl+Z (undo) */
+  onUndo?: () => void
+  /** Called when input value changes */
+  onChange?: (value: string) => void
   /** Whether input is currently accepting keystrokes */
   active: boolean
+  /** When true, CommandPicker handles Enter/Esc/arrows — InputArea only handles text */
+  pickerActive?: boolean
   /** Command history for up/down navigation */
   history?: string[]
 }
 
-export function InputArea({ onSubmit, onAbort, active, history = [] }: Props): React.ReactElement {
+export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onChange, active, pickerActive, history = [] }: Props): React.ReactElement {
   const { stdout } = useStdout()
   const cols = stdout?.columns || 80
-  const [value, setValue] = useState('')
+  const [value, setValueRaw] = useState('')
   const [cursor, setCursor] = useState(0)
   const [historyIdx, setHistoryIdx] = useState(-1)
+
+  const setValue = useCallback((v: string | ((prev: string) => string)) => {
+    setValueRaw(prev => {
+      const next = typeof v === 'function' ? v(prev) : v
+      if (next !== prev) onChange?.(next)
+      return next
+    })
+  }, [onChange])
 
   useInput(
     (input, key) => {
       if (!active) return
+
+      // When picker is active, defer Enter/Esc/arrows to CommandPicker
+      if (pickerActive && (key.return || key.escape || key.upArrow || key.downArrow)) return
 
       // Enter: submit (Ctrl+J inserts newline)
       if (key.return && !key.ctrl) {
@@ -66,8 +87,26 @@ export function InputArea({ onSubmit, onAbort, active, history = [] }: Props): R
         return
       }
 
+      // Shift+Tab: mode cycle
+      if (key.tab && key.shift) {
+        onModeCycle?.()
+        return
+      }
+
       // Tab: no-op (reserved for completion)
       if (key.tab) return
+
+      // Ctrl+L: clear screen
+      if (key.ctrl && input === 'l') {
+        onClear?.()
+        return
+      }
+
+      // Ctrl+Z: undo
+      if (key.ctrl && input === 'z') {
+        onUndo?.()
+        return
+      }
 
       // Ctrl+A: beginning of line
       if (key.ctrl && input === 'a') {

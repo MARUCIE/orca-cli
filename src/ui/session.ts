@@ -102,6 +102,18 @@ export class ChatSessionEmitter extends EventEmitter {
     this.emitUI({ type: 'clear' })
   }
 
+  // ── UI commands (UI → business logic) ─────────────────────
+
+  /** Emit a command from UI to business logic (e.g., mode-cycle, undo, clear-screen) */
+  emitCommand(command: 'mode-cycle' | 'undo' | 'clear-screen'): void {
+    this.emit('command', command)
+  }
+
+  /** Register handler for UI commands */
+  onCommand(handler: (command: string) => void): void {
+    this.on('command', handler)
+  }
+
   // ── Input from UI to business logic ───────────────────────
 
   private inputResolve: ((input: string | null) => void) | null = null

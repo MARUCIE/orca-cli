@@ -27,8 +27,10 @@ export function Footer({ isGenerating, isInputActive, permMode }: Props): React.
     shortcuts.push({ key: 'esc', label: 'interrupt' })
   } else if (isInputActive) {
     shortcuts.push({ key: 'enter', label: 'send' })
+    shortcuts.push({ key: 'ctrl+j', label: 'newline' })
     shortcuts.push({ key: '/help', label: 'commands' })
-    shortcuts.push({ key: 'shift+tab', label: `mode (${permMode})` })
+    shortcuts.push({ key: 'shift+tab', label: permMode })
+    shortcuts.push({ key: 'ctrl+z', label: 'undo' })
     shortcuts.push({ key: 'ctrl+l', label: 'clear' })
   }
 
