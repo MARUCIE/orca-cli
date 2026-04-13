@@ -109,6 +109,20 @@ describe('HookManager - Claude Code Compatibility', () => {
 
       expect(manager.hasHooks('SubagentStop')).toBe(true)
     })
+
+    it('recognizes MultiModelStart event as valid hook event', () => {
+      isolated({
+        '.orca.json': JSON.stringify({
+          hooks: {
+            MultiModelStart: [{ command: 'echo multi-model-start' }],
+          },
+        }),
+      })
+
+      manager.load(tempProject.dir)
+
+      expect(manager.hasHooks('MultiModelStart')).toBe(true)
+    })
   })
 
   describe('Config merging', () => {

@@ -520,6 +520,38 @@ describe('directory expansion — project file discovery', () => {
     expect(match![2]).toBe('~/Projects/myapp')
   })
 
+  it('leading dir match extracts path and user text', () => {
+    const prompt = '/Users/me/code 执行蜂群审计'
+    const match = prompt.match(/^((?:\/[\w.@/-]+|~\/[\w.@/-]+))\s+(.+)$/s)
+    expect(match).toBeTruthy()
+    expect(match![1]).toBe('/Users/me/code')
+    expect(match![2]).toBe('执行蜂群审计')
+  })
+
+  it('leading dir match works with tilde path', () => {
+    const prompt = '~/Projects/myapp review and audit'
+    const match = prompt.match(/^((?:\/[\w.@/-]+|~\/[\w.@/-]+))\s+(.+)$/s)
+    expect(match).toBeTruthy()
+    expect(match![1]).toBe('~/Projects/myapp')
+    expect(match![2]).toBe('review and audit')
+  })
+
+  it('leading dir match handles multiline user text', () => {
+    const prompt = '/Users/me/project do this\nand that'
+    const match = prompt.match(/^((?:\/[\w.@/-]+|~\/[\w.@/-]+))\s+(.+)$/s)
+    expect(match).toBeTruthy()
+    expect(match![1]).toBe('/Users/me/project')
+    expect(match![2]).toBe('do this\nand that')
+  })
+
+  it('leading dir match with mixed CJK and Latin text', () => {
+    const prompt = '/Users/mauricewen/Projects/20-ai-girlfriends 执行蜂群审计，如果这个项目发布到生产，还差什么'
+    const match = prompt.match(/^((?:\/[\w.@/-]+|~\/[\w.@/-]+))\s+(.+)$/s)
+    expect(match).toBeTruthy()
+    expect(match![1]).toBe('/Users/mauricewen/Projects/20-ai-girlfriends')
+    expect(match![2]).toBe('执行蜂群审计，如果这个项目发布到生产，还差什么')
+  })
+
   it('output wraps files in <file> tags', () => {
     const fp = '/project/README.md'
     const content = '# Title'

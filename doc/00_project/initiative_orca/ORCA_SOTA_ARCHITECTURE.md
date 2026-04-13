@@ -432,7 +432,7 @@ src/
 |---|---|
 | Version | 0.8.0 |
 | LOC | 16,722 |
-| Tests | 1118 (53 files) |
+| Tests | 1123 (53 files) |
 | Modules | 14 directories |
 | Tools | 41+ |
 | Slash commands | 30+ |
@@ -455,16 +455,16 @@ src/
 | Sandbox (Seatbelt/bwrap) | **Yes** | **Yes** | No | No | Yes | **--safe → Seatbelt/bwrap** | Parity |
 | MCP server ecosystem | **Mature** | No | No | No | No | **Tool bridge + auto-inject** | Parity |
 | IDE integration (VS Code) | **Yes** | **Yes** | **Yes** | **Yes** | No | No | **GAP** |
-| Hooks system | **Yes** | No | No | No | No | **8 events** | Parity |
+| Hooks system | **Yes** | No | No | No | No | **11 events (incl. MultiModelStart auto-preprocess)** | **LEAD** |
 | CJK-aware token estimation | No | No | No | No | No | **Yes** | **LEAD** |
 | Universal file preprocessing | No | No | No | No | No | **L0→L2 any-format→MD** | **LEAD** |
 | File reference expansion | **Yes** | **Yes** | No | No | No | **bare path + file:/// + stdin pipe + embedded** | Parity |
 
 ### Gap Summary
 
-**LEAD areas (7)**: Multi-model collaboration, task auto-decomposition, context protection, cognitive skeleton, knowledge management, CJK support, universal file preprocessing
+**LEAD areas (8)**: Multi-model collaboration, task auto-decomposition, context protection, cognitive skeleton, knowledge management, hooks (11 events + MultiModelStart auto-preprocess), CJK support, universal file preprocessing
 
-**Parity areas (9)**: Mission mode, concurrent execution, goal-loop, validation contract, hooks, git worktree isolation, sandbox security, MCP tool bridge, file reference expansion
+**Parity areas (8)**: Mission mode, concurrent execution, goal-loop, validation contract, git worktree isolation, sandbox security, MCP tool bridge, file reference expansion
 
 **GAP areas (1)**: IDE integration (VS Code extension)
 
@@ -501,7 +501,7 @@ src/
 | v0.8.0 Audit fix: worktree warnings | DONE | cleanup() returns warnings instead of silently swallowing errors |
 | v0.8.0 Audit fix: 413 status check | DONE | checks err.status/statusCode property in addition to string matching |
 | v0.8.0 5-layer context defense | DONE | L1 injection dedup hint + L2 tool read guard + L3 cumulative budget (50K) + L4 hard stop (85%) + L5 nuclear. 100× reduction in duplicate-read token waste |
-| v0.8.0 1118 tests | DONE | +26 context-guard tests covering all 5 defense layers |
+| v0.8.0 1123 tests | DONE | +26 context-guard tests covering all 5 defense layers |
 
 ---
 

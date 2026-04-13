@@ -160,6 +160,61 @@ function appendDedupHint(text: string, paths: Set<string>): string {
   return text + `\n\n<context-note>The file content above has been preprocessed and fully injected. Do NOT call read_file on these paths — their content is already complete in context: ${[...paths].join(', ')}</context-note>`
 }
 
+/**
+ * MultiModelStart built-in hook: force-inject project context for council/race/pipeline.
+ *
+ * When multiple SOTA models collaborate, they ALL need project context regardless of
+ * whether the user explicitly referenced files. This function:
+ *   1. Expands any explicit file/dir references in the prompt
+ *   2. Force-injects cwd project files (CLAUDE.md, README, package.json, tree, etc.)
+ *   3. Deduplicates — files already injected by step 1 are not re-injected
+ *   4. Returns the enriched prompt and all injected paths
+ */
+function prepareMultiModelContext(
+  prompt: string,
+  cwd: string,
+  sessionInjectedPaths: Set<string>,
+): { prompt: string; injectedPaths: Set<string> } {
+  // Step 1: expand explicit file/dir references
+  const expansion = expandFileReferences(prompt, cwd)
+  let enriched = expansion.text
+  const allPaths = new Set(expansion.injectedPaths)
+
+  // Step 2: force-inject cwd project context
+  const cwdContext = expandFileReferences(cwd, cwd)
+  if (cwdContext.injectedPaths.size > 0) {
+    const newPaths: string[] = []
+    for (const p of cwdContext.injectedPaths) {
+      if (!allPaths.has(p)) {
+        allPaths.add(p)
+        newPaths.push(p)
+      }
+    }
+    if (newPaths.length > 0) {
+      // Extract <file> tags for files not already in prompt
+      for (const np of newPaths) {
+        const escaped = np.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const tagMatch = cwdContext.text.match(new RegExp(`<file path="${escaped}">[\\s\\S]*?</file>`))
+        if (tagMatch) enriched += '\n\n' + tagMatch[0]
+      }
+      // Append project tree if not already present
+      if (!enriched.includes('<project-tree') && cwdContext.text.includes('<project-tree')) {
+        const treeMatch = cwdContext.text.match(/<project-tree[\s\S]*?<\/project-tree>/)
+        if (treeMatch) enriched += '\n\n' + treeMatch[0]
+      }
+      process.stderr.write(`\x1b[90m  [MultiModelStart] force-injected ${newPaths.length} project file(s) from ${cwd}\x1b[0m\n`)
+    }
+  }
+
+  // Step 3: dedup hint + track in session
+  for (const p of allPaths) sessionInjectedPaths.add(p)
+  if (allPaths.size > 0) {
+    enriched = appendDedupHint(enriched, allPaths)
+  }
+
+  return { prompt: enriched, injectedPaths: allPaths }
+}
+
 function resolveFilePath(p: string, home: string, cwd: string): string | null {
   let resolved = p
   if (resolved.startsWith('file:///')) resolved = '/' + resolved.slice(8)
@@ -251,6 +306,21 @@ function tryExpandDirectory(prompt: string, home: string, cwd: string): string |
         if (existsSync(candidate) && statSync(candidate).isDirectory()) {
           dirPath = candidate
           userText = trailingDirMatch[1]!.trim()
+        }
+      } catch {}
+    }
+  }
+
+  // Case 3: prompt is "/path/to/dir some text" — extract leading directory
+  if (!dirPath) {
+    const leadingDirMatch = trimmed.match(/^((?:\/[\w.@/-]+|~\/[\w.@/-]+))\s+(.+)$/s)
+    if (leadingDirMatch) {
+      let candidate = leadingDirMatch[1]!
+      if (candidate.startsWith('~') && home) candidate = home + candidate.slice(1)
+      try {
+        if (existsSync(candidate) && statSync(candidate).isDirectory()) {
+          dirPath = candidate
+          userText = leadingDirMatch[2]!.trim()
         }
       } catch {}
     }
@@ -1038,10 +1108,19 @@ async function runREPL(
           let mmPrompt = input.replace(/^\/(council|race|pipeline)\s*/, '').trim()
           if (!mmPrompt) continue
 
-          // Expand file references in multi-model prompts
-          const mmExpansion = expandFileReferences(mmPrompt, cwd)
-          mmPrompt = mmExpansion.text
-          for (const p of mmExpansion.injectedPaths) sessionInjectedPaths.add(p)
+          // MultiModelStart hook: force-inject project context for all SOTA models.
+          // Built-in behavior: universal file preprocessing + cwd project injection.
+          // External hooks can add additional context via MultiModelStart event.
+          const mmContext = prepareMultiModelContext(mmPrompt, cwd, sessionInjectedPaths)
+          mmPrompt = mmContext.prompt
+          const mmCommand = (handled as string)
+          await hooks.run('MultiModelStart', {
+            event: 'MultiModelStart',
+            prompt: mmPrompt,
+            cwd,
+            model: currentModel,
+            toolInput: { command: mmCommand, injectedFiles: mmContext.injectedPaths.size },
+          })
 
           // Import routing functions
           const { resolveModelEndpoint, findAggregator } = await import('../config.js')

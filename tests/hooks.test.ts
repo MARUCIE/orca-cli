@@ -275,12 +275,13 @@ describe('Safety system', () => {
     }
   })
 
-  it('5.15 All 8 hook event types are recognized', () => {
+  it('5.15 All 11 hook event types are recognized', () => {
     const events: HookEvent[] = [
       'PreToolUse', 'PostToolUse', 'SessionStart', 'SessionEnd',
       'PreCompact', 'PostCompact', 'UserPromptSubmit', 'SubagentStart',
+      'Stop', 'SubagentStop', 'MultiModelStart',
     ]
-    // Create a config with all 8 events
+    // Create a config with all 11 events
     const dir = join(testDir, 'all-events')
     mkdirSync(join(dir, '.orca'), { recursive: true })
     const config: Record<string, unknown[]> = {}
@@ -294,6 +295,6 @@ describe('Safety system', () => {
     for (const e of events) {
       expect(manager.hasHooks(e)).toBe(true)
     }
-    expect(manager.totalHooks).toBe(8)
+    expect(manager.totalHooks).toBe(11)
   })
 })

@@ -5,7 +5,7 @@
  * They receive JSON on stdin and return JSON on stdout.
  * Hooks can block operations, inject context, or log events.
  *
- * 10 hook events (superset of Claude Code):
+ * 11 hook events (superset of Claude Code):
  *   1. PreToolUse       — before tool execution (can block/modify)
  *   2. PostToolUse      — after tool execution (can log/modify output)
  *   3. SessionStart     — on REPL startup
@@ -16,6 +16,7 @@
  *   8. SubagentStart    — when a sub-agent spawns
  *   9. Stop             — when model stops generating (Claude Code compat)
  *  10. SubagentStop     — when a sub-agent finishes (Claude Code compat)
+ *  11. MultiModelStart  — before council/race/pipeline (built-in: force file preprocessing)
  *
  * Loads hooks from (priority order, all merged):
  *   1. .orca/hooks.json (native format)
@@ -46,6 +47,7 @@ export type HookEvent =
   | 'SubagentStart'
   | 'Stop'
   | 'SubagentStop'
+  | 'MultiModelStart'
 
 export interface HookDefinition {
   /** Shell command to execute */
@@ -295,7 +297,7 @@ export class HookManager {
 const HOOK_EVENTS: string[] = [
   'PreToolUse', 'PostToolUse', 'SessionStart', 'SessionEnd',
   'PreCompact', 'PostCompact', 'UserPromptSubmit', 'SubagentStart',
-  'Stop', 'SubagentStop',
+  'Stop', 'SubagentStop', 'MultiModelStart',
 ]
 
 function isHookEvent(s: string): s is HookEvent {
