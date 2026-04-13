@@ -233,15 +233,18 @@ export class MCPClient {
     }
   }
 
-  /** Connect to all configured servers (skips disabled) */
+  /** Connect to all configured servers in parallel (skips disabled) */
   async connectAll(): Promise<string[]> {
-    const connected: string[] = []
-    for (const name of this.configs.keys()) {
-      if (this.disabled.has(name)) continue
-      const ok = await this.connect(name)
-      if (ok) connected.push(name)
-    }
-    return connected
+    const names = [...this.configs.keys()].filter(n => !this.disabled.has(n))
+    const results = await Promise.allSettled(
+      names.map(async (name) => {
+        const ok = await this.connect(name)
+        return ok ? name : null
+      }),
+    )
+    return results
+      .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled' && r.value !== null)
+      .map(r => r.value)
   }
 
   /** Disable a server (disconnect if connected) */
@@ -417,6 +420,10 @@ export class MCPClient {
 
   get configuredCount(): number {
     return this.configs.size
+  }
+
+  get configuredNames(): string[] {
+    return [...this.configs.keys()]
   }
 
   // ── Internal ─────────────────────────────────────────────────

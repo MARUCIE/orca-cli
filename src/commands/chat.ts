@@ -428,54 +428,61 @@ async function runREPL(
     rl.once('close', () => resolve(null))
   })
 
-  // Load hooks and MCP servers
+  // ── Progressive Loading: prompt first, heavy init in background ──
+  // Hooks: sync file reads (fast, <50ms)
   hooks.load(cwd)
-  if (hooks.totalHooks > 0) {
-    hooks.printStatus()
-  }
+  if (hooks.totalHooks > 0) hooks.printStatus()
 
-  mcpClient.loadConfigs(cwd)
+  // MCP + Provider + SessionStart: async background (slow, 10-60s)
   let mcpToolDefs: Array<Record<string, unknown>> = []
-  if (mcpClient.configuredCount > 0) {
-    const connected = await mcpClient.connectAll()
-    if (connected.length > 0) {
-      // Discover MCP server tools and inject into LLM's tool list
-      const mcpTools = await mcpClient.getToolDefinitions()
-      mcpToolDefs = mcpTools as Array<Record<string, unknown>>
-      const toolCount = mcpTools.length
-      console.log(`\x1b[90m  MCP: ${connected.length} server(s), ${toolCount} tools\x1b[0m`)
-    }
-  }
+  let bgInitDone = false
 
-  await hooks.run('SessionStart', { event: 'SessionStart', cwd, model: currentModel })
-  logInfo('chat session started', { cwd, model: currentModel, provider: resolved.provider })
-
-  // ── Provider preflight check ──
-  if (resolved.baseURL) {
-    try {
-      const { chatOnce } = await import('../providers/openai-compat.js')
-      const probe = await Promise.race([
-        chatOnce({ apiKey: resolved.apiKey, baseURL: resolved.baseURL, model: resolved.model, maxTokens: 1 }, 'ping'),
-        new Promise<null>((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
-      ])
-      if (probe) {
-        console.log(`\x1b[32m  provider: ${resolved.provider}/${resolved.model} — connected\x1b[0m`)
+  // Fire background init — don't await, user can start typing immediately
+  const bgInit = (async () => {
+    // MCP server connect (all in parallel via connectAll)
+    mcpClient.loadConfigs(cwd)
+    if (mcpClient.configuredCount > 0) {
+      const connected = await mcpClient.connectAll()
+      if (connected.length > 0) {
+        const mcpTools = await mcpClient.getToolDefinitions()
+        mcpToolDefs = mcpTools as Array<Record<string, unknown>>
+        process.stderr.write(`\x1b[90m  MCP: ${connected.length} server(s), ${mcpTools.length} tools ready\x1b[0m\n`)
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.log(`\x1b[33m  provider: ${resolved.provider}/${resolved.model} — ${msg}\x1b[0m`)
-      console.log(`\x1b[33m  hint: check proxy/network. Session will continue — requests may fail.\x1b[0m`)
     }
-  }
+
+    // Provider preflight (non-blocking)
+    if (resolved.baseURL) {
+      try {
+        const { chatOnce } = await import('../providers/openai-compat.js')
+        await Promise.race([
+          chatOnce({ apiKey: resolved.apiKey, baseURL: resolved.baseURL, model: resolved.model, maxTokens: 1 }, 'ping'),
+          new Promise<null>((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000)),
+        ])
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        process.stderr.write(`\x1b[33m  provider: ${msg}\x1b[0m\n`)
+        process.stderr.write(`\x1b[33m  hint: check proxy/network. Session will continue.\x1b[0m\n`)
+      }
+    }
+
+    // SessionStart hook
+    await hooks.run('SessionStart', { event: 'SessionStart', cwd, model: currentModel })
+    bgInitDone = true
+  })()
+
+  // Don't block — background init runs while user types
+  bgInit.catch(err => {
+    process.stderr.write(`\x1b[33m  init warn: ${err instanceof Error ? err.message : String(err)}\x1b[0m\n`)
+  })
+
+  logInfo('chat session started', { cwd, model: currentModel, provider: resolved.provider })
 
   const startupWarning = getAgenticWarning(currentModel)
   if (startupWarning) {
-    console.log(`\x1b[33m  model caution: ${currentModel} — ${startupWarning}\x1b[0m`)
-    logWarning('model caution', { model: currentModel, provider: resolved.provider, warning: startupWarning })
+    console.log(`\x1b[33m  ${startupWarning}\x1b[0m`)
   }
 
-  console.log('\x1b[90m  Type your message. /help for commands. Ctrl+C to quit.\x1b[0m')
-  console.log('\x1b[90m  /council /race /pipeline — multi-model collaboration\x1b[0m\n')
+  console.log('\x1b[90m  /help for commands. Ctrl+C to quit.\x1b[0m\n')
 
   // Input history collector for persistence
   const inputHistory: string[] = []
