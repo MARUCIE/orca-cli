@@ -359,6 +359,57 @@ export class MCPClient {
     return this.request(serverName, 'tools/call', { name: toolName, arguments: args })
   }
 
+  /**
+   * Get all MCP server tools as OpenAI function calling definitions.
+   * Tool names are prefixed with "mcp__<server>__" for routing.
+   */
+  async getToolDefinitions(): Promise<Array<{ type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }>> {
+    const defs: Array<{ type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }> = []
+
+    for (const name of this.connections.keys()) {
+      try {
+        const result = await this.request(name, 'tools/list', {}) as { tools?: MCPTool[] }
+        if (result?.tools) {
+          for (const tool of result.tools) {
+            defs.push({
+              type: 'function',
+              function: {
+                name: `mcp__${name}__${tool.name}`,
+                description: tool.description || `MCP tool: ${tool.name} (server: ${name})`,
+                parameters: tool.inputSchema || { type: 'object', properties: {} },
+              },
+            })
+          }
+        }
+      } catch { /* server may not support tools */ }
+    }
+
+    return defs
+  }
+
+  /**
+   * Route a tool call with "mcp__<server>__<tool>" name format.
+   * Returns null if the name doesn't match MCP format.
+   */
+  async routeToolCall(fullName: string, args: Record<string, unknown>): Promise<{ success: boolean; output: string } | null> {
+    const match = fullName.match(/^mcp__([^_]+)__(.+)$/)
+    if (!match) return null
+
+    const [, serverName, toolName] = match
+    if (!serverName || !toolName) return null
+    if (!this.connections.has(serverName)) {
+      return { success: false, output: `MCP server "${serverName}" not connected` }
+    }
+
+    try {
+      const result = await this.callTool(serverName, toolName, args) as { content?: Array<{ text?: string }>; isError?: boolean }
+      const text = result?.content?.map(c => c.text || '').join('\n') || JSON.stringify(result)
+      return { success: !result?.isError, output: text.slice(0, 20_000) }
+    } catch (err) {
+      return { success: false, output: `MCP error: ${err instanceof Error ? err.message : String(err)}` }
+    }
+  }
+
   /** Get connected server count */
   get connectedCount(): number {
     return this.connections.size

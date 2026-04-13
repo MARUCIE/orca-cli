@@ -435,10 +435,15 @@ async function runREPL(
   }
 
   mcpClient.loadConfigs(cwd)
+  let mcpToolDefs: Array<Record<string, unknown>> = []
   if (mcpClient.configuredCount > 0) {
     const connected = await mcpClient.connectAll()
     if (connected.length > 0) {
-      console.log(`\x1b[90m  MCP: ${connected.length} server(s) connected (${connected.join(', ')})\x1b[0m`)
+      // Discover MCP server tools and inject into LLM's tool list
+      const mcpTools = await mcpClient.getToolDefinitions()
+      mcpToolDefs = mcpTools as Array<Record<string, unknown>>
+      const toolCount = mcpTools.length
+      console.log(`\x1b[90m  MCP: ${connected.length} server(s), ${toolCount} tools\x1b[0m`)
     }
   }
 
@@ -1032,6 +1037,7 @@ async function runREPL(
           loopDetector,
           tokenBudget,
           contextMonitor,
+          extraToolDefs: mcpToolDefs,
         })
         stats.turns++
         stats.totalInputTokens += result.inputTokens
@@ -2025,10 +2031,12 @@ interface ProxyTurnOptions {
   loopDetector?: LoopDetector
   tokenBudget?: TokenBudgetManager
   contextMonitor?: ContextMonitor
+  /** Extra tool definitions to merge (e.g., MCP server tools) */
+  extraToolDefs?: Array<Record<string, unknown>>
 }
 
 async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: number; outputTokens: number }> {
-  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onStreamToken, onFileWrite, safeMode, retryTracker, loopDetector, tokenBudget, contextMonitor } = options
+  const { prompt, resolved, config, outputMode, history, cwd, abortSignal, onFirstToken, onStreamToken, onFileWrite, safeMode, retryTracker, loopDetector, tokenBudget, contextMonitor, extraToolDefs } = options
 
   const startTime = Date.now()
   let inputTokens = 0
@@ -2166,6 +2174,16 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
             return { success: false, output: `MCP error: ${err instanceof Error ? err.message : String(err)}` }
           }
 
+        // MCP server tools — route mcp__<server>__<tool> calls
+        } else if (name.startsWith('mcp__')) {
+          try {
+            const result = await mcpClient.routeToolCall(name, args)
+            if (result) return result
+            return { success: false, output: `MCP tool not found: ${name}` }
+          } catch (err) {
+            return { success: false, output: `MCP error: ${err instanceof Error ? err.message : String(err)}` }
+          }
+
         // sleep — actually wait
         } else if (name === 'sleep') {
           const seconds = Math.min(Number(args.seconds) || 1, 60)
@@ -2263,7 +2281,7 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
       },
       abortSignal,
     },
-    TOOL_DEFINITIONS as Array<Record<string, unknown>>,
+    [...(TOOL_DEFINITIONS as Array<Record<string, unknown>>), ...(extraToolDefs || [])],
   )) {
     if (outputMode === 'json') {
       emitJson(event as unknown as Record<string, unknown>)
