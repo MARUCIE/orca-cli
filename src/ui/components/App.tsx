@@ -15,11 +15,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Box, Text, Static, useStdout } from 'ink'
 import type { ChatSessionEmitter } from '../session.js'
-import type { UIEvent, StatusInfo, ToolStartInfo, ToolEndInfo } from '../types.js'
+import type { UIEvent, StatusInfo, TurnSummaryInfo, ToolStartInfo, ToolEndInfo, ModelProgress } from '../types.js'
 import { StatusBar } from './StatusBar.js'
 import { InputArea } from './InputArea.js'
 import { ThinkingSpinner } from './ThinkingSpinner.js'
 import { ToolCallBlock } from './ToolCallBlock.js'
+import { TurnSummary } from './TurnSummary.js'
+import { PermissionPrompt } from './PermissionPrompt.js'
+import { MultiModelProgress } from './MultiModelProgress.js'
 
 interface Props {
   session: ChatSessionEmitter
@@ -47,6 +50,9 @@ export function App({ session, initialStatus }: Props): React.ReactElement {
   const [thinking, setThinking] = useState(false)
   const [inputActive, setInputActive] = useState(false)
   const [inputHistory, setInputHistory] = useState<string[]>([])
+  const [lastTurnSummary, setLastTurnSummary] = useState<TurnSummaryInfo | null>(null)
+  const [permRequest, setPermRequest] = useState<{ toolName: string; preview: string; resolve: (b: boolean) => void } | null>(null)
+  const [multiModelState, setMultiModelState] = useState<{ command: string; models: ModelProgress[] } | null>(null)
 
   // Batched text streaming: accumulate tokens, flush at 20fps
   const textBuffer = useRef('')
@@ -124,6 +130,7 @@ export function App({ session, initialStatus }: Props): React.ReactElement {
             return ''
           })
           textBuffer.current = ''
+          setLastTurnSummary(event.info)
           break
 
         case 'prompt_ready':
@@ -136,17 +143,47 @@ export function App({ session, initialStatus }: Props): React.ReactElement {
           })
           textBuffer.current = ''
           setInputActive(true)
+          setMultiModelState(null)
+          break
+
+        case 'permission_request':
+          setPermRequest({
+            toolName: event.request.toolName,
+            preview: event.request.preview,
+            resolve: (allowed) => {
+              event.request.resolve(allowed)
+              setPermRequest(null)
+            },
+          })
+          break
+
+        case 'multi_model_progress':
+          setMultiModelState({ command: event.command, models: event.models })
+          break
+
+        case 'multi_model_result':
+          setMultiModelState(prev => {
+            if (!prev) return null
+            return {
+              ...prev,
+              models: prev.models.map(m =>
+                m.model === event.model ? { ...m, done: true, elapsedMs: event.elapsedMs, output: event.output } : m,
+              ),
+            }
+          })
           break
 
         case 'abort':
           setThinking(false)
           setInputActive(false)
+          setPermRequest(null)
           break
 
         case 'clear':
           setBlocks([])
           setStreamingText('')
           textBuffer.current = ''
+          setLastTurnSummary(null)
           break
       }
     }
@@ -195,6 +232,26 @@ export function App({ session, initialStatus }: Props): React.ReactElement {
 
         {/* Thinking spinner */}
         <ThinkingSpinner active={thinking} />
+
+        {/* Multi-model progress */}
+        {multiModelState && (
+          <MultiModelProgress command={multiModelState.command} models={multiModelState.models} />
+        )}
+
+        {/* Turn summary */}
+        {lastTurnSummary && !thinking && !streamingText && (
+          <TurnSummary info={lastTurnSummary} />
+        )}
+
+        {/* Permission prompt */}
+        {permRequest && (
+          <PermissionPrompt
+            toolName={permRequest.toolName}
+            preview={permRequest.preview}
+            onResolve={permRequest.resolve}
+            active={!!permRequest}
+          />
+        )}
       </Box>
 
       {/* Input area */}
@@ -202,7 +259,7 @@ export function App({ session, initialStatus }: Props): React.ReactElement {
         <InputArea
           onSubmit={handleSubmit}
           onAbort={handleAbort}
-          active={inputActive}
+          active={inputActive && !permRequest}
           history={inputHistory}
         />
       </Box>

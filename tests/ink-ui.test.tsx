@@ -123,6 +123,96 @@ describe('InputArea', () => {
   })
 })
 
+describe('PermissionPrompt', () => {
+  // Dynamic import since it's a new component
+  it('renders tool name and preview when active', async () => {
+    const { PermissionPrompt } = await import('../src/ui/components/PermissionPrompt.js')
+    const { lastFrame } = render(
+      <PermissionPrompt
+        toolName="write_file"
+        preview="write 500 bytes to /tmp/test.ts"
+        onResolve={() => {}}
+        active={true}
+      />,
+    )
+    expect(lastFrame()).toContain('write_file')
+    expect(lastFrame()).toContain('write 500 bytes')
+    expect(lastFrame()).toContain('[y]')
+    expect(lastFrame()).toContain('[n]')
+  })
+
+  it('renders nothing when inactive', async () => {
+    const { PermissionPrompt } = await import('../src/ui/components/PermissionPrompt.js')
+    const { lastFrame } = render(
+      <PermissionPrompt toolName="x" preview="x" onResolve={() => {}} active={false} />,
+    )
+    expect(lastFrame()).toBe('')
+  })
+})
+
+describe('TurnSummary', () => {
+  it('renders elapsed time and tokens', async () => {
+    const { TurnSummary } = await import('../src/ui/components/TurnSummary.js')
+    const { lastFrame } = render(
+      <TurnSummary info={{
+        inputTokens: 500,
+        outputTokens: 1500,
+        duration: 3200,
+        toolCalls: 2,
+        costUsd: 0.005,
+        model: 'test-model',
+      }} />,
+    )
+    expect(lastFrame()).toContain('3.2s')
+    expect(lastFrame()).toContain('1.5K')
+    expect(lastFrame()).toContain('$0.0050')
+  })
+})
+
+describe('MultiModelProgress', () => {
+  it('renders model list with status', async () => {
+    const { MultiModelProgress } = await import('../src/ui/components/MultiModelProgress.js')
+    const { lastFrame } = render(
+      <MultiModelProgress
+        command="council"
+        models={[
+          { model: 'claude-sonnet', done: true, elapsedMs: 5000 },
+          { model: 'gpt-5', done: false, elapsedMs: 3000 },
+        ]}
+      />,
+    )
+    expect(lastFrame()).toContain('council')
+    expect(lastFrame()).toContain('claude-sonnet')
+    expect(lastFrame()).toContain('gpt-5')
+    expect(lastFrame()).toContain('ok')
+    expect(lastFrame()).toContain('5.0s')
+  })
+})
+
+describe('CommandPicker', () => {
+  it('renders filtered commands', async () => {
+    const { CommandPicker } = await import('../src/ui/components/CommandPicker.js')
+    const commands = [
+      { name: '/help', description: 'Show help' },
+      { name: '/model', description: 'Switch model' },
+      { name: '/history', description: 'Show history' },
+    ]
+    const { lastFrame } = render(
+      <CommandPicker commands={commands} filter="hi" onSelect={() => {}} onCancel={() => {}} active={true} />,
+    )
+    expect(lastFrame()).toContain('/history')
+    expect(lastFrame()).not.toContain('/model')
+  })
+
+  it('renders nothing when inactive', async () => {
+    const { CommandPicker } = await import('../src/ui/components/CommandPicker.js')
+    const { lastFrame } = render(
+      <CommandPicker commands={[]} filter="" onSelect={() => {}} onCancel={() => {}} active={false} />,
+    )
+    expect(lastFrame()).toBe('')
+  })
+})
+
 describe('ChatSessionEmitter', () => {
   it('emitText fires text event', () => {
     const session = new ChatSessionEmitter()
