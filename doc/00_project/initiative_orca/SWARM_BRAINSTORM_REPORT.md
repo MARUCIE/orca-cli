@@ -365,4 +365,77 @@ Versions:   0.6.0 aligned across 5 files
 
 ---
 
+## v0.7.0 SOTA Gap Re-Assessment: Core Differentiator Features
+
+> Updated 2026-04-13. User-triggered from real /council failure analysis.
+
+### Root Cause Analysis
+
+User ran `/council` to audit a report. Expected: 3+ diverse models (Claude Opus 4.6, GPT 5.4, Gemini 3.1 Pro) analyze in parallel. Actual: all models returned "No provider endpoint found" because:
+
+1. `findAggregator()` returns undefined — user's Poe provider config lacks `aggregator: true`
+2. `resolveModelEndpoint()` Path 2 (direct routing) fails — no ANTHROPIC/OPENAI/GOOGLE API keys
+3. `resolveModelEndpoint()` Path 3 (fallback) catches and returns null — doesn't propagate default provider
+4. Session grew to 610K tokens → 413 error (200K window) → auto-compact freed only 429 tokens
+
+### 4 SOTA Feature Gaps (v0.7.0 Scope)
+
+#### Gap A: Multi-Model Routing (P0 — CRITICAL)
+
+| Component | Current State | Problem | Fix |
+|---|---|---|---|
+| `findAggregator()` | Requires `aggregator: true` in config | Poe/OpenRouter not recognized as aggregator by default | Auto-detect known aggregators by provider ID |
+| `resolveModelEndpoint()` | 3-path fallback, Path 3 can return null | Default provider not tried as aggregator pass-through | If default provider is aggregator-capable, use it |
+| `/council` display | Doesn't show which models failed and why | Silent failures | Show diagnostic: "model X failed: no endpoint" |
+| `pickDiverseModels()` | Returns hardcoded model list | Picks models that have no configured endpoint | Filter to models with available endpoints |
+
+**Files**: `src/config.ts` (lines 535-601), `src/multi-model.ts`, `src/commands/chat.ts` (lines 720-767)
+**LOC**: ~50
+
+#### Gap B: Pre-Send Context Guard + Aggressive Compact (P0 — CRITICAL)
+
+| Component | Current State | Problem | Fix |
+|---|---|---|---|
+| Pre-send check | NONE | 610K sent to 200K model → 413 | Check history tokens before API call, auto-compact if > 75% |
+| `smartCompact()` | 200-char threshold, keepTurns=2 | Almost nothing gets deleted | Truncate large messages, drop tool_result bodies |
+| 413 error handling | Generic error display | No auto-recovery | Catch 413/context_length, auto-compact + retry once |
+| Harness trigger | Fires AFTER API call | Warning appears after failure | Move check to BEFORE API call |
+
+**Files**: `src/token-budget.ts`, `src/commands/chat.ts`, `src/providers/openai-compat.ts`
+**LOC**: ~80
+
+#### Gap C: Sub-Agent Agentic Loop (P1 — HIGH)
+
+| Component | Current State | Problem | Fix |
+|---|---|---|---|
+| Sub-agent worker | Single API call, exits | No tool-use loop | Add agentic loop: call → tool → call → ... until done |
+| Tool restriction | Receives tool list | Worker ignores tool_call responses | Process tool calls, feed results back |
+| Max turns | NONE | Could loop forever | Add maxTurns guard (default 10) |
+| Status reporting | Done message only | No progress visibility | Stream step count to parent |
+
+**Files**: `src/agent/sub-agent-worker.ts`, `src/agent/sub-agent.ts`
+**LOC**: ~60
+
+#### Gap D: Goal-Loop Controller (P2 — MEDIUM)
+
+| Component | Current State | Problem | Fix |
+|---|---|---|---|
+| `orca run` | `--max-turns` but no criteria | Runs N turns then stops | Add `--done-when` criteria (regex/test/LLM-judge) |
+| Loop detector | Tracks failures only | Doesn't drive re-execution | Integrate as circuit-breaker in goal-loop |
+| Verification | `verify_plan` is CRUD only | Doesn't actually verify | Run real verification (tests, typecheck) in loop |
+
+**Files**: new `src/harness/goal-loop.ts`, `src/commands/run.ts`
+**LOC**: ~100
+
+### v0.7.0 Implementation Plan
+
+| Phase | Feature | Files | Tests |
+|---|---|---|---|
+| 1 | Multi-model routing fix | config.ts, multi-model.ts, chat.ts | Round 29 |
+| 2 | Pre-send guard + aggressive compact | token-budget.ts, chat.ts, openai-compat.ts | Round 29 |
+| 3 | Sub-agent agentic loop | sub-agent-worker.ts, sub-agent.ts | Round 30 |
+| 4 | Goal-loop controller | goal-loop.ts, run.ts | Round 30 |
+
+---
+
 Maurice | maurice_wen@proton.me

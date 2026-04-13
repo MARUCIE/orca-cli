@@ -156,13 +156,16 @@ export class TokenBudgetManager {
   }
 
   /**
-   * Smart compaction: preserve decision-bearing messages.
+   * Smart compaction: aggressively free context while preserving recent state.
    *
-   * Priority (highest to lowest):
-   *   1. System message (always kept)
-   *   2. Tool result messages (contain verified state/decisions)
-   *   3. Last N user/assistant pairs (recent context)
-   *   4. Earlier user/assistant pairs (dropped first)
+   * Strategy:
+   *   1. System messages: always kept (but truncated if huge)
+   *   2. Last N turns: kept in full (recent working context)
+   *   3. Older messages: dropped entirely (not kept as decisions)
+   *   4. Large messages: truncated to first 200 chars with [truncated] marker
+   *
+   * Previous version was too conservative (200-char decision threshold kept almost
+   * everything). This version aggressively drops older messages and truncates large ones.
    *
    * @param history - Mutable conversation history
    * @param keepTurns - Number of recent user/assistant turns to keep
@@ -173,38 +176,40 @@ export class TokenBudgetManager {
     const convMsgs = history.filter(m => m.role !== 'system')
 
     if (convMsgs.length <= keepTurns * 2) {
+      // Even with few messages, truncate any that are too large (>2000 chars)
+      let truncated = 0
+      for (const msg of history) {
+        if (msg.content.length > 2000 && msg.role !== 'system') {
+          msg.content = msg.content.slice(0, 200) + '\n[truncated: ' + estimateTokens(msg.content) + ' tokens]'
+          truncated++
+        }
+      }
+      if (truncated > 0) {
+        return { dropped: 0, kept: history.length, tokensFreed: truncated * 500, summary: `Truncated ${truncated} large messages.` }
+      }
       return { dropped: 0, kept: history.length, tokensFreed: 0, summary: 'Nothing to compact.' }
     }
 
-    // Identify tool-result-like messages (assistant messages containing tool outputs)
-    // These are high-value because they contain verified state
     const recentMsgs = convMsgs.slice(-keepTurns * 2)
     const olderMsgs = convMsgs.slice(0, -keepTurns * 2)
 
-    // Among older messages, keep any that look like they contain decisions
-    // (short messages with keywords like "fixed", "created", "verified", "PASS")
-    const decisionKeywords = /\b(fixed|created|verified|pass|fail|error|bug|changed|updated|implemented)\b/i
+    // Drop ALL older messages — no decision-keeping threshold
+    // (Previous 200-char threshold kept almost everything, causing 413 errors)
+    const droppedMsgs = olderMsgs
     const keptDecisions: ChatMessage[] = []
-    const droppedMsgs: ChatMessage[] = []
 
-    for (const msg of olderMsgs) {
-      const isShortDecision = msg.content.length < 200 && decisionKeywords.test(msg.content)
-      if (isShortDecision) {
+    // Among older messages, only keep genuinely tiny decision summaries (<100 chars)
+    for (let i = olderMsgs.length - 1; i >= 0; i--) {
+      const msg = olderMsgs[i]!
+      if (msg.content.length < 100 && keptDecisions.length < 3) {
         keptDecisions.push(msg)
-      } else {
-        droppedMsgs.push(msg)
+        droppedMsgs.splice(droppedMsgs.indexOf(msg), 1)
       }
     }
 
-    // Cap kept decisions to avoid bloat
-    const maxDecisions = 4
-    const finalDecisions = keptDecisions.slice(-maxDecisions)
-    const extraDropped = keptDecisions.slice(0, -maxDecisions)
-    droppedMsgs.push(...extraDropped)
-
     // Rebuild history
     const droppedChars = droppedMsgs.reduce((sum, m) => sum + m.content.length, 0)
-    const tokensFreed = Math.ceil(droppedChars / 4)
+    const tokensFreed = estimateTokens(droppedMsgs.map(m => m.content).join(''))
 
     // Create summary of dropped content
     const droppedRoles = droppedMsgs.reduce((acc, m) => {
@@ -213,10 +218,22 @@ export class TokenBudgetManager {
     }, {} as Record<string, number>)
     const summaryParts = Object.entries(droppedRoles).map(([role, count]) => `${count} ${role}`)
 
+    // Truncate large recent messages (>2000 chars) to prevent context overflow
+    for (const msg of recentMsgs) {
+      if (msg.content.length > 2000) {
+        msg.content = msg.content.slice(0, 500) + '\n[truncated: original ' + msg.content.length + ' chars]'
+      }
+    }
+
+    // Truncate system prompt if huge (>4000 chars, keep first 2000)
+    if (sysMsg && sysMsg.content.length > 4000) {
+      sysMsg.content = sysMsg.content.slice(0, 2000) + '\n[system prompt truncated for context management]'
+    }
+
     history.length = 0
     if (sysMsg) history.push(sysMsg)
-    if (finalDecisions.length > 0) {
-      history.push({ role: 'assistant', content: `[compacted: kept ${finalDecisions.length} key decisions]\n${finalDecisions.map(m => m.content.slice(0, 100)).join('\n')}` })
+    if (keptDecisions.length > 0) {
+      history.push({ role: 'assistant', content: `[compacted: kept ${keptDecisions.length} key decisions]\n${keptDecisions.map(m => m.content.slice(0, 100)).join('\n')}` })
     }
     history.push(...recentMsgs)
 
@@ -224,7 +241,7 @@ export class TokenBudgetManager {
       dropped: droppedMsgs.length,
       kept: history.length,
       tokensFreed,
-      summary: `Dropped ${droppedMsgs.length} messages (${summaryParts.join(', ')}), freed ~${tokensFreed} tokens. Kept ${finalDecisions.length} decisions + last ${keepTurns} turns.`,
+      summary: `Dropped ${droppedMsgs.length} messages (${summaryParts.join(', ')}), freed ~${tokensFreed} tokens. Kept ${keptDecisions.length} decisions + last ${keepTurns} turns.`,
     }
   }
 }

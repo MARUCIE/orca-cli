@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { resolveConfig, resolveProvider, initProjectConfig } from '../src/config.js'
+import { resolveConfig, resolveProvider, initProjectConfig, findAggregator, resolveModelEndpoint } from '../src/config.js'
 import { existsSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -159,6 +159,81 @@ describe('config', () => {
       // Second call should not throw
       const path = initProjectConfig(tempDir)
       expect(existsSync(path)).toBe(true)
+    })
+  })
+
+  describe('findAggregator: auto-detect known aggregators', () => {
+    it('29.1 detects poe as aggregator by provider ID', () => {
+      const saved = process.env.POE_API_KEY
+      process.env.POE_API_KEY = 'test-poe-key'
+      try {
+        const config = resolveConfig({ cwd: tempDir })
+        const agg = findAggregator(config)
+        expect(agg).toBe('poe')
+      } finally {
+        if (saved) process.env.POE_API_KEY = saved
+        else delete process.env.POE_API_KEY
+      }
+    })
+
+    it('29.2 returns undefined when no aggregator keys exist', () => {
+      const saved = {
+        POE_API_KEY: process.env.POE_API_KEY,
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+      }
+      delete process.env.POE_API_KEY
+      delete process.env.OPENROUTER_API_KEY
+      try {
+        const config = resolveConfig({ cwd: tempDir })
+        // Also clear any provider configs that might have keys
+        config.providers = {}
+        expect(findAggregator(config)).toBeUndefined()
+      } finally {
+        for (const [k, v] of Object.entries(saved)) {
+          if (v) process.env[k] = v
+          else delete process.env[k]
+        }
+      }
+    })
+
+    it('29.3 resolveModelEndpoint uses aggregator pass-through', () => {
+      const saved = process.env.POE_API_KEY
+      process.env.POE_API_KEY = 'test-poe-key'
+      try {
+        const config = resolveConfig({ cwd: tempDir })
+        const aggId = findAggregator(config)
+        expect(aggId).toBe('poe')
+
+        // claude-opus-4.6 should route through poe aggregator
+        const ep = resolveModelEndpoint('claude-opus-4.6', config, aggId)
+        expect(ep).not.toBeNull()
+        expect(ep!.provider).toBe('poe')
+        expect(ep!.model).toBe('claude-opus-4.6')
+        expect(ep!.apiKey).toBe('test-poe-key')
+      } finally {
+        if (saved) process.env.POE_API_KEY = saved
+        else delete process.env.POE_API_KEY
+      }
+    })
+
+    it('29.4 resolveModelEndpoint routes diverse models through same aggregator', () => {
+      const saved = process.env.POE_API_KEY
+      process.env.POE_API_KEY = 'test-poe-key'
+      try {
+        const config = resolveConfig({ cwd: tempDir })
+        const aggId = findAggregator(config)
+
+        const models = ['claude-opus-4.6', 'gpt-5.4', 'gemini-3.1-pro']
+        for (const model of models) {
+          const ep = resolveModelEndpoint(model, config, aggId)
+          expect(ep).not.toBeNull()
+          expect(ep!.provider).toBe('poe')
+          expect(ep!.model).toBe(model)
+        }
+      } finally {
+        if (saved) process.env.POE_API_KEY = saved
+        else delete process.env.POE_API_KEY
+      }
     })
   })
 })

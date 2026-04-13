@@ -32,7 +32,30 @@ This file is a historical release log. Version-specific counts and examples refl
 
 Tests: 688 pass / 45 files (+20 new tests).
 
-## v0.6.1 — SOTA UX Overhaul (2026-04-13)
+## v0.7.0 — Multi-Model Routing + Context Guard (2026-04-13)
+
+Core differentiator features for multi-model collaboration.
+
+### Multi-Model Routing Fix (P0)
+- **`findAggregator()` auto-detects Poe/OpenRouter**: no longer requires `aggregator: true` in config
+- **All DIVERSITY_GROUPS models route through aggregator**: council/race/pipeline now actually call diverse models
+- **Pre-flight endpoint check**: /council and /race verify endpoints exist before calling, show diagnostics on failure
+- **Routing visibility**: council shows "model → provider" mapping before execution
+
+### Pre-Send Context Guard (P0)
+- **Budget check before API call**: auto-compact when history > 75% of context window
+- **Aggressive smartCompact**: drops ALL older messages (was keeping "decision" messages that blocked compaction)
+- **Large message truncation**: messages > 2000 chars truncated in compaction
+- **413 auto-recovery**: catches context_length_exceeded, auto-compacts, allows retry
+
+### SOTA Gap Document Updated
+- v0.7.0 gap re-assessment with 4 focus areas
+- Root cause analysis of /council routing failure
+- Implementation plan for sub-agent agentic loop (P1) and goal-loop (P2)
+
+Tests: 692 pass / 45 files (+4 new config routing tests).
+
+## v0.6.2 — Output Intelligence + Cognitive Skeleton (2026-04-13)
 
 Three rounds of UX improvements based on 2-agent swarm audit
 (internal deep audit + competitor analysis: Claude Code/Codex/Amp/Aider/Cursor).

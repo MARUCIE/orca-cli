@@ -718,8 +718,26 @@ async function runREPL(
           const resolveEndpoint = (m: string) => resolveModelEndpoint(m, config, aggId)
 
           if ((handled as string) === 'council') {
-            const models = pickDiverseModels(3)
+            const candidates = pickDiverseModels(3)
+            // Pre-check: verify endpoints exist before calling
+            const available = candidates.filter(m => resolveEndpoint(m) !== null)
+            const unavailable = candidates.filter(m => resolveEndpoint(m) === null)
+            if (available.length === 0) {
+              console.log(`\x1b[31m  council: no models with available endpoints.\x1b[0m`)
+              console.log(`\x1b[33m  tried: ${candidates.join(', ')}\x1b[0m`)
+              console.log(`\x1b[33m  hint: set multiple API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY)`)
+              console.log(`        or configure an aggregator provider (poe, openrouter) in .orca.json\x1b[0m\n`)
+              continue
+            }
+            if (unavailable.length > 0) {
+              console.log(`\x1b[33m  note: ${unavailable.join(', ')} unavailable (no endpoint), using ${available.length} models\x1b[0m`)
+            }
+            const models = available
             console.log(`\n\x1b[36m  ╭── Council: ${models.length} models ──╮\x1b[0m`)
+            models.forEach(m => {
+              const ep = resolveEndpoint(m)
+              console.log(`\x1b[90m  │ ${m} → ${ep?.provider || '?'}\x1b[0m`)
+            })
             const result = await runCouncil({
               prompt: mmPrompt, models, judgeModel: models[0]!, resolveEndpoint,
               onModelStart: (m) => process.stdout.write(`\x1b[90m  ● ${m}...\x1b[0m`),
@@ -734,7 +752,12 @@ async function runREPL(
             console.log(`\x1b[90m  ─ ${result.responses.length} models · ${(result.totalDurationMs/1000).toFixed(1)}s · agreement: ${result.agreement} ─\x1b[0m\n`)
 
           } else if ((handled as string) === 'race') {
-            const models = pickDiverseModels(5)
+            const candidates = pickDiverseModels(5)
+            const models = candidates.filter(m => resolveEndpoint(m) !== null)
+            if (models.length === 0) {
+              console.log(`\x1b[31m  race: no models with available endpoints. Set multiple API keys.\x1b[0m\n`)
+              continue
+            }
             console.log(`\n\x1b[33m  ╭── Race: ${models.length} models ──╮\x1b[0m`)
             const result = await runRace({
               prompt: mmPrompt, models, resolveEndpoint,
@@ -794,6 +817,20 @@ async function runREPL(
       // Inject as system-level context so the model applies the framework
       history.push({ role: 'system', content: cogCtx })
       process.stderr.write(`\x1b[90m  [cognitive] ${cogMatch.scenario}: ${cogMatch.models.map(m => m.name).join(', ')}\x1b[0m\n`)
+    }
+
+    // Pre-send context guard: compact BEFORE API call if too large
+    const preBudget = tokenBudget.getBudget(history)
+    if (preBudget.utilizationPct >= 75) {
+      const compactResult = tokenBudget.smartCompact(history)
+      if (compactResult.dropped > 0) {
+        process.stderr.write(`\x1b[33m  [auto-compact] ${compactResult.summary}\x1b[0m\n`)
+      }
+      // If still over 90% after compact, warn but try anyway
+      const postBudget = tokenBudget.getBudget(history)
+      if (postBudget.utilizationPct >= 90) {
+        process.stderr.write(`\x1b[31m  [warn] context still at ${postBudget.utilizationPct}% after compact — API call may fail\x1b[0m\n`)
+      }
     }
 
     // Abort controller for Esc/Ctrl+C during generation
@@ -889,7 +926,19 @@ async function runREPL(
     } catch (err) {
       progress.stop()
       if (!abortController.signal.aborted) {
-        printError(err instanceof Error ? err.message : String(err))
+        const errMsg = err instanceof Error ? err.message : String(err)
+        // Auto-recover from 413 (context too large): compact and retry once
+        if (errMsg.includes('413') || errMsg.includes('context_length') || errMsg.includes('too large')) {
+          process.stderr.write(`\x1b[33m  [auto-recovery] context overflow detected, compacting and retrying...\x1b[0m\n`)
+          const compact = tokenBudget.smartCompact(history, 1) // aggressive: keep only 1 turn
+          if (compact.dropped > 0) {
+            process.stderr.write(`\x1b[33m  [auto-compact] ${compact.summary}\x1b[0m\n`)
+            // Reset context monitor after aggressive compact
+            contextMonitor.reset()
+          }
+        } else {
+          printError(errMsg)
+        }
       }
     } finally {
       progress.stop()

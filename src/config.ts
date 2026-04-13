@@ -562,7 +562,9 @@ export function resolveModelEndpoint(
     }
   }
 
-  // Path 3: Fall back to default provider
+  // Path 3: Fall back to default provider (aggregator pass-through)
+  // If the default provider can route to multiple models (e.g., Poe, OpenRouter),
+  // pass the model name through — the aggregator handles vendor routing.
   try {
     const resolved = resolveProvider(config)
     if (resolved.baseURL) {
@@ -573,28 +575,46 @@ export function resolveModelEndpoint(
   return null
 }
 
+/** Known aggregator provider IDs (route any model via a single endpoint) */
+const KNOWN_AGGREGATORS = new Set(['poe', 'openrouter', 'zenmux'])
+
 /**
  * Find the best aggregator provider from config, or undefined if none available.
- * Checks multiModel.provider first, then scans for any enabled aggregator with a key.
+ *
+ * Detection order:
+ *   1. Explicit multiModel.provider (if aggregator-flagged)
+ *   2. Any provider with aggregator: true
+ *   3. Known aggregator by ID (poe, openrouter, zenmux) even without explicit flag
+ *   4. Check env vars for well-known aggregator keys
  */
 export function findAggregator(config: OrcaConfig): string | undefined {
-  // Explicit multiModel.provider — must be a true aggregator (aggregator: true)
+  // Path 1: Explicit multiModel.provider
   const explicit = config.multiModel?.provider
   if (explicit) {
     const pc = config.providers[explicit]
-    if (pc && !pc.disabled && pc.aggregator) {
+    if (pc && !pc.disabled && (pc.aggregator || KNOWN_AGGREGATORS.has(explicit))) {
       const wk = WELL_KNOWN_PROVIDERS[explicit]
-      const hasKey = !!(resolveEnvTemplate(pc.apiKey) || (wk ? process.env[wk.envKey] : undefined))
+      const hasKey = !!(resolveEnvTemplate(pc?.apiKey) || (wk ? process.env[wk.envKey] : undefined))
       if (hasKey) return explicit
     }
   }
 
-  // Scan for any aggregator with a key
+  // Path 2: Scan for any provider with aggregator: true
   for (const [id, pc] of Object.entries(config.providers)) {
     if (!pc.aggregator || pc.disabled) continue
     const wk = WELL_KNOWN_PROVIDERS[id]
     const hasKey = !!(resolveEnvTemplate(pc.apiKey) || (wk ? process.env[wk.envKey] : undefined))
     if (hasKey) return id
+  }
+
+  // Path 3: Auto-detect known aggregators by provider ID (even without aggregator: true)
+  for (const aggId of KNOWN_AGGREGATORS) {
+    const wk = WELL_KNOWN_PROVIDERS[aggId]
+    if (!wk) continue
+    const pc = config.providers[aggId]
+    if (pc?.disabled) continue
+    const hasKey = !!(resolveEnvTemplate(pc?.apiKey) || process.env[wk.envKey])
+    if (hasKey) return aggId
   }
 
   return undefined
