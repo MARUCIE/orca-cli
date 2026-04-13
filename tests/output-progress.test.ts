@@ -69,19 +69,41 @@ describe('ProgressIndicator', () => {
     })
   })
 
-  describe('addChars()', () => {
-    it('accumulates token count correctly', () => {
+  describe('addText() and addChars()', () => {
+    it('addText estimates tokens from Latin text (4 chars/token)', () => {
       const indicator = new ProgressIndicator()
       indicator.start()
 
-      indicator.addChars(10)
-      indicator.addChars(5)
-      indicator.addChars(3)
+      indicator.addText('Hello world test')  // 16 Latin chars → ceil(16/4) = 4 tokens
 
       vi.advanceTimersByTime(100)
 
       const result = indicator.stop()
-      expect(result.tokens).toBe(18)
+      expect(result.tokens).toBe(4)
+    })
+
+    it('addText estimates CJK tokens at ~1.5 chars/token', () => {
+      const indicator = new ProgressIndicator()
+      indicator.start()
+
+      indicator.addText('你好世界测试')  // 6 CJK chars → ceil(6/1.5) = 4 tokens
+
+      vi.advanceTimersByTime(100)
+
+      const result = indicator.stop()
+      expect(result.tokens).toBe(4)
+    })
+
+    it('addChars estimates tokens at 4 chars/token', () => {
+      const indicator = new ProgressIndicator()
+      indicator.start()
+
+      indicator.addChars(100)  // 100 chars → ceil(100/4) = 25 tokens
+
+      vi.advanceTimersByTime(100)
+
+      const result = indicator.stop()
+      expect(result.tokens).toBe(25)
     })
 
     it('starts at zero tokens', () => {
@@ -121,10 +143,10 @@ describe('ProgressIndicator', () => {
     it('returns token count', () => {
       const indicator = new ProgressIndicator()
       indicator.start()
-      indicator.addChars(42)
+      indicator.addChars(100)  // 100 chars → ceil(100/4) = 25 tokens
 
       const result = indicator.stop()
-      expect(result.tokens).toBe(42)
+      expect(result.tokens).toBe(25)
     })
 
     it('clears interval and can be called multiple times safely', () => {
@@ -364,16 +386,16 @@ describe('integration: full progress cycle', () => {
     indicator.markWorking()
     vi.advanceTimersByTime(100)
 
-    // Accumulate tokens
-    indicator.addChars(10)
-    indicator.addChars(20)
+    // Accumulate tokens via addText (Latin text)
+    indicator.addText('hello world')   // 11 Latin chars → ceil(11/4) = 3
+    indicator.addText('testing here')  // 12 Latin chars → ceil(12/4) = 3
     vi.advanceTimersByTime(1000)
 
     // Stop
     const result = indicator.stop()
 
     expect(result.elapsed).toBeGreaterThanOrEqual(1200)
-    expect(result.tokens).toBe(30)
+    expect(result.tokens).toBe(6)  // 3 + 3
   })
 
   it('quick operation: start and stop quickly', () => {
@@ -394,15 +416,15 @@ describe('integration: full progress cycle', () => {
     indicator.start()
     indicator.markWorking()
 
-    // Simulate token stream
+    // Simulate token stream via addChars (each 40 chars → ceil(40/4) = 10 tokens)
     for (let i = 0; i < 5; i++) {
-      indicator.addChars(15)
+      indicator.addChars(40)
       vi.advanceTimersByTime(500)
     }
 
     const result = indicator.stop()
 
     expect(result.elapsed).toBeGreaterThanOrEqual(2500)
-    expect(result.tokens).toBe(75)
+    expect(result.tokens).toBe(50)  // 5 × 10
   })
 })

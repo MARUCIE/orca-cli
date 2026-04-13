@@ -441,6 +441,14 @@ export interface StatusLineInfo {
   contextTokens: number
   /** Cumulative total tokens consumed across all turns */
   totalTokens: number
+  /** Cumulative input tokens */
+  inputTokens?: number
+  /** Cumulative output tokens */
+  outputTokens?: number
+  /** Estimated session cost in USD */
+  costUsd?: number
+  /** Output tokens per second (latest turn) */
+  tokPerSec?: number
   cwd: string
   gitBranch?: string
   effort?: ThinkingEffort
@@ -461,9 +469,12 @@ export function printStatusLine(info: StatusLineInfo): void {
   const filled = Math.round((pct / 100) * barLen)
   const empty = barLen - filled
   let barColor = '\x1b[32m'  // green
-  if (pct >= 60) barColor = '\x1b[31m'
-  else if (pct >= 40) barColor = '\x1b[33m'
-  const bar = `${barColor}${'█'.repeat(filled)}${'░'.repeat(empty)}\x1b[0m`
+  if (pct >= 60) barColor = '\x1b[31m'       // red
+  else if (pct >= 50) barColor = '\x1b[33m'  // yellow (orange tier)
+  else if (pct >= 40) barColor = '\x1b[33m'  // yellow
+  // Overflow indicator: when context is at capacity
+  const overflowMark = info.contextPct >= 95 ? '\x1b[31;1m!\x1b[0m' : ''
+  const bar = `${barColor}${'█'.repeat(filled)}${'░'.repeat(empty)}\x1b[0m${overflowMark}`
 
   // Git branch
   const gitPart = info.gitBranch ? ` \x1b[90mgit:(\x1b[32m${info.gitBranch}\x1b[90m)\x1b[0m` : ''
@@ -495,15 +506,26 @@ export function printStatusLine(info: StatusLineInfo): void {
   const fmtK = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${Math.round(n / 1000)}K` : String(n)
   const ctxStr = `${fmtK(info.contextTokens)}/${fmtK(info.contextWindow)}`
 
-  // Cumulative total tokens right-aligned
-  const tokenStr = `\x1b[90mtotal\x1b[0m ${info.totalTokens.toLocaleString()}`
+  // Cost display
+  const costStr = info.costUsd && info.costUsd > 0 ? ` ${theme.dim}|${RST} ${formatCost(info.costUsd)}` : ''
+
+  // Tok/s display
+  const tpsStr = info.tokPerSec && info.tokPerSec > 0 ? ` ${theme.dim}${Math.round(info.tokPerSec)} tok/s${RST}` : ''
+
+  // Cumulative token display: input/output split + total
+  const tokenParts: string[] = []
+  if (info.inputTokens && info.outputTokens) {
+    tokenParts.push(`\x1b[90min:${fmtK(info.inputTokens)} out:${fmtK(info.outputTokens)}\x1b[0m`)
+  }
+  tokenParts.push(`\x1b[90mtotal\x1b[0m ${info.totalTokens.toLocaleString()}`)
+  const tokenStr = tokenParts.join(' ')
 
   // Line 1: ◇ ORCA | model | ████░░░░ 15% (12K/200K) | project git:(branch)
   const left1 = `${theme.accent}◇${RST} \x1b[1;37mORCA${RST} ${theme.dim}|${RST} ${modelShort} ${theme.dim}|${RST} ${bar} ${pct}% ${theme.dim}(${ctxStr})${RST} ${theme.dim}|${RST} ${theme.accent}${project}${RST}${gitPart}`
   console.log(`${left1}`)
 
-  // Line 2: ▸▸ yolo | high                                    total 1,618,413
-  const left2 = `${modeTag} \x1b[90m|\x1b[0m ${effortTag}`
+  // Line 2: ▸▸ yolo | high | $0.42 · 38 tok/s           in:1.2M out:234K total:1.4M
+  const left2 = `${modeTag} \x1b[90m|\x1b[0m ${effortTag}${costStr}${tpsStr}`
   // Strip ANSI for width calculation
   const plainLeft2 = left2.replace(/\x1b\[[0-9;]*m/g, '')
   const plainToken = tokenStr.replace(/\x1b\[[0-9;]*m/g, '')
@@ -550,9 +572,24 @@ export class ProgressIndicator {
     this.phase = 'working'
   }
 
-  /** Add streamed characters (will be converted to estimated tokens at ~4 chars/token) */
+  /** Add streamed text with CJK-aware token estimation */
+  addText(text: string): void {
+    // CJK chars: ~1.5 chars/token; Latin: ~4 chars/token
+    let cjk = 0
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i)
+      if ((code >= 0x4E00 && code <= 0x9FFF) || (code >= 0x3400 && code <= 0x4DBF) ||
+          (code >= 0xFF00 && code <= 0xFFEF) || (code >= 0x3000 && code <= 0x303F)) {
+        cjk++
+      }
+    }
+    const latin = text.length - cjk
+    this.tokenCount += Math.ceil(cjk / 1.5 + latin / 4)
+  }
+
+  /** Legacy: add raw character count (Latin-only estimation) */
   addChars(n: number): void {
-    this.tokenCount += n
+    this.tokenCount += Math.ceil(n / 4)
   }
 
   private render(): void {
@@ -561,14 +598,17 @@ export class ProgressIndicator {
     const frame = frames[this.spinIdx % frames.length]!
     this.spinIdx++
 
+    // Show "esc to interrupt" only for first 5 seconds, then just "esc"
+    const age = Date.now() - this.startTime
+    const hint = age < 5000 ? 'esc to interrupt' : 'esc'
+
     let line: string
     if (this.phase === 'thinking') {
-      line = `  ${frame} Thinking... (${elapsed} • esc to interrupt)`
+      line = `  ${frame} Thinking... (${elapsed} • ${hint})`
     } else {
-      // Estimate tokens from character count (~4 chars per token)
-      const estTokens = Math.ceil(this.tokenCount / 4)
-      const tokStr = estTokens > 0 ? ` · ↓ ${estTokens.toLocaleString()} tokens` : ''
-      line = `  ${frame} Working (${elapsed}${tokStr} • esc to interrupt)`
+      // Token count already CJK-aware from addText()
+      const tokStr = this.tokenCount > 0 ? ` · ↓ ${this.tokenCount.toLocaleString()} tokens` : ''
+      line = `  ${frame} Working (${elapsed}${tokStr} • ${hint})`
     }
 
     // Write to stderr to avoid polluting stdout's streamed text

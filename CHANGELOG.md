@@ -2,6 +2,36 @@
 
 This file is a historical release log. Version-specific counts and examples reflect the release date they were recorded, not the current repo head.
 
+## v0.6.2 — Output Intelligence + Cognitive Skeleton (2026-04-13)
+
+6 fixes from screenshot-based I/O analysis:
+
+### Critical Fix
+- **Context display overflow**: chars/4 fallback capped at contextWindow (was showing 3.0M/200K = 1500%)
+- **CJK token estimation**: Latin ~4 chars/tok, CJK ~1.5 chars/tok (was treating all text as Latin)
+
+### StatusLine Enhancements
+- **Cost display**: estimated session cost in statusline ($0.42 format)
+- **tok/s**: output speed metric from latest turn
+- **Input/output split**: `in:1.2M out:234K` alongside total
+- **Overflow indicator**: `!` mark when context >= 95%
+
+### Progress Indicator
+- **"esc to interrupt"** reduced to "esc" after 5 seconds (was repeating full hint every 100ms)
+- **CJK-aware addText()**: replaces addChars() in streaming callback
+
+### Harness Warnings
+- Show actual token counts: `context 42.0% YELLOW (84K/200K) -- run /compact`
+- More actionable: "run /clear now" instead of "recommended"
+
+### Cognitive Skeleton (new module)
+- 9 scenarios x 4 mental models (111 Munger + 100 PM frameworks)
+- Auto-matches user prompt → injects relevant thinking models as context
+- First Principles pre-check injected into system prompt (always-on)
+- Chinese trigger support (CJK regex without \\b word boundary)
+
+Tests: 688 pass / 45 files (+20 new tests).
+
 ## v0.6.1 — SOTA UX Overhaul (2026-04-13)
 
 Three rounds of UX improvements based on 2-agent swarm audit

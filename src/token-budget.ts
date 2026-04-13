@@ -65,6 +65,36 @@ function getContextWindow(model: string): number {
   return 128_000 // safe default
 }
 
+// ── CJK-Aware Token Estimation ─────────────────────────────────
+
+/**
+ * Count CJK characters in text.
+ * CJK chars tokenize at ~1.5 chars/token vs ~4 chars/token for Latin.
+ */
+function countCJK(text: string): number {
+  let count = 0
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i)
+    if ((code >= 0x4E00 && code <= 0x9FFF) ||  // CJK Unified Ideographs
+        (code >= 0x3400 && code <= 0x4DBF) ||  // CJK Extension A
+        (code >= 0xFF00 && code <= 0xFFEF) ||  // Fullwidth Forms
+        (code >= 0x3000 && code <= 0x303F)) {  // CJK Symbols
+      count++
+    }
+  }
+  return count
+}
+
+/**
+ * Estimate tokens from text with CJK awareness.
+ * Latin: ~4 chars/token, CJK: ~1.5 chars/token.
+ */
+export function estimateTokens(text: string): number {
+  const cjk = countCJK(text)
+  const latin = text.length - cjk
+  return Math.ceil(cjk / 1.5 + latin / 4)
+}
+
 // ── Token Budget Manager ────────────────────────────────────────
 
 export class TokenBudgetManager {
@@ -89,11 +119,15 @@ export class TokenBudgetManager {
     const contextWindow = getContextWindow(this.model)
     const maxOutput = Math.min(contextWindow / 4, 64_000)
 
-    // Prefer API-reported inputTokens (exact), fall back to chars/4 estimate
-    const historyChars = history.reduce((sum, m) => sum + m.content.length, 0)
+    // Prefer API-reported inputTokens (exact), fall back to CJK-aware estimate
+    // CRITICAL: fallback MUST cap at contextWindow — conversation history includes
+    // tool results with full file contents, so raw chars/4 can be 10-50x the window
     const historyTokensEst = this.lastInputTokens > 0
       ? this.lastInputTokens
-      : Math.ceil(historyChars / 4)
+      : Math.min(
+          history.reduce((sum, m) => sum + estimateTokens(m.content), 0),
+          contextWindow,
+        )
 
     // Context utilization = current context fill / window
     const totalUsed = historyTokensEst

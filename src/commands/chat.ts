@@ -44,6 +44,7 @@ import { logInfo, logWarning } from '../logger.js'
 import { ContextMonitor, LoopDetector, classifyError } from '../harness/index.js'
 import { ModeRegistry } from '../modes/index.js'
 import { ThreadManager } from '../memory/threads.js'
+import { matchCognitive, formatCognitiveContext } from '../cognitive-skeleton.js'
 
 interface ChatOptions {
   model?: string
@@ -374,9 +375,20 @@ async function runREPL(
     gitBranch = execSyncImport('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd, encoding: 'utf-8' }).trim() || undefined
   } catch { /* not a git repo */ }
 
+  // Track last turn's output speed for tok/s display
+  let lastTokPerSec = 0
+
   const renderStatusAndPrompt = (): string => {
     const budget = tokenBudget.getBudget(history)
     const totalTokens = stats.totalInputTokens + stats.totalOutputTokens
+
+    // Estimate session cost from cumulative tokens
+    const pricing = getPricingForModel(currentModel)
+    let costUsd = 0
+    if (pricing) {
+      costUsd = (stats.totalInputTokens / 1_000_000) * pricing[0]
+             + (stats.totalOutputTokens / 1_000_000) * pricing[1]
+    }
 
     printSeparator()
     printStatusLine({
@@ -387,6 +399,10 @@ async function runREPL(
       contextWindow: budget.contextWindow,
       contextTokens: budget.historyTokensEst,
       totalTokens,
+      inputTokens: stats.totalInputTokens,
+      outputTokens: stats.totalOutputTokens,
+      costUsd,
+      tokPerSec: lastTokPerSec,
       cwd,
       gitBranch,
       effort: currentEffort,
@@ -771,6 +787,15 @@ async function runREPL(
       }
     }
 
+    // Cognitive skeleton: match prompt → inject thinking framework
+    const cogMatch = matchCognitive(messageToSend)
+    if (cogMatch) {
+      const cogCtx = formatCognitiveContext(cogMatch)
+      // Inject as system-level context so the model applies the framework
+      history.push({ role: 'system', content: cogCtx })
+      process.stderr.write(`\x1b[90m  [cognitive] ${cogMatch.scenario}: ${cogMatch.models.map(m => m.name).join(', ')}\x1b[0m\n`)
+    }
+
     // Abort controller for Esc/Ctrl+C during generation
     const abortController = new AbortController()
 
@@ -821,7 +846,7 @@ async function runREPL(
             progress.markWorking()
           },
           onStreamToken: (text: string) => {
-            progress.addChars(text.length)
+            progress.addText(text)
           },
           onFileWrite: (path, oldContent) => { lastWrite = { path, oldContent } },
           safeMode: currentPermMode !== 'yolo',
@@ -834,17 +859,25 @@ async function runREPL(
         tokenBudget.recordUsage(result.inputTokens, result.outputTokens)
         contextMonitor.recordUsage(result.inputTokens, result.outputTokens)
 
-        // Harness: context utilization warning
+        // Track tok/s from this turn (output tokens / generation time)
+        const turnElapsed = progress.stop().elapsed
+        if (turnElapsed > 0 && result.outputTokens > 0) {
+          lastTokPerSec = result.outputTokens / (turnElapsed / 1000)
+        }
+
+        // Harness: context utilization warning with actionable detail
         const risk = contextMonitor.getRiskLevel()
         if (risk !== 'green') {
           const snap = contextMonitor.getSnapshot()
           const pct = (snap.utilization * 100).toFixed(1)
+          const fmtK = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${Math.round(n / 1000)}K` : String(n)
+          const detail = `${fmtK(snap.inputTokens)}/${fmtK(snap.modelWindow)}`
           if (risk === 'red') {
-            process.stderr.write(`\x1b[31m  [harness] context ${pct}% RED — /clear + HANDOFF.md recommended\x1b[0m\n`)
+            process.stderr.write(`\x1b[31m  [harness] context ${pct}% RED (${detail}) — run /clear now\x1b[0m\n`)
           } else if (risk === 'orange') {
-            process.stderr.write(`\x1b[33m  [harness] context ${pct}% ORANGE — force /compact\x1b[0m\n`)
+            process.stderr.write(`\x1b[33m  [harness] context ${pct}% ORANGE (${detail}) — run /compact\x1b[0m\n`)
           } else if (risk === 'yellow') {
-            process.stderr.write(`\x1b[33m  [harness] context ${pct}% YELLOW — consider /compact\x1b[0m\n`)
+            process.stderr.write(`\x1b[33m  [harness] context ${pct}% YELLOW (${detail}) — consider /compact\x1b[0m\n`)
           }
         }
       } else if (!abortController.signal.aborted) {

@@ -7,6 +7,7 @@
 import { TOOL_DEFINITIONS } from './tools.js'
 import { loadProjectContext, formatContextForPrompt, loadSkills } from './context.js'
 import { discoverGuidance, formatGuidanceForPrompt } from './agents-discovery.js'
+import { getFirstPrinciplesPrompt } from './cognitive-skeleton.js'
 
 export function buildSystemPrompt(cwd: string): string {
   // Generate tool list from actual definitions
@@ -36,6 +37,10 @@ ${toolDocs}
 - After making changes, verify your work (run tests, check syntax).
 - Fix your own errors immediately without asking.
 - Keep explanations concise. Lead with the action, not the reasoning.
+
+## First Principles (mandatory pre-check)
+
+${getFirstPrinciplesPrompt()}
 
 ## Working Directory
 

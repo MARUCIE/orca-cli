@@ -276,14 +276,14 @@ Features that close the gap between "tool" and "agent":
 | Multi-edit Atomicity | Failed batch edits leave file unchanged | No partial corruption on error |
 | Background Completion Notifications | `run_background` jobs notify the REPL when they finish, and `/jobs` shows tracked state | Agent can keep working without manual PID polling |
 
-Tested: 668 tests across 44 files, 10/10 SOTA benchmark.
+Tested: 688 tests across 45 files, 10/10 SOTA benchmark.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │  Orca CLI  v0.6.0                                   │
-│  13,000+ LOC · 63 source files · 668 tests          │
+│  13,000+ LOC · 63 source files · 688 tests          │
 ├─────────────────────────────────────────────────────┤
 │  New in v0.6.0 — Mode Wiring + Threads + Guidance   │
 │  /mode command · thread memory · guidance injection  │
