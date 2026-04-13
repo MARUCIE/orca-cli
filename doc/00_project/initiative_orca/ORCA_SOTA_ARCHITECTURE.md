@@ -453,7 +453,7 @@ src/
 | Knowledge management | Memory | No | No | No | No | **Notes/Postmortem/Prompts/Learn** | **LEAD** |
 | Git worktree isolation | **Yes** | No | No | No | Yes | **WorktreeManager + Mission** | Parity |
 | Sandbox (Seatbelt/bwrap) | **Yes** | **Yes** | No | No | Yes | **--safe → Seatbelt/bwrap** | Parity |
-| MCP server ecosystem | **Mature** | No | No | No | No | Basic | **GAP** |
+| MCP server ecosystem | **Mature** | No | No | No | No | **Tool bridge + auto-inject** | Parity |
 | IDE integration (VS Code) | **Yes** | **Yes** | **Yes** | **Yes** | No | No | **GAP** |
 | Hooks system | **Yes** | No | No | No | No | **8 events** | Parity |
 | CJK-aware token estimation | No | No | No | No | No | **Yes** | **LEAD** |
@@ -462,9 +462,9 @@ src/
 
 **LEAD areas (6)**: Multi-model collaboration, task auto-decomposition, context protection, cognitive skeleton, knowledge management, CJK support
 
-**Parity areas (7)**: Mission mode, concurrent execution, goal-loop, validation contract, hooks, git worktree isolation, sandbox security
+**Parity areas (8)**: Mission mode, concurrent execution, goal-loop, validation contract, hooks, git worktree isolation, sandbox security, MCP tool bridge
 
-**GAP areas (2)**: MCP ecosystem depth, IDE integration
+**GAP areas (1)**: IDE integration (VS Code extension)
 
 ### Priority Targets for v0.9.0
 
