@@ -797,9 +797,11 @@ async function runREPL(
     const costTag = costUsd > 0 ? `$${costUsd < 0.01 ? costUsd.toFixed(4) : costUsd.toFixed(2)}` : ''
     const footerParts = [modelShort, `ctx ${pct}%`, currentPermMode, branchTag, costTag].filter(Boolean)
 
-    // Status line + full-width input separator
-    console.log(`\x1b[90m  ${footerParts.join('  ·  ')}\x1b[0m`)
-    console.log(`\x1b[90m${'─'.repeat(cols)}\x1b[0m`)
+    // Status embedded in full-width separator: ──── model · ctx · mode ────
+    const statusText = ` ${footerParts.join('  ·  ')} `
+    const leftPad = 2
+    const rightFill = Math.max(0, cols - leftPad - statusText.length)
+    console.log(`\x1b[90m${'─'.repeat(leftPad)}${statusText}${'─'.repeat(rightFill)}\x1b[0m`)
 
     return `${theme.prompt}❯\x1b[0m `
   }
