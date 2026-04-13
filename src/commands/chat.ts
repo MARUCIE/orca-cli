@@ -788,9 +788,7 @@ async function runREPL(
              + (stats.totalOutputTokens / 1_000_000) * pricing[1]
     }
 
-    // Clean prompt: dotted border + model hint, then ❯
     const cols = process.stdout.columns || 80
-    const borderWidth = Math.min(cols - 4, 72)
 
     // Compact footer: model · context% · mode · branch · session cost
     const modelShort = currentModel.length > 22 ? currentModel.slice(0, 20) + '..' : currentModel
@@ -799,11 +797,11 @@ async function runREPL(
     const costTag = costUsd > 0 ? `$${costUsd < 0.01 ? costUsd.toFixed(4) : costUsd.toFixed(2)}` : ''
     const footerParts = [modelShort, `ctx ${pct}%`, currentPermMode, branchTag, costTag].filter(Boolean)
 
-    // Status line + clean input box
+    // Status line + full-width input separator
     console.log(`\x1b[90m  ${footerParts.join('  ·  ')}\x1b[0m`)
-    console.log(`\x1b[90m  ╭${'─'.repeat(borderWidth - 2)}╮\x1b[0m`)
+    console.log(`\x1b[90m${'─'.repeat(cols)}\x1b[0m`)
 
-    return `\x1b[90m  │\x1b[0m ${theme.prompt}❯\x1b[0m `
+    return `${theme.prompt}❯\x1b[0m `
   }
 
   const promptUser = (): Promise<string | null> => new Promise((resolve) => {
@@ -904,8 +902,7 @@ async function runREPL(
     let input = await promptUser()
 
     // Close input box bottom border
-    const boxWidth = Math.min((process.stdout.columns || 80) - 4, 72)
-    console.log(`\x1b[90m  ╰${'─'.repeat(boxWidth - 2)}╯\x1b[0m`)
+    // No closing border — open layout
 
     if (input === null) break
     if (!input) continue
