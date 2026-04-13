@@ -467,6 +467,28 @@ async function runREPL(
     // ── Crash-safe turn boundary: uncaught errors here don't kill the session ──
     try {
 
+    // Shell mode: !command executes directly (like Amp's $ prefix)
+    if (input.startsWith('!') && input.length > 1) {
+      const shellCmd = input.slice(1).trim()
+      if (shellCmd) {
+        try {
+          const result = execSync(shellCmd, {
+            cwd, encoding: 'utf-8', timeout: 30_000, maxBuffer: 2 * 1024 * 1024,
+            stdio: ['pipe', 'pipe', 'pipe'],
+          })
+          if (result.trim()) {
+            console.log(`\x1b[90m${result.slice(0, 5000)}\x1b[0m`)
+            if (result.length > 5000) console.log('\x1b[90m  ... (truncated)\x1b[0m')
+          }
+        } catch (err) {
+          const execErr = err as { stdout?: string; stderr?: string; message: string; status?: number }
+          const output = execErr.stderr || execErr.stdout || execErr.message
+          console.log(`\x1b[31m${output.slice(0, 2000)}\x1b[0m`)
+        }
+      }
+      continue
+    }
+
     // Slash command dispatch
     if (input.startsWith('/')) {
       // Interactive command picker: just `/` alone opens the picker

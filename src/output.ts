@@ -626,12 +626,16 @@ export function printToolResult(toolName: string, success: boolean, output?: str
   const icon = success ? chalk.green('  ✓') : chalk.red('  ✗')
   const timeStr = chalk.gray(` ${durationStr}`)
 
-  // Show result preview
+  // Show result preview — inline diff for edits, compact summary for others
   if (output) {
-    const preview = getResultPreview(toolName, output)
-    if (preview) {
-      const previewColor = success ? chalk.gray : chalk.yellow
-      console.log(previewColor(`  │ ${preview}`))
+    if ((toolName === 'edit_file' || toolName === 'multi_edit') && success) {
+      printInlineDiff(output)
+    } else {
+      const preview = getResultPreview(toolName, output)
+      if (preview) {
+        const previewColor = success ? chalk.gray : chalk.yellow
+        console.log(previewColor(`  │ ${preview}`))
+      }
     }
   }
 
@@ -694,15 +698,17 @@ function getResultPreview(toolName: string, output: string): string {
   switch (toolName) {
     case 'read_file': {
       const lines = output.split('\n')
-      return `${lines.length} lines`
+      return `${lines.length} lines read`
     }
     case 'list_directory': {
       const entries = output.split('\n').filter(Boolean)
       return `${entries.length} entries`
     }
     case 'run_command': {
-      const firstLine = output.split('\n')[0] || ''
-      return truncate(firstLine, 100)
+      const lines = output.split('\n').filter(Boolean)
+      if (lines.length <= 3) return lines.map(l => truncate(l, 100)).join(' | ')
+      const first = truncate(lines[0]!, 80)
+      return `${first} ... (${lines.length} lines)`
     }
     case 'search_files': {
       const matches = output.split('\n').filter(Boolean)
@@ -720,6 +726,47 @@ function getResultPreview(toolName: string, output: string): string {
     }
     default:
       return ''
+  }
+}
+
+/**
+ * Print a compact inline diff for edit_file results.
+ * Shows +/- lines with color: green for additions, red for deletions, gray for context.
+ * Folds long diffs to keep output compact.
+ */
+function printInlineDiff(output: string): void {
+  const lines = output.split('\n')
+  const MAX_DIFF_LINES = 12
+
+  // Parse diff-like output: lines starting with + or - or containing "→"
+  const diffLines: Array<{ type: 'add' | 'del' | 'ctx'; text: string }> = []
+  for (const line of lines) {
+    if (line.startsWith('+')) diffLines.push({ type: 'add', text: line })
+    else if (line.startsWith('-')) diffLines.push({ type: 'del', text: line })
+    else if (line.startsWith('@@') || line.startsWith('diff ')) continue // skip headers
+    else if (line.trim()) diffLines.push({ type: 'ctx', text: line })
+  }
+
+  // If output doesn't look like a diff, show as compact preview
+  if (diffLines.length === 0) {
+    const preview = truncate(output, 80)
+    if (preview) console.log(chalk.gray(`  │ ${preview}`))
+    return
+  }
+
+  // Show diff lines with folding
+  const showLines = diffLines.length > MAX_DIFF_LINES
+    ? [...diffLines.slice(0, 5), { type: 'ctx' as const, text: `... ${diffLines.length - 10} lines hidden ...` }, ...diffLines.slice(-5)]
+    : diffLines
+
+  for (const dl of showLines) {
+    const prefix = '  │ '
+    const text = dl.text.slice(0, 100) + (dl.text.length > 100 ? '...' : '')
+    switch (dl.type) {
+      case 'add': console.log(`${prefix}\x1b[32m${text}\x1b[0m`); break
+      case 'del': console.log(`${prefix}\x1b[31m${text}\x1b[0m`); break
+      case 'ctx': console.log(`${prefix}\x1b[90m${text}\x1b[0m`); break
+    }
   }
 }
 
