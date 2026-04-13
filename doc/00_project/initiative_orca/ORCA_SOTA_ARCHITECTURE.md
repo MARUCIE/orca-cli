@@ -424,20 +424,76 @@ src/
 
 ---
 
-## Success Criteria
+## v0.8.0 SOTA Gap Status (2026-04-13)
 
-| Milestone | Metric | Target |
+### Current Reality
+
+| Metric | Value |
+|---|---|
+| Version | 0.8.0 |
+| LOC | 16,722 |
+| Tests | 915 (50 files) |
+| Modules | 14 directories |
+| Tools | 41+ |
+| Slash commands | 30+ |
+
+### SOTA Gap Matrix: Orca vs Competitors
+
+| Capability | Claude Code | Codex | Amp | KiloCode | Factory Droid | **Orca v0.8.0** | Gap |
+|---|---|---|---|---|---|---|---|
+| Multi-model routing | No | No | No | No | No | **Council/Race/Pipeline** | **LEAD** |
+| Mission mode (multi-step) | Sub-agents | Codex tasks | No | No | **Droid Missions** | **Mission Mode** | Parity |
+| Task auto-decomposition | No | No | No | No | No | **Task Planner** | **LEAD** |
+| Concurrent side tasks | No | No | No | No | Worker pool | **executePlan()** | Parity |
+| Context protection (nuclear) | Auto-compact | Unknown | Unknown | No | Unknown | **4-layer + nuclear** | **LEAD** |
+| 413 auto-recovery | No | Unknown | Unknown | No | Unknown | **Auto-compact + retry** | **LEAD** |
+| Cognitive skeleton (hook) | No | No | No | No | No | **9 scenarios** | **LEAD** |
+| Goal-loop (done-when) | No | Codex loop | No | No | Droid loop | **runGoalLoop** | Parity |
+| Validation contract first | No | No | No | No | **Yes** | **Yes** | Parity |
+| Knowledge management | Memory | No | No | No | No | **Notes/Postmortem/Prompts/Learn** | **LEAD** |
+| Git worktree isolation | **Yes** | No | No | No | Yes | Planned | **GAP** |
+| Sandbox (Seatbelt/bwrap) | **Yes** | **Yes** | No | No | Yes | Planned | **GAP** |
+| MCP server ecosystem | **Mature** | No | No | No | No | Basic | **GAP** |
+| IDE integration (VS Code) | **Yes** | **Yes** | **Yes** | **Yes** | No | No | **GAP** |
+| Hooks system | **Yes** | No | No | No | No | **8 events** | Parity |
+| CJK-aware token estimation | No | No | No | No | No | **Yes** | **LEAD** |
+
+### Gap Summary
+
+**LEAD areas (6)**: Multi-model collaboration, task auto-decomposition, context protection, cognitive skeleton, knowledge management, CJK support
+
+**Parity areas (5)**: Mission mode, concurrent execution, goal-loop, validation contract, hooks
+
+**GAP areas (4)**: Git worktree isolation, sandbox security, MCP ecosystem, IDE integration
+
+### Priority Targets for v0.9.0
+
+| Priority | Feature | Competitor Ref | Estimated LOC |
+|---|---|---|---|
+| P0 | Git worktree agent teams | Claude Code | ~800 |
+| P0 | Seatbelt/bwrap sandbox | Codex CLI | ~600 |
+| P1 | MCP server discovery + auto-connect | Claude Code | ~500 |
+| P1 | VS Code extension skeleton | Amp | ~1000 |
+| P2 | DNA capsule inheritance | Factory Droid | ~400 |
+| P2 | Webhook gateway (Telegram/Discord) | Hermes | ~600 |
+
+### Achieved Milestones (v0.4.0 → v0.8.0)
+
+| Milestone | Status | Evidence |
 |---|---|---|
-| v0.4.0 | Harness modules passing | 4/4 modules + 30 tests |
-| v0.4.0 | Sub-agent spawning | spawn_agent/delegate_task functional |
-| v0.4.0 | Session resume | `orca -c` loads and continues |
-| v0.5.0 | Skills execution | swarm + pipeline + loop modes |
-| v0.5.0 | Sandbox isolation | Seatbelt on macOS verified |
-| v0.5.0 | Agent teams | 2+ agents on separate worktrees |
-| v0.6.0 | Webhook gateway | POST → agent → response |
-| v0.6.0 | Telegram adapter | Message → agent → reply |
-| v0.6.0 | DNA capsules | Create + search + inherit |
-| v0.6.0 | Total tests | 545+ |
+| v0.4.0 Harness layer | DONE | VerificationGate + LoopDetector + ContextMonitor + ErrorClassifier |
+| v0.4.0 Sub-agent isolation | DONE | spawnSubAgent with process fork + IPC |
+| v0.5.0 Skills engine | DONE | ModeRegistry + command picker |
+| v0.5.0 Session resume | DONE | `orca chat -c` + auto-save |
+| v0.6.0 Knowledge system | DONE | Notes + Postmortem + Prompts + Learning Journal |
+| v0.7.0 Cognitive skeleton | DONE | 9 scenarios × 4 models, always-on hook |
+| v0.7.0 Goal-loop controller | DONE | `orca run --done-when` with regex/command/judge |
+| v0.7.0 Context 4-layer protection | DONE | L1 tool truncation + L2 pre-round + L3 PostToolUse + L4 413 recovery |
+| v0.8.0 Mission Mode | DONE | Orchestrator/Worker/Validator, validation contract first |
+| v0.8.0 Task Planner | DONE | Auto-decompose + concurrent executor + visual checklist |
+| v0.8.0 Nuclear compact | DONE | >100% utilization → drop all except system + last user |
+| v0.8.0 UI/UX overhaul | DONE | Box-drawing, compact status, clean help |
+| v0.8.0 915 tests | DONE | 50 files, all passing |
 
 ---
 

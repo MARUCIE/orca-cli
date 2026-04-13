@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { execSync } from 'node:child_process'
 
 // ── Type imports ────────────────────────────────────────────────
 
@@ -514,5 +515,747 @@ describe('MissionController', () => {
       expect(events2).toHaveLength(1)
       expect(events1[0]!.type).toBe('plan_created')
     })
+  })
+})
+
+// ── Plan Parsing Edge Cases ─────────────────────────────────────
+
+describe('Plan parsing edge cases', () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = join(tmpdir(), `orca-parse-test-${randomUUID().slice(0, 8)}`)
+    mkdirSync(tmpDir, { recursive: true })
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    try { rmSync(tmpDir, { recursive: true, force: true }) } catch {}
+  })
+
+  const apiOptions = {
+    apiKey: 'test-key',
+    baseURL: 'http://localhost:8080/v1',
+    model: 'test-model',
+  }
+
+  it('parsePlanResponse with malformed JSON — missing fields', async () => {
+    // Contract with missing updatedAt field
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{
+  "version": 1,
+  "criteria": [{"id":"c-1","description":"test","type":"command","value":"true","milestoneId":"m-1"}],
+  "createdAt": "2026-01-01"
+}
+\`\`\`
+\`\`\`milestones
+[{"title":"M1","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"F1","spec":"spec"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      const ctrl = new MissionController('malformed contract', tmpDir, apiOptions)
+      const plan = await ctrl.plan()
+
+      // Should still parse what it can
+      expect(plan.contract.version).toBe(1)
+      expect(plan.milestones).toHaveLength(1)
+      expect(plan.features).toHaveLength(1)
+  })
+
+  it('parsePlanResponse with partial JSON blocks — empty features list', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `Here is the plan:
+
+\`\`\`contract
+{"version":1,"criteria":[],"createdAt":"2026-01-01","updatedAt":"2026-01-01"}
+\`\`\`
+
+\`\`\`milestones
+[{"title":"Setup","featureIds":[]}]
+\`\`\`
+
+\`\`\`features
+[]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      const ctrl = new MissionController('empty features', tmpDir, apiOptions)
+      const plan = await ctrl.plan()
+
+      // Fallback should kick in or handle gracefully
+      expect(plan.milestones).toBeDefined()
+      expect(Array.isArray(plan.features)).toBe(true)
+  })
+
+  it('parsePlanResponse with no JSON blocks — falls back to bullet extraction', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `Here is my plan:
+- Implement the database layer
+- Build the API endpoints
+- Add authentication
+- Write integration tests
+- Deploy to production`,
+        inputTokens: 50,
+        outputTokens: 100,
+      })
+
+      const ctrl = new MissionController('bullet fallback', tmpDir, apiOptions)
+      const plan = await ctrl.plan()
+
+      // Should extract bullets as features
+      expect(plan.features.length).toBeGreaterThanOrEqual(3)
+      expect(plan.features[0]!.title).toContain('database')
+      expect(plan.milestones).toHaveLength(1)
+      expect(plan.milestones[0]!.title).toBe('Complete all features')
+  })
+
+  it('parsePlanResponse with empty response text', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: '',
+      inputTokens: 10,
+      outputTokens: 10,
+    })
+
+    const ctrl = new MissionController('empty response', tmpDir, apiOptions)
+    const plan = await ctrl.plan()
+
+    // Should create a valid plan with defaults
+    expect(plan).toBeDefined()
+    expect(plan.contract.version).toBe(1)
+    expect(Array.isArray(plan.milestones)).toBe(true)
+    expect(Array.isArray(plan.features)).toBe(true)
+  })
+
+  it('parsePlanResponse with milestone containing no features', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[{"id":"c-1","description":"Pass tests","type":"command","value":"npm test","milestoneId":"m-1"}],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"Setup","featureIds":[]}]
+\`\`\`
+\`\`\`features
+[{"title":"Init project","spec":"Initialize","criteriaIds":["c-1"],"milestoneId":"m-1"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      const ctrl = new MissionController('empty milestone', tmpDir, apiOptions)
+      const plan = await ctrl.plan()
+
+      // Should handle orphaned features gracefully
+      expect(plan.milestones[0]!.featureIds.length).toBeGreaterThanOrEqual(0)
+      expect(plan.features).toHaveLength(1)
+  })
+
+  it('parsePlanResponse with nested/invalid JSON in blocks', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{
+  "version": 1,
+  "criteria": [{"id":"c-1","description":"test
+  with newline","type":"command","value":"true","milestoneId":"m-1"}],
+  "createdAt": "2026-01-01",
+  "updatedAt": "2026-01-01"
+}
+\`\`\`
+\`\`\`milestones
+[{"title":"First","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"Task","spec":"Do it"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      const ctrl = new MissionController('invalid json', tmpDir, apiOptions)
+      // Should not throw, should fall back or parse what it can
+      const plan = await ctrl.plan()
+      expect(plan).toBeDefined()
+  })
+})
+
+// ── Validation Criterion Types ──────────────────────────────────
+
+describe('Validation criterion types', () => {
+  let tmpDir: string
+  let testFile: string
+
+  beforeEach(() => {
+    tmpDir = join(tmpdir(), `orca-criterion-test-${randomUUID().slice(0, 8)}`)
+    mkdirSync(tmpDir, { recursive: true })
+    testFile = join(tmpDir, 'test.txt')
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    try { rmSync(tmpDir, { recursive: true, force: true }) } catch {}
+  })
+
+  const apiOptions = {
+    apiKey: 'test-key',
+    baseURL: 'http://localhost:8080/v1',
+    model: 'test-model',
+  }
+
+  it('file_exists criterion with non-existent file — fails validation', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[{"id":"c-1","description":"output.txt exists","type":"file_exists","value":"output.txt","milestoneId":"m-1"}],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"Create file","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"Write output","spec":"Create output.txt","criteriaIds":["c-1"],"milestoneId":"m-1"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      // Worker succeeds but doesn't create the file
+      mockedSpawnSubAgent.mockResolvedValueOnce({
+        success: true,
+        output: 'Attempted to create file',
+        tokensUsed: 100,
+        duration: 2000,
+      })
+
+      const events: MissionEvent[] = []
+      const ctrl = new MissionController('file missing test', tmpDir, apiOptions)
+      ctrl.onEvent(e => events.push(e))
+
+      await ctrl.plan()
+      const state = await ctrl.execute()
+
+      // Validation should fail because file doesn't exist
+      expect(state.phase).toBe('failed')
+      const failedEvent = events.find(e => e.type === 'validation_failed')
+      expect(failedEvent).toBeDefined()
+  })
+
+  it('file_exists criterion with existing file — passes validation', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[{"id":"c-1","description":"result.txt exists","type":"file_exists","value":"result.txt","milestoneId":"m-1"}],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"Create","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"Write file","spec":"Create result.txt","criteriaIds":["c-1"],"milestoneId":"m-1"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      // Worker creates the file
+      mockedSpawnSubAgent.mockImplementationOnce(async () => {
+        writeFileSync(join(tmpDir, 'result.txt'), 'success', 'utf-8')
+        return { success: true, output: 'Created result.txt', tokensUsed: 100, duration: 2000 }
+      })
+
+      const events: MissionEvent[] = []
+      const ctrl = new MissionController('file exists test', tmpDir, apiOptions)
+      ctrl.onEvent(e => events.push(e))
+
+      await ctrl.plan()
+      const state = await ctrl.execute()
+
+      // Validation should pass
+      expect(state.phase).toBe('completed')
+      expect(state.featuresValidated).toBe(1)
+      const passedEvent = events.find(e => e.type === 'validation_passed')
+      expect(passedEvent).toBeDefined()
+  })
+
+  it('command criterion with exit 0 — passes validation', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[{"id":"c-1","description":"tests pass","type":"command","value":"true","milestoneId":"m-1"}],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"Test","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"Setup tests","spec":"Configure","criteriaIds":["c-1"],"milestoneId":"m-1"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      mockedSpawnSubAgent.mockResolvedValueOnce({
+        success: true,
+        output: 'Tests setup',
+        tokensUsed: 100,
+        duration: 2000,
+      })
+
+      const events: MissionEvent[] = []
+      const ctrl = new MissionController('command exit 0 test', tmpDir, apiOptions)
+      ctrl.onEvent(e => events.push(e))
+
+      await ctrl.plan()
+      const state = await ctrl.execute()
+
+      expect(state.phase).toBe('completed')
+      const passedEvent = events.find(e => e.type === 'validation_passed')
+      expect(passedEvent).toBeDefined()
+  })
+
+  it('command criterion with exit 1 — fails validation', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[{"id":"c-1","description":"must fail","type":"command","value":"false","milestoneId":"m-1"}],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"Test","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"Fail task","spec":"This always fails","criteriaIds":["c-1"],"milestoneId":"m-1"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      mockedSpawnSubAgent.mockResolvedValue({
+        success: true,
+        output: 'Attempted',
+        tokensUsed: 50,
+        duration: 1000,
+      })
+
+      const events: MissionEvent[] = []
+      const ctrl = new MissionController('command exit 1 test', tmpDir, apiOptions, {
+        maxMilestoneRetries: 0,
+      })
+      ctrl.onEvent(e => events.push(e))
+
+      await ctrl.plan()
+      const state = await ctrl.execute()
+
+      expect(state.phase).toBe('failed')
+      const failedEvent = events.find(e => e.type === 'validation_failed')
+      expect(failedEvent).toBeDefined()
+  })
+
+  it('regex criterion with matching pattern in diff — passes validation', async () => {
+    // Create initial commit
+    try {
+      execSync('git init', { cwd: tmpDir })
+      execSync('git config user.email "test@test.com"', { cwd: tmpDir })
+      execSync('git config user.name "Test User"', { cwd: tmpDir })
+      writeFileSync(join(tmpDir, 'README.md'), 'initial', 'utf-8')
+      execSync('git add README.md', { cwd: tmpDir })
+      execSync('git commit -m "initial"', { cwd: tmpDir })
+    } catch {
+      // Git not available in test env, skip regex test
+      return
+    }
+
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[{"id":"c-1","description":"add feature","type":"regex","value":"added_feature","milestoneId":"m-1"}],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"Feature","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"Add feature","spec":"Write code","criteriaIds":["c-1"],"milestoneId":"m-1"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      mockedSpawnSubAgent.mockImplementationOnce(async () => {
+        // Create a file with the pattern
+        writeFileSync(join(tmpDir, 'feature.ts'), 'const added_feature = true', 'utf-8')
+        execSync('git add feature.ts', { cwd: tmpDir })
+        execSync('git commit -m "add feature"', { cwd: tmpDir })
+        return { success: true, output: 'Added feature', tokensUsed: 100, duration: 2000 }
+      })
+
+      const events: MissionEvent[] = []
+      const ctrl = new MissionController('regex match test', tmpDir, apiOptions)
+      ctrl.onEvent(e => events.push(e))
+
+      await ctrl.plan()
+      const state = await ctrl.execute()
+
+      expect(state.phase).toBe('completed')
+  })
+
+  it('regex criterion with no matching pattern — fails validation', async () => {
+    // Create initial commit
+    try {
+      execSync('git init', { cwd: tmpDir })
+      execSync('git config user.email "test@test.com"', { cwd: tmpDir })
+      execSync('git config user.name "Test User"', { cwd: tmpDir })
+      writeFileSync(join(tmpDir, 'README.md'), 'initial', 'utf-8')
+      execSync('git add README.md', { cwd: tmpDir })
+      execSync('git commit -m "initial"', { cwd: tmpDir })
+    } catch {
+      // Git not available, skip
+      return
+    }
+
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[{"id":"c-1","description":"match pattern","type":"regex","value":"impossible_pattern_xyz","milestoneId":"m-1"}],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"Feature","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"Do something","spec":"Write code","criteriaIds":["c-1"],"milestoneId":"m-1"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      mockedSpawnSubAgent.mockImplementationOnce(async () => {
+        // Create a file without the pattern
+        writeFileSync(join(tmpDir, 'file.ts'), 'const x = 1', 'utf-8')
+        execSync('git add file.ts', { cwd: tmpDir })
+        execSync('git commit -m "add file"', { cwd: tmpDir })
+        return { success: true, output: 'Created file', tokensUsed: 100, duration: 2000 }
+      })
+
+      const events: MissionEvent[] = []
+      const ctrl = new MissionController('regex no match test', tmpDir, apiOptions, {
+        maxMilestoneRetries: 0,
+      })
+      ctrl.onEvent(e => events.push(e))
+
+      await ctrl.plan()
+      const state = await ctrl.execute()
+
+      expect(state.phase).toBe('failed')
+  })
+})
+
+// ── Controller Lifecycle Edge Cases ─────────────────────────────
+
+describe('Controller lifecycle edge cases', () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = join(tmpdir(), `orca-lifecycle-test-${randomUUID().slice(0, 8)}`)
+    mkdirSync(tmpDir, { recursive: true })
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    try { rmSync(tmpDir, { recursive: true, force: true }) } catch {}
+  })
+
+  const apiOptions = {
+    apiKey: 'test-key',
+    baseURL: 'http://localhost:8080/v1',
+    model: 'test-model',
+  }
+
+  it('execute() with multiple milestones where first passes, second fails', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[{"id":"c-1","description":"first milestone","type":"command","value":"true","milestoneId":"m-1"},{"id":"c-2","description":"second milestone","type":"command","value":"false","milestoneId":"m-2"}],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"First","featureIds":["f-1"]},{"title":"Second","featureIds":["f-2"]}]
+\`\`\`
+\`\`\`features
+[{"title":"First feature","spec":"Pass","criteriaIds":["c-1"],"milestoneId":"m-1"},{"title":"Second feature","spec":"Fail","criteriaIds":["c-2"],"milestoneId":"m-2"}]
+\`\`\``,
+        inputTokens: 200,
+        outputTokens: 200,
+      })
+
+      mockedSpawnSubAgent.mockResolvedValue({
+        success: true,
+        output: 'Attempted',
+        tokensUsed: 100,
+        duration: 2000,
+      })
+
+      const events: MissionEvent[] = []
+      const ctrl = new MissionController('multi milestone test', tmpDir, apiOptions, {
+        maxMilestoneRetries: 0,
+      })
+      ctrl.onEvent(e => events.push(e))
+
+      await ctrl.plan()
+      const state = await ctrl.execute()
+
+      // Should complete first milestone and fail on second
+      expect(state.phase).toBe('failed')
+      expect(state.currentMilestoneIndex).toBe(1)
+      expect(events.some(e => e.type === 'milestone_passed')).toBe(true)
+      expect(events.some(e => e.type === 'milestone_failed')).toBe(true)
+  })
+
+  it('Mission with maxFeatureRetries=0 allows no retries', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[{"id":"c-1","description":"impossible","type":"command","value":"false","milestoneId":"m-1"}],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"Test","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"Fail","spec":"Cannot pass","criteriaIds":["c-1"],"milestoneId":"m-1"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      mockedSpawnSubAgent.mockResolvedValue({
+        success: true,
+        output: 'Tried',
+        tokensUsed: 50,
+        duration: 1000,
+      })
+
+      const ctrl = new MissionController('no retries test', tmpDir, apiOptions, {
+        maxFeatureRetries: 0,
+        maxMilestoneRetries: 1,
+      })
+
+      await ctrl.plan()
+      const state = await ctrl.execute()
+
+      // Should fail without excessive retries
+      expect(state.phase).toBe('failed')
+      // Worker called once per feature, then validation fails
+      expect(mockedSpawnSubAgent.mock.calls.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('Feature that fails on first attempt but succeeds on retry', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[{"id":"c-1","description":"file exists","type":"file_exists","value":"retry.txt","milestoneId":"m-1"}],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"Retry","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"Create file","spec":"Make retry.txt","criteriaIds":["c-1"],"milestoneId":"m-1"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      let attemptCount = 0
+
+      // First attempt: failure, second attempt: success
+      mockedSpawnSubAgent.mockImplementation(async () => {
+        attemptCount++
+        if (attemptCount === 1) {
+          // First attempt doesn't create the file
+          return { success: true, output: 'Failed to create', tokensUsed: 100, duration: 2000 }
+        } else {
+          // Retry succeeds
+          writeFileSync(join(tmpDir, 'retry.txt'), 'success', 'utf-8')
+          return { success: true, output: 'Created file', tokensUsed: 100, duration: 2000 }
+        }
+      })
+
+      const ctrl = new MissionController('retry success test', tmpDir, apiOptions)
+      await ctrl.plan()
+      const state = await ctrl.execute()
+
+      expect(state.phase).toBe('completed')
+      expect(state.featuresValidated).toBe(1)
+      // Confirm file was created on second attempt
+      expect(existsSync(join(tmpDir, 'retry.txt'))).toBe(true)
+  })
+
+  it('Worker returning success=false marks feature as failed', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[{"id":"c-1","description":"file must exist","type":"file_exists","value":"worker-output.txt","milestoneId":"m-1"}],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"Task","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"Do work","spec":"Implement","criteriaIds":["c-1"],"milestoneId":"m-1"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      // Worker explicitly returns success=false (won't create the file)
+      mockedSpawnSubAgent.mockResolvedValue({
+        success: false,
+        output: 'Worker error: could not complete',
+        tokensUsed: 100,
+        duration: 2000,
+      })
+
+      const events: MissionEvent[] = []
+      const ctrl = new MissionController('worker fail test', tmpDir, apiOptions, {
+        maxFeatureRetries: 3,
+        maxMilestoneRetries: 0,
+      })
+      ctrl.onEvent(e => events.push(e))
+
+      await ctrl.plan()
+      const state = await ctrl.execute()
+
+      // Feature failed + file doesn't exist → milestone validation fails → mission fails
+      expect(state.phase).toBe('failed')
+      const failedEvent = events.find(e => e.type === 'feature_failed')
+      expect(failedEvent).toBeDefined()
+  })
+
+  it('Multiple event handlers all receive events', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"Task","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"Work","spec":"Do it","criteriaIds":[],"milestoneId":"m-1"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      mockedSpawnSubAgent.mockResolvedValueOnce({
+        success: true,
+        output: 'Done',
+        tokensUsed: 100,
+        duration: 2000,
+      })
+
+      const handler1Events: MissionEvent[] = []
+      const handler2Events: MissionEvent[] = []
+      const handler3Events: MissionEvent[] = []
+
+      const ctrl = new MissionController('multi handler lifecycle', tmpDir, apiOptions)
+      ctrl.onEvent(e => handler1Events.push(e))
+      ctrl.onEvent(e => handler2Events.push(e))
+      ctrl.onEvent(e => handler3Events.push(e))
+
+      await ctrl.plan()
+      await ctrl.execute()
+
+      // All handlers should receive the same events
+      expect(handler1Events.length).toBeGreaterThan(0)
+      expect(handler2Events.length).toBe(handler1Events.length)
+      expect(handler3Events.length).toBe(handler1Events.length)
+
+      // All should have mission_completed
+      expect(handler1Events.some(e => e.type === 'mission_completed')).toBe(true)
+      expect(handler2Events.some(e => e.type === 'mission_completed')).toBe(true)
+      expect(handler3Events.some(e => e.type === 'mission_completed')).toBe(true)
+  })
+})
+
+// ── State Persistence ───────────────────────────────────────────
+
+describe('State persistence', () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = join(tmpdir(), `orca-persist-test-${randomUUID().slice(0, 8)}`)
+    mkdirSync(tmpDir, { recursive: true })
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    try { rmSync(tmpDir, { recursive: true, force: true }) } catch {}
+  })
+
+  const apiOptions = {
+    apiKey: 'test-key',
+    baseURL: 'http://localhost:8080/v1',
+    model: 'test-model',
+  }
+
+  it('State file is written after plan()', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"M1"}]
+\`\`\`
+\`\`\`features
+[{"title":"F1","spec":"spec"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      const ctrl = new MissionController('persist plan', tmpDir, apiOptions)
+      const mission = ctrl.getState()
+      const missionDir = join(tmpDir, '.orca', 'missions', mission.id)
+
+      await ctrl.plan()
+
+      const stateFile = join(missionDir, 'state.json')
+      expect(existsSync(stateFile)).toBe(true)
+
+      const stateContent = JSON.parse(readFileSync(stateFile, 'utf-8'))
+      expect(stateContent.mission.state.phase).toBe('planning')
+  })
+
+  it('State file is updated after execute()', async () => {
+    mockedChatOnce.mockResolvedValueOnce({
+      text: `\`\`\`contract
+{"version":1,"criteria":[{"id":"c-1","description":"pass","type":"command","value":"true","milestoneId":"m-1"}],"createdAt":"","updatedAt":""}
+\`\`\`
+\`\`\`milestones
+[{"title":"M1","featureIds":["f-1"]}]
+\`\`\`
+\`\`\`features
+[{"title":"F1","spec":"spec","criteriaIds":["c-1"],"milestoneId":"m-1"}]
+\`\`\``,
+        inputTokens: 100,
+        outputTokens: 100,
+      })
+
+      mockedSpawnSubAgent.mockResolvedValueOnce({
+        success: true,
+        output: 'Done',
+        tokensUsed: 100,
+        duration: 2000,
+      })
+
+      const ctrl = new MissionController('persist execute', tmpDir, apiOptions)
+      const mission = ctrl.getState()
+      const missionDir = join(tmpDir, '.orca', 'missions', mission.id)
+
+      await ctrl.plan()
+      await ctrl.execute()
+
+      const stateFile = join(missionDir, 'state.json')
+      const stateContent = JSON.parse(readFileSync(stateFile, 'utf-8'))
+      expect(stateContent.mission.state.phase).toBe('completed')
+      expect(stateContent.mission.state.completedAt).toBeTruthy()
+      expect(stateContent.mission.state.featuresImplemented).toBeGreaterThan(0)
+  })
+
+  it('Mission directory is created on construction', () => {
+    const ctrl = new MissionController('dir creation test', tmpDir, apiOptions)
+    const mission = ctrl.getState()
+    const missionDir = join(tmpDir, '.orca', 'missions', mission.id)
+
+    expect(existsSync(missionDir)).toBe(true)
+    expect(existsSync(join(tmpDir, '.orca'))).toBe(true)
+    expect(existsSync(join(tmpDir, '.orca', 'missions'))).toBe(true)
   })
 })

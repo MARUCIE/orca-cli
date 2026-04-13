@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ProgressIndicator, printError, printRichBanner } from '../src/output.js'
+import { ProgressIndicator, printError, printRichBanner, printSeparator, printStatusLine, printSessionSummary } from '../src/output.js'
 
 describe('ProgressIndicator', () => {
   let mockStderr: string[] = []
@@ -421,5 +421,341 @@ describe('integration: full progress cycle', () => {
 
     expect(result.elapsed).toBeGreaterThanOrEqual(2500)
     expect(result.tokens).toBe(50)  // 5 × 10
+  })
+})
+
+// ── UI Output Formatting Tests ──────────────────────────────────────
+
+describe('printSeparator - Separator Line', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    logSpy.mockRestore()
+  })
+
+  it('uses ─ characters (not dots)', () => {
+    printSeparator()
+
+    expect(logSpy).toHaveBeenCalled()
+    const output = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(output).toContain('─')
+    expect(output).not.toContain('.')
+  })
+
+  it('caps width at 72 characters', () => {
+    printSeparator()
+
+    expect(logSpy).toHaveBeenCalled()
+    const output = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    // Count the dashes (without ANSI codes)
+    const dashCount = (output.match(/─/g) || []).length
+    expect(dashCount).toBeLessThanOrEqual(72)
+  })
+
+  it('includes ANSI color codes for gray styling', () => {
+    printSeparator()
+
+    expect(logSpy).toHaveBeenCalled()
+    const output = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    // Should have ANSI escape sequences
+    expect(output).toMatch(/\x1b\[/)
+  })
+})
+
+describe('printStatusLine - Status Display', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    logSpy.mockRestore()
+  })
+
+  it('produces single line output', () => {
+    printStatusLine({
+      model: 'claude-opus-4',
+      provider: 'anthropic',
+      mode: 'auto',
+      contextPct: 35,
+      contextWindow: 200000,
+      contextTokens: 70000,
+      totalTokens: 70000,
+      cwd: '/Users/test/project',
+    })
+
+    expect(logSpy).toHaveBeenCalledTimes(1)
+    const output = String(logSpy.mock.calls[0][0])
+    // Single line should not have multiple console.log calls
+    expect(output.split('\n').length).toBe(1)
+  })
+
+  it('displays model name', () => {
+    printStatusLine({
+      model: 'claude-opus-4',
+      provider: 'anthropic',
+      mode: 'auto',
+      contextPct: 35,
+      contextWindow: 200000,
+      contextTokens: 70000,
+      totalTokens: 70000,
+      cwd: '/Users/test/project',
+    })
+
+    const output = String(logSpy.mock.calls[0][0])
+    expect(output).toContain('claude-opus-4')
+  })
+
+  it('displays mode indicator', () => {
+    printStatusLine({
+      model: 'claude-opus-4',
+      provider: 'anthropic',
+      mode: 'yolo',
+      contextPct: 35,
+      contextWindow: 200000,
+      contextTokens: 70000,
+      totalTokens: 70000,
+      cwd: '/Users/test/project',
+    })
+
+    const output = String(logSpy.mock.calls[0][0])
+    expect(output).toContain('yolo')
+  })
+
+  it('displays context percentage', () => {
+    printStatusLine({
+      model: 'claude-opus-4',
+      provider: 'anthropic',
+      mode: 'auto',
+      contextPct: 45,
+      contextWindow: 200000,
+      contextTokens: 90000,
+      totalTokens: 90000,
+      cwd: '/Users/test/project',
+    })
+
+    const output = String(logSpy.mock.calls[0][0])
+    expect(output).toContain('45%')
+  })
+
+  it('includes git branch when provided', () => {
+    printStatusLine({
+      model: 'claude-opus-4',
+      provider: 'anthropic',
+      mode: 'auto',
+      contextPct: 35,
+      contextWindow: 200000,
+      contextTokens: 70000,
+      totalTokens: 70000,
+      cwd: '/Users/test/project',
+      gitBranch: 'feature/context-protection',
+    })
+
+    const output = String(logSpy.mock.calls[0][0])
+    expect(output).toContain('feature/context-protection')
+  })
+
+  it('omits git branch when not provided', () => {
+    printStatusLine({
+      model: 'claude-opus-4',
+      provider: 'anthropic',
+      mode: 'auto',
+      contextPct: 35,
+      contextWindow: 200000,
+      contextTokens: 70000,
+      totalTokens: 70000,
+      cwd: '/Users/test/project',
+    })
+
+    const output = String(logSpy.mock.calls[0][0])
+    // Should not have parentheses around nothing
+    expect(output).not.toMatch(/\(\s*\)/)
+  })
+
+  it('displays context bar with correct colors', () => {
+    // Test at different utilization levels
+    printStatusLine({
+      model: 'claude-opus-4',
+      provider: 'anthropic',
+      mode: 'auto',
+      contextPct: 30, // green
+      contextWindow: 200000,
+      contextTokens: 60000,
+      totalTokens: 60000,
+      cwd: '/Users/test/project',
+    })
+
+    const output = String(logSpy.mock.calls[0][0])
+    expect(output).toContain('█')  // filled block
+    expect(output).toContain('░')  // empty block
+  })
+
+  it('shows warning mark at >=95% context', () => {
+    printStatusLine({
+      model: 'claude-opus-4',
+      provider: 'anthropic',
+      mode: 'auto',
+      contextPct: 95,
+      contextWindow: 200000,
+      contextTokens: 190000,
+      totalTokens: 190000,
+      cwd: '/Users/test/project',
+    })
+
+    const output = String(logSpy.mock.calls[0][0])
+    expect(output).toContain('!')
+  })
+
+  it('truncates long model names to 22 chars with ..', () => {
+    printStatusLine({
+      model: 'very-long-model-name-that-exceeds-limit',
+      provider: 'anthropic',
+      mode: 'auto',
+      contextPct: 35,
+      contextWindow: 200000,
+      contextTokens: 70000,
+      totalTokens: 70000,
+      cwd: '/Users/test/project',
+    })
+
+    const output = String(logSpy.mock.calls[0][0])
+    expect(output).toContain('..')
+  })
+
+  it('displays cost when costUsd > 0', () => {
+    printStatusLine({
+      model: 'claude-opus-4',
+      provider: 'anthropic',
+      mode: 'auto',
+      contextPct: 35,
+      contextWindow: 200000,
+      contextTokens: 70000,
+      totalTokens: 70000,
+      costUsd: 0.12,
+      cwd: '/Users/test/project',
+    })
+
+    const output = String(logSpy.mock.calls[0][0])
+    expect(output).toContain('$')
+  })
+})
+
+describe('printSessionSummary - Session Footer', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    logSpy.mockRestore()
+  })
+
+  it('uses box-drawing characters ╭ ╰', () => {
+    printSessionSummary({
+      turns: 5,
+      totalInputTokens: 10000,
+      totalOutputTokens: 5000,
+      durationMs: 45000,
+      model: 'claude-opus-4',
+    })
+
+    const output = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(output).toContain('╭')
+    expect(output).toContain('╰')
+  })
+
+  it('displays turn count', () => {
+    printSessionSummary({
+      turns: 8,
+      totalInputTokens: 10000,
+      totalOutputTokens: 5000,
+      durationMs: 45000,
+      model: 'claude-opus-4',
+    })
+
+    const output = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(output).toContain('8')
+    expect(output).toContain('turn')
+  })
+
+  it('displays total tokens', () => {
+    printSessionSummary({
+      turns: 5,
+      totalInputTokens: 10000,
+      totalOutputTokens: 5000,
+      durationMs: 45000,
+      model: 'claude-opus-4',
+    })
+
+    const output = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(output).toContain('15')  // 10K + 5K
+    expect(output).toContain('token')
+  })
+
+  it('displays duration in seconds', () => {
+    printSessionSummary({
+      turns: 5,
+      totalInputTokens: 10000,
+      totalOutputTokens: 5000,
+      durationMs: 45000,
+      model: 'claude-opus-4',
+    })
+
+    const output = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(output).toContain('45')
+    expect(output).toContain('s')
+  })
+
+  it('displays cost when > 0', () => {
+    printSessionSummary({
+      turns: 5,
+      totalInputTokens: 100000,  // expensive
+      totalOutputTokens: 50000,
+      durationMs: 45000,
+      model: 'claude-opus-4',
+    })
+
+    const output = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(output).toContain('$')
+  })
+
+  it('skips output when turns = 0', () => {
+    logSpy.mockClear()
+
+    printSessionSummary({
+      turns: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      durationMs: 0,
+      model: 'claude-opus-4',
+    })
+
+    expect(logSpy).not.toHaveBeenCalled()
+  })
+
+  it('renders horizontally aligned box', () => {
+    printSessionSummary({
+      turns: 5,
+      totalInputTokens: 10000,
+      totalOutputTokens: 5000,
+      durationMs: 45000,
+      model: 'claude-opus-4',
+    })
+
+    const lines = logSpy.mock.calls.map(c => String(c[0]))
+    // Should have top border, content, bottom border
+    expect(lines.length).toBeGreaterThanOrEqual(3)
+
+    const topLine = lines.find(l => l.includes('╭'))
+    const bottomLine = lines.find(l => l.includes('╰'))
+
+    expect(topLine).toBeDefined()
+    expect(bottomLine).toBeDefined()
   })
 })
