@@ -489,6 +489,11 @@ export function printStatusLine(info: StatusLineInfo): void {
   // Single compact line:
   //   model  ██████ 42%  yolo  (main)  $0.12
   console.log(`  \x1b[1;37m${modelShort}\x1b[0m  ${bar} \x1b[90m${pct}%\x1b[0m  ${modeColor}${info.mode}\x1b[0m  ${gitPart}${costPart ? `\x1b[90m${costPart}\x1b[0m` : ''}`)
+
+  // Input area top border — light dotted line to visually frame the prompt
+  const cols = process.stdout.columns || 80
+  const borderWidth = Math.min(cols - 4, 72)
+  console.log(`\x1b[90m  ${'·'.repeat(borderWidth)}\x1b[0m`)
 }
 
 // ── Progress Indicator ──────────────────────────────────────────────

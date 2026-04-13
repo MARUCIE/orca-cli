@@ -489,9 +489,9 @@ describe('printStatusLine - Status Display', () => {
       cwd: '/Users/test/project',
     })
 
-    expect(logSpy).toHaveBeenCalledTimes(1)
+    expect(logSpy).toHaveBeenCalledTimes(2) // status line + input border
     const output = String(logSpy.mock.calls[0][0])
-    // Single line should not have multiple console.log calls
+    // First call is the status line, second is the input area border
     expect(output.split('\n').length).toBe(1)
   })
 
