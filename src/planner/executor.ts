@@ -102,7 +102,7 @@ export async function executePlan(
           // Check doneCriteria if present
           if (nextMain.doneCriteria) {
             const criteria = parseDoneCriteria(nextMain.doneCriteria)
-            const check = evaluateCriteria(criteria, result.output, config.cwd)
+            const check = await evaluateCriteria(criteria, result.output, config.cwd)
             if (check.passed) {
               tracker.markDone(nextMain.id, result.output, result.durationMs, result.tokensUsed)
             } else {
@@ -198,7 +198,7 @@ async function executeTaskAsync(
       // Check doneCriteria if present
       if (task.doneCriteria) {
         const criteria = parseDoneCriteria(task.doneCriteria)
-        const check = evaluateCriteria(criteria, result.output, config.cwd)
+        const check = await evaluateCriteria(criteria, result.output, config.cwd)
         if (check.passed) {
           tracker.markDone(task.id, result.output, result.duration, result.tokensUsed)
         } else {

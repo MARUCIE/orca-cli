@@ -864,7 +864,7 @@
       <tr><td>文件引用扩展</td><td><strong>Yes</strong></td><td><strong>Yes</strong></td><td>--</td><td><strong>裸路径 + file:/// + stdin pipe + 嵌入路径</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
       <tr><td>Mission 多步自治</td><td>Sub-agents</td><td>Tasks</td><td><strong>Droid</strong></td><td><strong>Mission Mode</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
       <tr><td>并发任务执行</td><td>--</td><td>--</td><td>Worker Pool</td><td><strong>executePlan()</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
-      <tr><td>目标循环</td><td>--</td><td>Loop</td><td>Droid Loop</td><td><strong>runGoalLoop</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
+      <tr><td>目标循环</td><td>--</td><td>Loop</td><td>Droid Loop</td><td><strong>runGoalLoop（regex + cmd + LLM judge）</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
       <tr><td>验证契约优先</td><td>--</td><td>--</td><td><strong>Yes</strong></td><td><strong>Yes</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
       <tr><td>Hook 系统</td><td><strong>Yes</strong></td><td>--</td><td>--</td><td><strong>8 events</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
       <tr><td>Git Worktree 隔离</td><td><strong>Yes</strong></td><td>--</td><td>Yes</td><td><strong>WorktreeManager + Mission</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
@@ -905,12 +905,12 @@
   <table>
     <thead><tr><th>发现</th><th>严重度</th><th>状态</th><th>说明</th></tr></thead>
     <tbody>
-      <tr><td>Goal-Loop LLM judge 未实现</td><td>中</td><td>已记录</td><td>goal-loop.ts:134-136，judge criterion 返回 "not yet implemented"，regex/command 正常</td></tr>
-      <tr><td>Mission validation contract 可为空</td><td>低</td><td>已记录</td><td>LLM 未返回结构化 JSON 时，buildDefaultContract() 创建空 contract，验证空转通过</td></tr>
-      <tr><td>Worktree cleanup 静默吞错</td><td>低</td><td>已记录</td><td>git worktree remove 和 branch -d 错误被 catch 忽略，可能残留孤立分支</td></tr>
-      <tr><td>413 检测靠字符串匹配</td><td>低</td><td>可接受</td><td>检测 "413" / "context_length" / "too large"，未检查 HTTP status code</td></tr>
+      <tr><td>Goal-Loop LLM judge 未实现</td><td>中</td><td><span class="badge badge-green">已修复</span></td><td>evaluateCriteria 现为 async，judge criterion 调用 chatOnce 做 PASS/FAIL 判定</td></tr>
+      <tr><td>Mission validation contract 可为空</td><td>低</td><td><span class="badge badge-green">已修复</span></td><td>buildDefaultContract 现从 feature.files 自动生成 file_exists criteria，避免空转</td></tr>
+      <tr><td>Worktree cleanup 静默吞错</td><td>低</td><td><span class="badge badge-green">已修复</span></td><td>cleanup() 返回 { warnings: string[] }，调用方可记录或展示</td></tr>
+      <tr><td>413 检测靠字符串匹配</td><td>低</td><td><span class="badge badge-green">已修复</span></td><td>新增 err.status / err.statusCode === 413 检查，兼容所有 provider 错误格式</td></tr>
       <tr><td>LEAD 1-7 实现</td><td>--</td><td><span class="badge badge-green">全部 REAL</span></td><td>无 stub，无假实现，全部可执行</td></tr>
-      <tr><td>Parity 1-9 实现</td><td>--</td><td><span class="badge badge-green">8 REAL + 1 PARTIAL</span></td><td>Goal-loop LLM judge 为唯一 partial（2/3 criterion type 正常）</td></tr>
+      <tr><td>Parity 1-9 实现</td><td>--</td><td><span class="badge badge-green">全部 REAL</span></td><td>审计发现的唯一 partial（judge stub）已修复为完整实现</td></tr>
     </tbody>
   </table>
 

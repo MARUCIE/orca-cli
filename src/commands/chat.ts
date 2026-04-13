@@ -1295,8 +1295,10 @@ async function runREPL(
       progress.stop()
       if (!abortController.signal.aborted) {
         const errMsg = err instanceof Error ? err.message : String(err)
+        const errStatus = (err as { status?: number; statusCode?: number })?.status
+          ?? (err as { status?: number; statusCode?: number })?.statusCode
         // Auto-recover from 413 (context too large): compact and retry
-        if (errMsg.includes('413') || errMsg.includes('context_length') || errMsg.includes('too large')) {
+        if (errStatus === 413 || errMsg.includes('413') || errMsg.includes('context_length') || errMsg.includes('too large')) {
           process.stderr.write(`\x1b[33m  [auto-recovery] context overflow — compacting and retrying...\x1b[0m\n`)
           const compact = tokenBudget.smartCompact(history, 1)
           if (compact.dropped > 0 || compact.tokensFreed > 0) {

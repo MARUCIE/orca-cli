@@ -448,7 +448,7 @@ src/
 | Context protection (nuclear) | Auto-compact | Unknown | Unknown | No | Unknown | **4-layer + nuclear** | **LEAD** |
 | 413 auto-recovery | No | Unknown | Unknown | No | Unknown | **Auto-compact + retry** | **LEAD** |
 | Cognitive skeleton (hook) | No | No | No | No | No | **9 scenarios** | **LEAD** |
-| Goal-loop (done-when) | No | Codex loop | No | No | Droid loop | **runGoalLoop** | Parity |
+| Goal-loop (done-when) | No | Codex loop | No | No | Droid loop | **runGoalLoop (regex+cmd+judge)** | Parity |
 | Validation contract first | No | No | No | No | **Yes** | **Yes** | Parity |
 | Knowledge management | Memory | No | No | No | No | **Notes/Postmortem/Prompts/Learn** | **LEAD** |
 | Git worktree isolation | **Yes** | No | No | No | Yes | **WorktreeManager + Mission** | Parity |
@@ -496,6 +496,10 @@ src/
 | v0.8.0 1077 tests | DONE | 53 files, all passing (post-audit: +162 tests for preprocess, file expansion, goal-loop) |
 | v0.8.0 Universal file preprocessing | DONE | L0 detect (70+ ext) → L1 convert (markitdown/pandoc/ffmpeg) → L2 smart truncate |
 | v0.8.0 File reference expansion | DONE | bare path + file:///URL + stdin pipe + embedded path detection (Claude Code/Codex parity) |
+| v0.8.0 Audit fix: LLM judge | DONE | goal-loop judge criterion now calls chatOnce for PASS/FAIL evaluation |
+| v0.8.0 Audit fix: auto-contract | DONE | empty validation contract auto-generates file_exists criteria from feature files |
+| v0.8.0 Audit fix: worktree warnings | DONE | cleanup() returns warnings instead of silently swallowing errors |
+| v0.8.0 Audit fix: 413 status check | DONE | checks err.status/statusCode property in addition to string matching |
 
 ---
 

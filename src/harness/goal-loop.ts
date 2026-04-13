@@ -14,6 +14,7 @@
 
 import { execSync } from 'node:child_process'
 import { LoopDetector } from './loop-detector.js'
+import { chatOnce } from '../providers/openai-compat.js'
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -32,6 +33,8 @@ export interface GoalLoopConfig {
   doneCriteria: DoneCriteria
   /** Working directory for command execution */
   cwd: string
+  /** API options — required for 'judge' criteria type */
+  apiOptions?: { apiKey: string; baseURL: string; model: string }
   /** Callback for each iteration start */
   onIterationStart?: (iteration: number, maxIterations: number) => void
   /** Callback for each iteration result */
@@ -98,12 +101,16 @@ export function parseDoneCriteria(input: string): DoneCriteria {
 /**
  * Check if done criteria is satisfied.
  * Returns { passed: true/false, output: string }
+ *
+ * For 'judge' type: requires apiOptions. Asks an LLM to evaluate whether
+ * the agent output satisfies the criteria. Expects "PASS" or "FAIL" in response.
  */
-export function evaluateCriteria(
+export async function evaluateCriteria(
   criteria: DoneCriteria,
   agentOutput: string,
   cwd: string,
-): { passed: boolean; output: string } {
+  apiOptions?: { apiKey: string; baseURL: string; model: string },
+): Promise<{ passed: boolean; output: string }> {
   switch (criteria.type) {
     case 'regex': {
       try {
@@ -131,9 +138,31 @@ export function evaluateCriteria(
       }
     }
 
-    case 'judge':
-      // LLM-judge would require an API call — deferred to future implementation
-      return { passed: false, output: 'LLM-judge not yet implemented' }
+    case 'judge': {
+      if (!apiOptions) {
+        return { passed: false, output: 'Judge criteria requires apiOptions (apiKey, baseURL, model)' }
+      }
+      try {
+        const judgePrompt = `You are a strict pass/fail judge. Evaluate whether the following agent output satisfies the criteria.
+
+Criteria: ${criteria.value}
+
+Agent output (last 2000 chars):
+${agentOutput.slice(-2000)}
+
+Respond with exactly one word on the first line: PASS or FAIL
+Then a brief explanation on the next line.`
+        const result = await chatOnce(
+          { apiKey: apiOptions.apiKey, baseURL: apiOptions.baseURL, model: apiOptions.model, systemPrompt: 'You are a binary pass/fail judge. Be strict.' },
+          judgePrompt,
+        )
+        const firstLine = result.text.trim().split('\n')[0]!.trim().toUpperCase()
+        const passed = firstLine === 'PASS'
+        return { passed, output: `Judge: ${result.text.trim().slice(0, 300)}` }
+      } catch (err) {
+        return { passed: false, output: `Judge error: ${err instanceof Error ? err.message : String(err)}` }
+      }
+    }
   }
 }
 
@@ -165,7 +194,7 @@ export async function runGoalLoop(
       lastOutput = agentOutput
 
       // Check done criteria
-      const check = evaluateCriteria(config.doneCriteria, agentOutput, config.cwd)
+      const check = await evaluateCriteria(config.doneCriteria, agentOutput, config.cwd, config.apiOptions)
       config.onIterationDone?.(i, check.passed, check.output)
 
       if (check.passed) {

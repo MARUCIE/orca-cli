@@ -487,7 +487,7 @@ function evaluateCriterion(
  * Falls back to heuristic extraction if structured output fails.
  */
 function parsePlanResponse(text: string, missionId: string): MissionPlan {
-  const contract = extractJsonBlock<ValidationContract>(text, 'contract') || buildDefaultContract(missionId)
+  let contract = extractJsonBlock<ValidationContract>(text, 'contract')
   const rawMilestones = extractJsonBlock<Array<{ title: string; featureIds?: string[] }>>(text, 'milestones') || []
   const rawFeatures = extractJsonBlock<Array<{
     title: string; spec: string; criteriaIds?: string[];
@@ -496,6 +496,7 @@ function parsePlanResponse(text: string, missionId: string): MissionPlan {
 
   // If structured extraction failed, try to parse from plain text
   if (rawMilestones.length === 0 && rawFeatures.length === 0) {
+    if (!contract) contract = buildDefaultContract(missionId)
     return buildFallbackPlan(text, missionId, contract)
   }
 
@@ -510,6 +511,18 @@ function parsePlanResponse(text: string, missionId: string): MissionPlan {
     attempts: 0,
     files: rf.files,
   }))
+
+  // Build default contract with auto-generated criteria from features if LLM didn't provide one
+  if (!contract) {
+    contract = buildDefaultContract(missionId, features)
+    // Link auto-generated criteria IDs to features
+    for (const criterion of contract.criteria) {
+      const matchingFeature = features.find(f => f.files?.includes(criterion.value))
+      if (matchingFeature && !matchingFeature.criteriaIds.includes(criterion.id)) {
+        matchingFeature.criteriaIds.push(criterion.id)
+      }
+    }
+  }
 
   // Build milestones
   const milestones: Milestone[] = rawMilestones.map((rm, i) => ({
@@ -575,11 +588,31 @@ function extractJsonBlock<T>(text: string, label: string): T | null {
   return null
 }
 
-/** Build a default contract when the orchestrator doesn't produce structured output */
-function buildDefaultContract(missionId: string): ValidationContract {
+/** Build a default contract when the orchestrator doesn't produce structured output.
+ *  Auto-generates file_exists criteria from feature file lists to prevent vacuous validation. */
+function buildDefaultContract(missionId: string, features?: Feature[]): ValidationContract {
+  const criteria: AcceptanceCriterion[] = []
+
+  // Auto-generate file_exists criteria from feature files
+  if (features && features.length > 0) {
+    for (const feature of features) {
+      if (feature.files) {
+        for (const file of feature.files) {
+          criteria.push({
+            id: `auto-${criteria.length + 1}`,
+            description: `File exists: ${file}`,
+            type: 'file_exists',
+            value: file,
+            milestoneId: feature.milestoneId,
+          })
+        }
+      }
+    }
+  }
+
   return {
     version: 1,
-    criteria: [],
+    criteria,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }

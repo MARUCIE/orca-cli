@@ -77,9 +77,10 @@ export class WorktreeManager {
   }
 
   /** Clean up a worktree (remove the worktree and delete the branch). */
-  cleanup(agentId: string, cwd: string): void {
+  cleanup(agentId: string, cwd: string): { warnings: string[] } {
+    const warnings: string[] = []
     const agent = this.agents.get(agentId)
-    if (!agent) return
+    if (!agent) return { warnings }
 
     try {
       execSync(`git worktree remove "${agent.worktreePath}"`, {
@@ -87,8 +88,11 @@ export class WorktreeManager {
         encoding: 'utf-8',
         stdio: 'pipe',
       })
-    } catch {
-      // worktree may already be removed
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (!msg.includes('is not a working tree')) {
+        warnings.push(`worktree remove failed for ${agentId}: ${msg.slice(0, 200)}`)
+      }
     }
 
     try {
@@ -97,11 +101,15 @@ export class WorktreeManager {
         encoding: 'utf-8',
         stdio: 'pipe',
       })
-    } catch {
-      // branch may already be deleted
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (!msg.includes('not found')) {
+        warnings.push(`branch delete failed for ${agent.branch}: ${msg.slice(0, 200)}`)
+      }
     }
 
     this.agents.delete(agentId)
+    return { warnings }
   }
 
   /** List all active agent worktrees. */

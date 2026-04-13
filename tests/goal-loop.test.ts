@@ -54,28 +54,28 @@ describe('parseDoneCriteria: natural language → structured criteria', () => {
 // ── 2. Criteria Evaluation ───────────────────────────────────────
 
 describe('evaluateCriteria: check conditions', () => {
-  it('30.7 regex matches in agent output', () => {
+  it('30.7 regex matches in agent output', async () => {
     const criteria: DoneCriteria = { type: 'regex', value: 'all.*passed' }
-    const result = evaluateCriteria(criteria, 'Output: all 5 tests passed!', '/tmp')
+    const result = await evaluateCriteria(criteria, 'Output: all 5 tests passed!', '/tmp')
     expect(result.passed).toBe(true)
   })
 
-  it('30.8 regex does not match', () => {
+  it('30.8 regex does not match', async () => {
     const criteria: DoneCriteria = { type: 'regex', value: 'PASS' }
-    const result = evaluateCriteria(criteria, 'All tests FAILED', '/tmp')
+    const result = await evaluateCriteria(criteria, 'All tests FAILED', '/tmp')
     expect(result.passed).toBe(false)
   })
 
-  it('30.9 command succeeds (echo exits 0)', () => {
+  it('30.9 command succeeds (echo exits 0)', async () => {
     const criteria: DoneCriteria = { type: 'command', value: 'echo ok' }
-    const result = evaluateCriteria(criteria, '', '/tmp')
+    const result = await evaluateCriteria(criteria, '', '/tmp')
     expect(result.passed).toBe(true)
     expect(result.output).toContain('ok')
   })
 
-  it('30.10 command fails (false exits 1)', () => {
+  it('30.10 command fails (false exits 1)', async () => {
     const criteria: DoneCriteria = { type: 'command', value: 'false' }
-    const result = evaluateCriteria(criteria, '', '/tmp')
+    const result = await evaluateCriteria(criteria, '', '/tmp')
     expect(result.passed).toBe(false)
   })
 })
@@ -205,43 +205,43 @@ describe('parseDoneCriteria - edge cases', () => {
 })
 
 describe('evaluateCriteria - edge cases', () => {
-  it('regex with special characters in pattern', () => {
+  it('regex with special characters in pattern', async () => {
     const criteria: DoneCriteria = { type: 'regex', value: '\\d+ tests? passed' }
-    const result = evaluateCriteria(criteria, '42 tests passed', '/tmp')
+    const result = await evaluateCriteria(criteria, '42 tests passed', '/tmp')
     expect(result.passed).toBe(true)
   })
 
-  it('regex is case insensitive (flag i)', () => {
+  it('regex is case insensitive (flag i)', async () => {
     const criteria: DoneCriteria = { type: 'regex', value: 'pass' }
-    const result = evaluateCriteria(criteria, 'PASS', '/tmp')
+    const result = await evaluateCriteria(criteria, 'PASS', '/tmp')
     expect(result.passed).toBe(true)
   })
 
-  it('invalid regex returns graceful error', () => {
+  it('invalid regex returns graceful error', async () => {
     const criteria: DoneCriteria = { type: 'regex', value: '[unclosed(' }
-    const result = evaluateCriteria(criteria, 'test', '/tmp')
+    const result = await evaluateCriteria(criteria, 'test', '/tmp')
     expect(result.passed).toBe(false)
     expect(result.output).toContain('Invalid regex')
   })
 
-  it('command captures stdout on success', () => {
+  it('command captures stdout on success', async () => {
     const criteria: DoneCriteria = { type: 'command', value: 'echo "hello world"' }
-    const result = evaluateCriteria(criteria, '', '/tmp')
+    const result = await evaluateCriteria(criteria, '', '/tmp')
     expect(result.passed).toBe(true)
     expect(result.output).toContain('hello world')
   })
 
-  it('command truncates long output', () => {
+  it('command truncates long output', async () => {
     const criteria: DoneCriteria = { type: 'command', value: `printf '${'X'.repeat(600)}'` }
-    const result = evaluateCriteria(criteria, '', '/tmp')
+    const result = await evaluateCriteria(criteria, '', '/tmp')
     expect(result.output.length).toBeLessThanOrEqual(500)
   })
 
-  it('judge type is explicitly not implemented', () => {
+  it('judge without apiOptions returns clear error', async () => {
     const criteria: DoneCriteria = { type: 'judge', value: 'Is the code correct?' }
-    const result = evaluateCriteria(criteria, 'some output', '/tmp')
+    const result = await evaluateCriteria(criteria, 'some output', '/tmp')
     expect(result.passed).toBe(false)
-    expect(result.output).toContain('not yet implemented')
+    expect(result.output).toContain('requires apiOptions')
   })
 })
 
