@@ -951,17 +951,23 @@ async function runREPL(
       process.stderr.write(`\x1b[90m  [cognitive] ${cogMatch.scenario}: ${cogMatch.models.map(m => m.name).join(', ')}\x1b[0m\n`)
     }
 
-    // Pre-send context guard: compact BEFORE API call if too large
+    // Pre-send context guard: compact BEFORE API call if context is growing
     const preBudget = tokenBudget.getBudget(history)
-    if (preBudget.utilizationPct >= 75) {
-      const compactResult = tokenBudget.smartCompact(history)
-      if (compactResult.dropped > 0) {
-        process.stderr.write(`\x1b[33m  [auto-compact] ${compactResult.summary}\x1b[0m\n`)
+    if (preBudget.utilizationPct >= 50) {
+      // Choose aggressiveness based on severity
+      const keepTurns = preBudget.utilizationPct >= 80 ? 1 : 2
+      const compactResult = tokenBudget.smartCompact(history, keepTurns)
+      if (compactResult.dropped > 0 || compactResult.tokensFreed > 0) {
+        process.stderr.write(`\x1b[33m  [pre-send compact] ${compactResult.summary}\x1b[0m\n`)
       }
-      // If still over 90% after compact, warn but try anyway
+      // If still over 80% after compact, try nuclear
       const postBudget = tokenBudget.getBudget(history)
-      if (postBudget.utilizationPct >= 90) {
-        process.stderr.write(`\x1b[31m  [warn] context still at ${postBudget.utilizationPct}% after compact — API call may fail\x1b[0m\n`)
+      if (postBudget.utilizationPct >= 80) {
+        const nuclear = tokenBudget.smartCompact(history, 0)
+        if (nuclear.dropped > 0 || nuclear.tokensFreed > 0) {
+          process.stderr.write(`\x1b[31m  [nuclear compact] ${nuclear.summary}\x1b[0m\n`)
+        }
+        tokenBudget.reset()
       }
     }
 
@@ -1113,20 +1119,27 @@ async function runREPL(
 
     if (budget.risk === 'red') {
       hooks.run('PreCompact', { event: 'PreCompact', cwd })
+      // RED: use nuclear compact (keep only system + last user msg)
       const result = tokenBudget.smartCompact(history, 1)
       hooks.run('PostCompact', { event: 'PostCompact', cwd })
-      console.log(`\x1b[31m  auto-compact (${budget.utilizationPct}% · ${msgCount} msgs): ${result.summary}\x1b[0m`)
+      console.log(`\x1b[31m  auto-compact (${budget.utilizationPct}%): ${result.summary}\x1b[0m`)
+      tokenBudget.reset()
       retryTracker.cleanup()
+      // Auto-save session for recovery
+      autoSaveSession(currentModel, history, stats)
+      console.log(`\x1b[90m  session auto-saved. Context freed — continuing.\x1b[0m`)
     } else if (budget.risk === 'orange') {
+      hooks.run('PreCompact', { event: 'PreCompact', cwd })
+      const result = tokenBudget.smartCompact(history, 1)
+      hooks.run('PostCompact', { event: 'PostCompact', cwd })
+      console.log(`\x1b[33m  auto-compact (${budget.utilizationPct}%): ${result.summary}\x1b[0m`)
+    } else if (budget.risk === 'yellow') {
       hooks.run('PreCompact', { event: 'PreCompact', cwd })
       const result = tokenBudget.smartCompact(history, 2)
       hooks.run('PostCompact', { event: 'PostCompact', cwd })
-      console.log(`\x1b[33m  auto-compact (${budget.utilizationPct}% · ${msgCount} msgs): ${result.summary}\x1b[0m`)
-    } else if (budget.risk === 'yellow') {
-      console.log(`\x1b[33m  context: ${budget.utilizationPct}% · ${msgCount} msgs — /compact to free space\x1b[0m`)
-    } else if (msgCount >= 6) {
-      // Show context info after first few turns so user knows the system is tracking
-      console.log(`\x1b[90m  context: ${budget.utilizationPct}% · ${msgCount} msgs · auto-compact at 40%\x1b[0m`)
+      if (result.dropped > 0 || result.tokensFreed > 0) {
+        console.log(`\x1b[33m  auto-compact (${budget.utilizationPct}%): ${result.summary}\x1b[0m`)
+      }
     }
 
     } catch (turnErr) {

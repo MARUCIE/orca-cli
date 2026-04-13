@@ -179,20 +179,63 @@ export class TokenBudgetManager {
    * @returns Summary of what was compacted
    */
   smartCompact(history: ChatMessage[], keepTurns = 2): CompactionResult {
+    const contextWindow = getContextWindow(this.model)
+    const totalChars = history.reduce((sum, m) => sum + m.content.length, 0)
+    const estimatedPct = Math.round((estimateTokens(history.map(m => m.content).join('')) / contextWindow) * 100)
+
+    // ── NUCLEAR MODE: >100% utilization — emergency purge ──────────
+    // Keep ONLY the system prompt (truncated) + last user message.
+    // This is the only way to recover from massive context overflow.
+    if (estimatedPct > 100 || this.lastInputTokens > contextWindow * 0.9) {
+      const sysMsg = history.find(m => m.role === 'system')
+      const lastUser = [...history].reverse().find(m => m.role === 'user')
+      const droppedCount = history.length - (sysMsg ? 1 : 0) - (lastUser ? 1 : 0)
+      const freedChars = totalChars
+
+      // Truncate system prompt aggressively (keep first 1500 chars)
+      if (sysMsg && sysMsg.content.length > 1500) {
+        sysMsg.content = sysMsg.content.slice(0, 1500) + '\n[system truncated for recovery]'
+      }
+
+      // Truncate last user message if huge
+      if (lastUser && lastUser.content.length > 1000) {
+        lastUser.content = lastUser.content.slice(0, 1000) + '\n[truncated]'
+      }
+
+      history.length = 0
+      if (sysMsg) history.push(sysMsg)
+      if (lastUser) history.push(lastUser)
+
+      const tokensFreed = estimateTokens(String(freedChars))
+      return {
+        dropped: droppedCount,
+        kept: history.length,
+        tokensFreed,
+        summary: `NUCLEAR: dropped ${droppedCount} msgs, freed ~${tokensFreed} tokens. Kept system + last user msg.`,
+      }
+    }
+
+    // ── NORMAL COMPACT ─────────────────────────────────────────────
     const sysMsg = history.find(m => m.role === 'system')
     const convMsgs = history.filter(m => m.role !== 'system')
 
+    // Force truncation on ALL messages if few messages but large content
     if (convMsgs.length <= keepTurns * 2) {
-      // Even with few messages, truncate any that are too large (>2000 chars)
       let truncated = 0
+      let freedTokens = 0
       for (const msg of history) {
-        if (msg.content.length > 2000 && msg.role !== 'system') {
+        if (msg.role === 'system' && msg.content.length > 3000) {
+          freedTokens += estimateTokens(msg.content.slice(2000))
+          msg.content = msg.content.slice(0, 2000) + '\n[system truncated]'
+          truncated++
+        } else if (msg.content.length > 1000 && msg.role !== 'system') {
+          freedTokens += estimateTokens(msg.content.slice(200))
           msg.content = msg.content.slice(0, 200) + '\n[truncated: ' + estimateTokens(msg.content) + ' tokens]'
           truncated++
         }
       }
       if (truncated > 0) {
-        return { dropped: 0, kept: history.length, tokensFreed: truncated * 500, summary: `Truncated ${truncated} large messages.` }
+        return { dropped: 0, kept: history.length, tokensFreed: freedTokens, summary: `Truncated ${truncated} large messages, freed ~${freedTokens} tokens.` }
       }
       return { dropped: 0, kept: history.length, tokensFreed: 0, summary: 'Nothing to compact.' }
     }
@@ -200,47 +243,44 @@ export class TokenBudgetManager {
     const recentMsgs = convMsgs.slice(-keepTurns * 2)
     const olderMsgs = convMsgs.slice(0, -keepTurns * 2)
 
-    // Drop ALL older messages — no decision-keeping threshold
-    // (Previous 200-char threshold kept almost everything, causing 413 errors)
-    const droppedMsgs = olderMsgs
+    // Drop ALL older messages
+    const droppedMsgs = [...olderMsgs]
     const keptDecisions: ChatMessage[] = []
 
-    // Among older messages, only keep genuinely tiny decision summaries (<100 chars)
+    // Among older messages, only keep genuinely tiny summaries (<100 chars, max 3)
     for (let i = olderMsgs.length - 1; i >= 0; i--) {
       const msg = olderMsgs[i]!
       if (msg.content.length < 100 && keptDecisions.length < 3) {
         keptDecisions.push(msg)
-        droppedMsgs.splice(droppedMsgs.indexOf(msg), 1)
+        const idx = droppedMsgs.indexOf(msg)
+        if (idx >= 0) droppedMsgs.splice(idx, 1)
       }
     }
 
-    // Rebuild history
-    const droppedChars = droppedMsgs.reduce((sum, m) => sum + m.content.length, 0)
     const tokensFreed = estimateTokens(droppedMsgs.map(m => m.content).join(''))
 
-    // Create summary of dropped content
     const droppedRoles = droppedMsgs.reduce((acc, m) => {
       acc[m.role] = (acc[m.role] || 0) + 1
       return acc
     }, {} as Record<string, number>)
     const summaryParts = Object.entries(droppedRoles).map(([role, count]) => `${count} ${role}`)
 
-    // Truncate large recent messages (>2000 chars) to prevent context overflow
+    // Truncate large recent messages
     for (const msg of recentMsgs) {
       if (msg.content.length > 2000) {
         msg.content = msg.content.slice(0, 500) + '\n[truncated: original ' + msg.content.length + ' chars]'
       }
     }
 
-    // Truncate system prompt if huge (>4000 chars, keep first 2000)
+    // Truncate system prompt if huge
     if (sysMsg && sysMsg.content.length > 4000) {
-      sysMsg.content = sysMsg.content.slice(0, 2000) + '\n[system prompt truncated for context management]'
+      sysMsg.content = sysMsg.content.slice(0, 2000) + '\n[system prompt truncated]'
     }
 
     history.length = 0
     if (sysMsg) history.push(sysMsg)
     if (keptDecisions.length > 0) {
-      history.push({ role: 'assistant', content: `[compacted: kept ${keptDecisions.length} key decisions]\n${keptDecisions.map(m => m.content.slice(0, 100)).join('\n')}` })
+      history.push({ role: 'assistant', content: `[compacted: ${keptDecisions.length} decisions]\n${keptDecisions.map(m => m.content.slice(0, 100)).join('\n')}` })
     }
     history.push(...recentMsgs)
 
