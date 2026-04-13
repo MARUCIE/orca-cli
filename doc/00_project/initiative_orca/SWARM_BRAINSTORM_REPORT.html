@@ -85,12 +85,12 @@
 <div class="header">
   <div class="header-inner">
     <h1>Orca 生态系统 SOTA 差距分析</h1>
-    <div class="subtitle">蜂群头脑风暴报告 -- v0.3.0 基线 → v0.7.1 全量闭合（含知识管理 + 上下文保护 + 目标循环）</div>
+    <div class="subtitle">蜂群头脑风暴报告 -- v0.3.0 基线 → v0.8.0（含 Mission Mode + Task Planner + Nuclear Compact）</div>
     <div class="meta-row">
-      <span>v0.3.0 基线 → v0.7.1 现状</span>
+      <span>v0.3.0 基线 → v0.8.0 现状</span>
       <span>2026-04-12 ~ 2026-04-13</span>
-      <span>对标: AI-Fleet / Claude Code / Codex / Amp / KiloCode / Hermes</span>
-      <span>732 测试 · 70 源码文件 · 21K LOC</span>
+      <span>对标: AI-Fleet / Claude Code / Codex / Amp / KiloCode / Hermes / Factory Droid</span>
+      <span>915 测试 · 50 文件 · 16.7K LOC · 14 模块</span>
     </div>
   </div>
 </div>
@@ -100,25 +100,25 @@
   <h2>概要结论</h2>
   <div class="exec-summary">
     <p><strong>v0.3.0 基线</strong>：Orca CLI 拥有扎实基础（41 个工具、10 个钩子事件、多模型 council/race/pipeline、493 个测试用例），但对标 SOTA 级编码代理在 6 个关键维度存在结构性差距。</p>
-    <p><strong>v0.7.1 现状</strong>：经过 7 轮迭代，<strong>全部 SOTA 差距已关闭</strong>。新增核心差异化：知识管理体系（4 模块）、上下文三层保护、认知骨架（9 场景）、目标循环交付、多模型路由修复。生产就绪度 <strong>95%+</strong>。</p>
+    <p><strong>v0.8.0 现状</strong>：经过 9 轮迭代，原有 SOTA 差距全部关闭，并在 <strong>6 个维度建立差异化领先</strong>：Mission Mode（Droid 架构）、Task Planner（自动拆分+并发）、Nuclear Compact（核弹级上下文保护）、认知骨架、知识管理、CJK 感知。剩余 4 个 GAP 待 v0.9.0 关闭。</p>
   </div>
 
   <div class="metric-grid">
     <div class="metric-card">
-      <div class="value" style="color: var(--success);">95%+</div>
-      <div class="label">生产就绪度（v0.3.0: 70-75%）</div>
-    </div>
-    <div class="metric-card">
-      <div class="value" style="color: var(--success);">0</div>
-      <div class="label">SOTA 差距（全部关闭）</div>
-    </div>
-    <div class="metric-card">
-      <div class="value">732</div>
-      <div class="label">测试用例（v0.3.0: 493）</div>
-    </div>
-    <div class="metric-card">
-      <div class="value">v0.7.1</div>
+      <div class="value" style="color: var(--success);">v0.8.0</div>
       <div class="label">当前版本</div>
+    </div>
+    <div class="metric-card">
+      <div class="value" style="color: var(--success);">6</div>
+      <div class="label">领先维度</div>
+    </div>
+    <div class="metric-card">
+      <div class="value" style="color: var(--warning);">4</div>
+      <div class="label">待追赶 GAP</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">915</div>
+      <div class="label">测试用例（v0.3.0: 493）</div>
     </div>
   </div>
 
@@ -763,32 +763,165 @@
     </tbody>
   </table>
 
-  <h3>累计进度（v0.3.0 -> v0.7.0）</h3>
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- v0.8.0 新增（2026-04-13）                              -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <h2>v0.8.0 新增：Mission Mode + Task Planner + Nuclear Compact</h2>
+
+  <div class="exec-summary">
+    <p>v0.8.0 是架构跃迁版本：从"单任务 Agent"升级为"多目标并发编排器"。核心新增 3 个模块：<strong>Mission Mode</strong>（Droid 三层架构）、<strong>Task Planner</strong>（自动拆分+并发执行+可视化清单）、<strong>Nuclear Compact</strong>（核弹级上下文恢复）。同时完成 UI/UX 系统性打磨。</p>
+  </div>
+
+  <h3>Mission Mode（src/mission/）</h3>
+  <p>灵感来源：Factory.ai Droid Missions 架构。Orchestrator / Worker / Validator 三层分离，验证契约优先。</p>
+  <table>
+    <thead><tr><th>组件</th><th>职责</th><th>实现方式</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Orchestrator</strong></td><td>分解目标为 Milestone → Feature，生成 ValidationContract</td><td>chatOnce 调用 LLM，输出结构化 JSON blocks</td></tr>
+      <tr><td><strong>Worker</strong></td><td>实现单个 Feature（每次获得全新上下文）</td><td>spawnSubAgent fork 隔离进程，DELEGATE_TOOLS</td></tr>
+      <tr><td><strong>Validator</strong></td><td>独立验证 — 对照契约，不对照实现</td><td>evaluateCriterion: command / regex / file_exists</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size: 13px; color: var(--gray-500);">关键设计：ValidationContract 在 Feature 分解之前生成（防止 implementation bias）；每个 Worker 获得独立上下文（防止 context rot）；Validator 不看实现代码（防止 self-evaluation bias）。</p>
+  <p>入口：<code>/mission &lt;goal&gt;</code>（REPL 交互式）/ <code>orca run --mission &lt;goal&gt;</code>（headless）</p>
+
+  <h3>Task Planner（src/planner/）</h3>
+  <p>核心 SOTA 差异化：用户输入一段包含多个任务的提示词，系统自动拆分为主线（顺序）+ 支线（并发）任务清单。</p>
+  <table>
+    <thead><tr><th>模块</th><th>功能</th><th>亮点</th></tr></thead>
+    <tbody>
+      <tr><td><strong>decomposer</strong></td><td>提示词 → TaskPlan 拆分</td><td>LLM 分解 + 启发式 fallback（编号列表 / bullet / 中文分号 / 英文连词）</td></tr>
+      <tr><td><strong>tracker</strong></td><td>可视化待办清单 + 状态生命周期</td><td>Box-drawing 清单，每完成一个回到清单标记 ✓</td></tr>
+      <tr><td><strong>executor</strong></td><td>并发执行引擎</td><td>main 顺序 + side 并发（spawnSubAgent，最大 3 并发）</td></tr>
+    </tbody>
+  </table>
+  <p>自动检测：<code>isMultiTaskPrompt()</code> 在 REPL 输入时自动识别多任务提示词，提示用户 <code>/plan</code>。</p>
+  <p>入口：<code>/plan &lt;tasks&gt;</code>（REPL）/ <code>orca run --plan &lt;tasks&gt;</code>（headless）</p>
+
+  <h3>Nuclear Compact（上下文核弹恢复）</h3>
+  <p>根因：v0.7.1 在 484% 利用率（967K/200K）时，smartCompact 仅释放 415 tokens — 因为 4 条消息全部保留。</p>
+  <table>
+    <thead><tr><th>层级</th><th>触发条件</th><th>v0.7.1 行为</th><th>v0.8.0 行为</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Pre-send</strong></td>
+        <td>发送前检查</td>
+        <td>75% 触发，keepTurns=2</td>
+        <td><span class="badge badge-green">50%</span> 触发，80% 升级核弹</td>
+      </tr>
+      <tr>
+        <td><strong>Nuclear</strong></td>
+        <td>>100% 利用率</td>
+        <td>不存在</td>
+        <td><span class="badge badge-green">新增</span> 丢弃全部，仅保留 system(1500) + last user(1000)</td>
+      </tr>
+      <tr>
+        <td><strong>Post-turn RED</strong></td>
+        <td>>60%</td>
+        <td>keepTurns=1</td>
+        <td><span class="badge badge-green">核弹</span> + reset + auto-save</td>
+      </tr>
+      <tr>
+        <td><strong>Post-turn YELLOW</strong></td>
+        <td>40-50%</td>
+        <td>仅提示</td>
+        <td><span class="badge badge-green">自动压缩</span> keepTurns=2</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>UI/UX 系统性打磨（5 项）</h3>
+  <table>
+    <thead><tr><th>改动</th><th>前</th><th>后</th></tr></thead>
+    <tbody>
+      <tr><td>分隔线</td><td><code>····················</code>（满屏小点）</td><td><code>──────────────</code>（细线，最宽 72 字符）</td></tr>
+      <tr><td>状态栏</td><td>2 行（大量 | 分隔 + 右对齐 token）</td><td>1 行：model + bar + mode + git + cost</td></tr>
+      <tr><td>会话摘要</td><td>裸线 <code>───────</code></td><td>圆角框 <code>╭─ Session ───╮</code></td></tr>
+      <tr><td>帮助</td><td>38 字符列，拥挤</td><td>28 字符列 + <code>│</code> 分栏</td></tr>
+      <tr><td>Hook 输出</td><td>逐事件展开</td><td><code>hooks: 7 across 4 events</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>SOTA 竞品差距矩阵（v0.8.0）</h3>
+  <div class="matrix-legend">
+    <span><span class="badge badge-green">LEAD</span> 领先</span>
+    <span><span class="badge badge-yellow">Parity</span> 持平</span>
+    <span><span class="badge badge-red">GAP</span> 待追赶</span>
+  </div>
+  <table>
+    <thead>
+      <tr><th>能力维度</th><th>Claude Code</th><th>Codex</th><th>Factory Droid</th><th>Orca v0.8.0</th><th>差距</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>多模型协作路由</td><td>--</td><td>--</td><td>--</td><td><strong>Council / Race / Pipeline</strong></td><td><span class="badge badge-green">LEAD</span></td></tr>
+      <tr><td>任务自动拆分</td><td>--</td><td>--</td><td>--</td><td><strong>Task Planner</strong></td><td><span class="badge badge-green">LEAD</span></td></tr>
+      <tr><td>上下文核弹保护</td><td>Auto-compact</td><td>--</td><td>--</td><td><strong>4 层 + Nuclear + 413 恢复</strong></td><td><span class="badge badge-green">LEAD</span></td></tr>
+      <tr><td>认知骨架</td><td>--</td><td>--</td><td>--</td><td><strong>9 场景 x 4 心智模型</strong></td><td><span class="badge badge-green">LEAD</span></td></tr>
+      <tr><td>知识管理</td><td>Memory</td><td>--</td><td>--</td><td><strong>笔记 / 复盘 / 提示库 / 学习</strong></td><td><span class="badge badge-green">LEAD</span></td></tr>
+      <tr><td>CJK Token 估算</td><td>--</td><td>--</td><td>--</td><td><strong>中日韩 1.5 字/token</strong></td><td><span class="badge badge-green">LEAD</span></td></tr>
+      <tr><td>Mission 多步自治</td><td>Sub-agents</td><td>Tasks</td><td><strong>Droid</strong></td><td><strong>Mission Mode</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
+      <tr><td>并发任务执行</td><td>--</td><td>--</td><td>Worker Pool</td><td><strong>executePlan()</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
+      <tr><td>目标循环</td><td>--</td><td>Loop</td><td>Droid Loop</td><td><strong>runGoalLoop</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
+      <tr><td>验证契约优先</td><td>--</td><td>--</td><td><strong>Yes</strong></td><td><strong>Yes</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
+      <tr><td>Hook 系统</td><td><strong>Yes</strong></td><td>--</td><td>--</td><td><strong>8 events</strong></td><td><span class="badge badge-yellow">Parity</span></td></tr>
+      <tr><td>Git Worktree 隔离</td><td><strong>Yes</strong></td><td>--</td><td>Yes</td><td>Planned</td><td><span class="badge badge-red">GAP</span></td></tr>
+      <tr><td>沙箱安全</td><td><strong>Yes</strong></td><td><strong>Yes</strong></td><td>Yes</td><td>Planned</td><td><span class="badge badge-red">GAP</span></td></tr>
+      <tr><td>MCP Server 生态</td><td><strong>Mature</strong></td><td>--</td><td>--</td><td>Basic</td><td><span class="badge badge-red">GAP</span></td></tr>
+      <tr><td>IDE 集成</td><td><strong>Yes</strong></td><td><strong>Yes</strong></td><td>--</td><td>--</td><td><span class="badge badge-red">GAP</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>v0.9.0 优先目标</h3>
+  <table>
+    <thead><tr><th>优先级</th><th>功能</th><th>对标</th><th>预估</th></tr></thead>
+    <tbody>
+      <tr><td><span class="priority p0">P0</span></td><td>Git Worktree Agent Teams</td><td>Claude Code</td><td>~800 LOC</td></tr>
+      <tr><td><span class="priority p0">P0</span></td><td>Seatbelt / bwrap 沙箱</td><td>Codex CLI</td><td>~600 LOC</td></tr>
+      <tr><td><span class="priority p1">P1</span></td><td>MCP Server 发现 + 自动连接</td><td>Claude Code</td><td>~500 LOC</td></tr>
+      <tr><td><span class="priority p1">P1</span></td><td>VS Code Extension 骨架</td><td>Amp</td><td>~1000 LOC</td></tr>
+      <tr><td><span class="priority p2">P2</span></td><td>DNA Capsule 跨 Agent 继承</td><td>Factory Droid</td><td>~400 LOC</td></tr>
+      <tr><td><span class="priority p2">P2</span></td><td>Webhook Gateway</td><td>Hermes</td><td>~600 LOC</td></tr>
+    </tbody>
+  </table>
+
+  <h3>v0.8.0 深度测试覆盖（+119 tests）</h3>
+  <table>
+    <thead><tr><th>模块</th><th>新增</th><th>覆盖面</th></tr></thead>
+    <tbody>
+      <tr><td>Mission Mode</td><td>~20</td><td>plan 解析边界、3 种验证标准、controller 生命周期、状态持久化</td></tr>
+      <tr><td>Task Planner</td><td>~40</td><td>多语言检测、启发式分解、tracker 状态机、executor 并发</td></tr>
+      <tr><td>Context Protection</td><td>~40</td><td>核弹压缩、正常压缩、预算风险、CJK 估算</td></tr>
+      <tr><td>Output/UI</td><td>~19</td><td>分隔线样式、状态栏格式、box-drawing 会话摘要</td></tr>
+    </tbody>
+  </table>
+
+  <h3>累计进度（v0.3.0 → v0.8.0）</h3>
   <div class="metric-grid">
     <div class="metric-card">
-      <div class="metric-value">70+</div>
-      <div class="metric-label">源码文件（+33）</div>
+      <div class="value">16,722</div>
+      <div class="label">源码行数</div>
     </div>
     <div class="metric-card">
-      <div class="metric-value">15,000+</div>
-      <div class="metric-label">源码行数（+7,800）</div>
+      <div class="value">14</div>
+      <div class="label">模块目录</div>
     </div>
     <div class="metric-card">
-      <div class="metric-value">732</div>
-      <div class="metric-label">测试用例（+239）</div>
+      <div class="value">915</div>
+      <div class="label">测试用例（v0.3.0: 493）</div>
     </div>
     <div class="metric-card">
-      <div class="metric-value" style="color: var(--success);">0</div>
-      <div class="metric-label">SOTA 差距（全部关闭）</div>
+      <div class="value" style="color: var(--success);">6 LEAD</div>
+      <div class="label">竞品领先维度</div>
     </div>
   </div>
 
 </div>
 
 <footer>
-    <p>Orca CLI v0.7.1 -- SOTA 差距分析报告（v0.3.0 → v0.7.1 全量闭合）</p>
+    <p>Orca CLI v0.8.0 -- SOTA 差距分析报告（v0.3.0 → v0.8.0）</p>
     <p>Maurice | maurice_wen@proton.me</p>
-    <p style="font-size:12px; margin-top:8px;">初始生成 2026-04-12 | v0.7.1 最终更新 2026-04-13 | 732 测试 · 70 源码文件 · 21K LOC · 10 commits</p>
+    <p style="font-size:12px; margin-top:8px;">初始生成 2026-04-12 | v0.8.0 更新 2026-04-13 | 915 测试 · 50 文件 · 16.7K LOC</p>
 </footer>
 
 </body>
