@@ -68,6 +68,11 @@ function expandFileReferences(prompt: string, cwd: string): string {
   const home = process.env.HOME || ''
   const trimmed = prompt.trim()
 
+  // Mode 0: Directory path — entire prompt is a directory path (or prompt ends with one)
+  // Auto-discover and inject key project files so SOTA models have full context.
+  const dirExpansion = tryExpandDirectory(trimmed, home, cwd)
+  if (dirExpansion) return dirExpansion
+
   // Mode 1: Bare path — entire prompt is just a file path
   // Claude Code behavior: read file, ask "what would you like to do?"
   const barePath = resolveFilePath(trimmed, home, cwd)
@@ -174,6 +179,128 @@ function tryReadFile(filePath: string): string | null {
 function truncateFileContent(content: string): string {
   if (content.length <= 20_000) return content
   return content.slice(0, 20_000) + `\n[... truncated at 20KB, original ${(content.length / 1024).toFixed(0)}KB]`
+}
+
+/**
+ * Expand a directory path into project context.
+ *
+ * When the user passes a directory (as the entire prompt, or "prompt /dir/path"),
+ * auto-discover and inject key project files so SOTA models get full context
+ * without the user having to manually paste files.
+ *
+ * Discovery order (reads first found in each category):
+ *   Config:  CLAUDE.md, README.md, package.json, pyproject.toml, Cargo.toml, go.mod, Makefile
+ *   Docs:    AGENTS.md, CODEX.md, doc/index.md
+ *   Source:  tree listing (depth 3, max 200 lines)
+ */
+function tryExpandDirectory(prompt: string, home: string, cwd: string): string | null {
+  // Extract directory path from prompt — check if entire prompt is a dir, or ends with a dir path
+  let dirPath: string | null = null
+  let userText = ''
+
+  const trimmed = prompt.trim()
+
+  // Case 1: entire prompt is a directory path
+  let resolved = trimmed
+  if (resolved.startsWith('~') && home) resolved = home + resolved.slice(1)
+  if (!resolved.startsWith('/')) resolved = join(cwd, resolved)
+  try {
+    if (existsSync(resolved) && statSync(resolved).isDirectory()) {
+      dirPath = resolved
+    }
+  } catch {}
+
+  // Case 2: prompt is "some text /path/to/dir" — extract trailing directory
+  if (!dirPath) {
+    const trailingDirMatch = trimmed.match(/^(.+?)\s+((?:\/[\w.@/-]+|~\/[\w.@/-]+))\s*$/)
+    if (trailingDirMatch) {
+      let candidate = trailingDirMatch[2]!
+      if (candidate.startsWith('~') && home) candidate = home + candidate.slice(1)
+      try {
+        if (existsSync(candidate) && statSync(candidate).isDirectory()) {
+          dirPath = candidate
+          userText = trailingDirMatch[1]!.trim()
+        }
+      } catch {}
+    }
+  }
+
+  if (!dirPath) return null
+
+  const parts: string[] = []
+  const injected = new Set<string>()
+  let totalChars = 0
+  const MAX_TOTAL = 60_000 // ~15K tokens budget for project context
+
+  // Key project files to auto-discover (ordered by priority)
+  const PROJECT_FILES = [
+    'CLAUDE.md', 'README.md', 'AGENTS.md', 'CODEX.md',
+    'package.json', 'pyproject.toml', 'Cargo.toml', 'go.mod', 'Makefile', 'Dockerfile',
+    'tsconfig.json', '.env.example',
+    'doc/index.md', 'doc/00_project/initiative_*/PRD.md',
+  ]
+
+  for (const pattern of PROJECT_FILES) {
+    if (totalChars >= MAX_TOTAL) break
+    // Simple glob: handle wildcard in path
+    if (pattern.includes('*')) {
+      try {
+        const dir = join(dirPath, pattern.split('*')[0]!)
+        if (existsSync(dir) && statSync(dir).isDirectory()) {
+          const entries = readdirSync(dir)
+          for (const entry of entries) {
+            const fp = join(dir, entry, pattern.split('/').pop()!.replace('*', ''))
+            if (existsSync(fp) && !statSync(fp).isDirectory()) {
+              const content = tryReadFile(fp)
+              if (content && !injected.has(fp)) {
+                injected.add(fp)
+                const truncated = truncateFileContent(content)
+                parts.push(`<file path="${fp}">\n${truncated}\n</file>`)
+                totalChars += truncated.length
+              }
+            }
+          }
+        }
+      } catch {}
+      continue
+    }
+
+    const fp = join(dirPath, pattern)
+    if (!existsSync(fp) || statSync(fp).isDirectory()) continue
+    if (injected.has(fp)) continue
+
+    const content = tryReadFile(fp)
+    if (content === null) continue
+
+    injected.add(fp)
+    const truncated = truncateFileContent(content)
+    parts.push(`<file path="${fp}">\n${truncated}\n</file>`)
+    totalChars += truncated.length
+  }
+
+  // Generate tree listing for source structure overview
+  try {
+    const tree = execSync(
+      `find "${dirPath}" -maxdepth 3 -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/__pycache__/*' -not -path '*/.orca-worktrees/*' | head -200`,
+      { encoding: 'utf-8', timeout: 5_000 },
+    ).trim()
+    if (tree) {
+      // Convert to relative paths for readability
+      const relTree = tree.split('\n').map(l => l.replace(dirPath!, '.')).join('\n')
+      parts.push(`<project-tree path="${dirPath}">\n${relTree}\n</project-tree>`)
+    }
+  } catch {}
+
+  if (parts.length === 0) return null
+
+  const fileCount = injected.size
+  const header = userText
+    ? userText
+    : `The user shared project directory: ${dirPath}\nAnalyze this project and respond to the user's request.`
+
+  process.stderr.write(`\x1b[90m  [project-expand] ${dirPath}: ${fileCount} files injected, tree included\x1b[0m\n`)
+
+  return `${header}\n\n${parts.join('\n\n')}`
 }
 
 // ── Chat Options ─────────────────────────────────────────────────

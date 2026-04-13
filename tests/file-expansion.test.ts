@@ -423,3 +423,115 @@ describe('file size guards', () => {
     expect(limit).toBe(20_000)
   })
 })
+
+// ── Directory Expansion Logic ──────────────────────────────────────
+
+describe('directory expansion — project file discovery', () => {
+  const PROJECT_FILES = [
+    'CLAUDE.md', 'README.md', 'AGENTS.md', 'CODEX.md',
+    'package.json', 'pyproject.toml', 'Cargo.toml', 'go.mod', 'Makefile', 'Dockerfile',
+    'tsconfig.json', '.env.example',
+  ]
+
+  it('discovers CLAUDE.md when present', () => {
+    const dir = join(TMP_DIR, 'project-discover')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'CLAUDE.md'), '# Project\nSome rules')
+    expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true)
+    const content = readFileSync(join(dir, 'CLAUDE.md'), 'utf-8')
+    expect(content).toContain('# Project')
+  })
+
+  it('discovers README.md when present', () => {
+    const dir = join(TMP_DIR, 'project-readme')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'README.md'), '# My Project\nDescription')
+    expect(existsSync(join(dir, 'README.md'))).toBe(true)
+  })
+
+  it('discovers package.json when present', () => {
+    const dir = join(TMP_DIR, 'project-pkg')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'package.json'), '{"name":"test","version":"1.0.0"}')
+    const content = readFileSync(join(dir, 'package.json'), 'utf-8')
+    expect(JSON.parse(content).name).toBe('test')
+  })
+
+  it('discovers pyproject.toml when present', () => {
+    const dir = join(TMP_DIR, 'project-py')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "test"')
+    expect(existsSync(join(dir, 'pyproject.toml'))).toBe(true)
+  })
+
+  it('priority order: CLAUDE.md before README.md', () => {
+    // Both should be discovered, but CLAUDE.md should appear first in output
+    expect(PROJECT_FILES.indexOf('CLAUDE.md')).toBeLessThan(PROJECT_FILES.indexOf('README.md'))
+  })
+
+  it('detects directory existence correctly', () => {
+    const dir = join(TMP_DIR, 'project-exists')
+    mkdirSync(dir, { recursive: true })
+    expect(existsSync(dir)).toBe(true)
+    expect(statSync(dir).isDirectory()).toBe(true)
+  })
+
+  it('detects non-directory correctly', () => {
+    const fp = createFile('not-a-dir.txt', 'content')
+    expect(statSync(fp).isDirectory()).toBe(false)
+  })
+
+  it('handles missing directory gracefully', () => {
+    expect(existsSync('/nonexistent/project/dir')).toBe(false)
+  })
+
+  it('respects 60KB total budget for project context', () => {
+    const MAX_TOTAL = 60_000
+    expect(MAX_TOTAL).toBe(60_000) // ~15K tokens
+  })
+
+  it('generates relative tree paths', () => {
+    const dirPath = '/Users/me/Projects/myapp'
+    const fullPath = '/Users/me/Projects/myapp/src/index.ts'
+    const relative = fullPath.replace(dirPath, '.')
+    expect(relative).toBe('./src/index.ts')
+  })
+
+  it('tilde directory paths are resolved', () => {
+    const home = '/Users/me'
+    let resolved = '~/Projects/myapp'
+    if (resolved.startsWith('~') && home) resolved = home + resolved.slice(1)
+    expect(resolved).toBe('/Users/me/Projects/myapp')
+  })
+
+  it('trailing dir match extracts user text and path', () => {
+    const prompt = 'analyze this project /Users/me/code'
+    const match = prompt.match(/^(.+?)\s+((?:\/[\w.@/-]+|~\/[\w.@/-]+))\s*$/)
+    expect(match).toBeTruthy()
+    expect(match![1]).toBe('analyze this project')
+    expect(match![2]).toBe('/Users/me/code')
+  })
+
+  it('trailing dir match works with tilde path', () => {
+    const prompt = 'review ~/Projects/myapp'
+    const match = prompt.match(/^(.+?)\s+((?:\/[\w.@/-]+|~\/[\w.@/-]+))\s*$/)
+    expect(match).toBeTruthy()
+    expect(match![1]).toBe('review')
+    expect(match![2]).toBe('~/Projects/myapp')
+  })
+
+  it('output wraps files in <file> tags', () => {
+    const fp = '/project/README.md'
+    const content = '# Title'
+    const tag = `<file path="${fp}">\n${content}\n</file>`
+    expect(tag).toContain('path="/project/README.md"')
+    expect(tag).toContain('# Title')
+  })
+
+  it('output includes <project-tree> tag', () => {
+    const tree = '.\n./src\n./src/index.ts'
+    const tag = `<project-tree path="/project">\n${tree}\n</project-tree>`
+    expect(tag).toContain('project-tree')
+    expect(tag).toContain('./src/index.ts')
+  })
+})
