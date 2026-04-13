@@ -90,7 +90,7 @@
       <span>v0.3.0 基线 → v0.8.0 现状</span>
       <span>2026-04-12 ~ 2026-04-13</span>
       <span>对标: AI-Fleet / Claude Code / Codex / Amp / KiloCode / Hermes / Factory Droid</span>
-      <span>915 测试 · 50 文件 · 16.7K LOC · 14 模块</span>
+      <span>1077 测试 · 53 文件 · 16.7K LOC · 14 模块</span>
     </div>
   </div>
 </div>
@@ -117,7 +117,7 @@
       <div class="label">待追赶 GAP（IDE 集成）</div>
     </div>
     <div class="metric-card">
-      <div class="value">915</div>
+      <div class="value">1077</div>
       <div class="label">测试用例（v0.3.0: 493）</div>
     </div>
   </div>
@@ -887,7 +887,7 @@
     </tbody>
   </table>
 
-  <h3>v0.8.0 深度测试覆盖（+119 tests）</h3>
+  <h3>v0.8.0 深度测试覆盖（+281 tests → 1077 total）</h3>
   <table>
     <thead><tr><th>模块</th><th>新增</th><th>覆盖面</th></tr></thead>
     <tbody>
@@ -895,6 +895,22 @@
       <tr><td>Task Planner</td><td>~40</td><td>多语言检测、启发式分解、tracker 状态机、executor 并发</td></tr>
       <tr><td>Context Protection</td><td>~40</td><td>核弹压缩、正常压缩、预算风险、CJK 估算</td></tr>
       <tr><td>Output/UI</td><td>~19</td><td>分隔线样式、状态栏格式、box-drawing 会话摘要</td></tr>
+      <tr><td><strong>Preprocess（蜂群审计新增）</strong></td><td><strong>100</strong></td><td>70+ 格式检测、可转换性、passthrough 转换、smart truncation、HTML fallback、end-to-end pipeline</td></tr>
+      <tr><td><strong>File Expansion（蜂群审计新增）</strong></td><td><strong>46</strong></td><td>file:///URL regex、bare path regex、relative path regex、标点剥离、路径解析、截断、去重、XML 包装</td></tr>
+      <tr><td><strong>Goal-Loop（蜂群审计新增）</strong></td><td><strong>+16</strong></td><td>parseDoneCriteria 边界、judge stub 验证、callback 完整性、command criteria loop、duration 追踪</td></tr>
+    </tbody>
+  </table>
+
+  <h3>蜂群审计发现（2026-04-13）</h3>
+  <table>
+    <thead><tr><th>发现</th><th>严重度</th><th>状态</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>Goal-Loop LLM judge 未实现</td><td>中</td><td>已记录</td><td>goal-loop.ts:134-136，judge criterion 返回 "not yet implemented"，regex/command 正常</td></tr>
+      <tr><td>Mission validation contract 可为空</td><td>低</td><td>已记录</td><td>LLM 未返回结构化 JSON 时，buildDefaultContract() 创建空 contract，验证空转通过</td></tr>
+      <tr><td>Worktree cleanup 静默吞错</td><td>低</td><td>已记录</td><td>git worktree remove 和 branch -d 错误被 catch 忽略，可能残留孤立分支</td></tr>
+      <tr><td>413 检测靠字符串匹配</td><td>低</td><td>可接受</td><td>检测 "413" / "context_length" / "too large"，未检查 HTTP status code</td></tr>
+      <tr><td>LEAD 1-7 实现</td><td>--</td><td><span class="badge badge-green">全部 REAL</span></td><td>无 stub，无假实现，全部可执行</td></tr>
+      <tr><td>Parity 1-9 实现</td><td>--</td><td><span class="badge badge-green">8 REAL + 1 PARTIAL</span></td><td>Goal-loop LLM judge 为唯一 partial（2/3 criterion type 正常）</td></tr>
     </tbody>
   </table>
 
@@ -909,7 +925,7 @@
       <div class="label">模块目录</div>
     </div>
     <div class="metric-card">
-      <div class="value">915</div>
+      <div class="value">1077</div>
       <div class="label">测试用例（v0.3.0: 493）</div>
     </div>
     <div class="metric-card">
@@ -923,7 +939,7 @@
 <footer>
     <p>Orca CLI v0.8.0 -- SOTA 差距分析报告（v0.3.0 → v0.8.0）</p>
     <p>Maurice | maurice_wen@proton.me</p>
-    <p style="font-size:12px; margin-top:8px;">初始生成 2026-04-12 | v0.8.0 更新 2026-04-13 | 915 测试 · 50 文件 · 16.7K LOC</p>
+    <p style="font-size:12px; margin-top:8px;">初始生成 2026-04-12 | v0.8.0 更新 2026-04-13 | 蜂群审计 2026-04-13 | 1077 测试 · 53 文件 · 16.7K LOC</p>
 </footer>
 
 </body>

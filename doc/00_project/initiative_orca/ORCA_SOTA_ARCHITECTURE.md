@@ -432,7 +432,7 @@ src/
 |---|---|
 | Version | 0.8.0 |
 | LOC | 16,722 |
-| Tests | 915 (50 files) |
+| Tests | 1077 (53 files) |
 | Modules | 14 directories |
 | Tools | 41+ |
 | Slash commands | 30+ |
@@ -493,7 +493,7 @@ src/
 | v0.8.0 Task Planner | DONE | Auto-decompose + concurrent executor + visual checklist |
 | v0.8.0 Nuclear compact | DONE | >100% utilization → drop all except system + last user |
 | v0.8.0 UI/UX overhaul | DONE | Box-drawing, compact status, clean help |
-| v0.8.0 915 tests | DONE | 50 files, all passing |
+| v0.8.0 1077 tests | DONE | 53 files, all passing (post-audit: +162 tests for preprocess, file expansion, goal-loop) |
 | v0.8.0 Universal file preprocessing | DONE | L0 detect (70+ ext) → L1 convert (markitdown/pandoc/ffmpeg) → L2 smart truncate |
 | v0.8.0 File reference expansion | DONE | bare path + file:///URL + stdin pipe + embedded path detection (Claude Code/Codex parity) |
 
