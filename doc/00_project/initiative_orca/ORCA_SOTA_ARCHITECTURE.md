@@ -432,7 +432,7 @@ src/
 |---|---|
 | Version | 0.8.0 |
 | LOC | 16,722 |
-| Tests | 1123 (53 files) |
+| Tests | 1142 (54 files) |
 | Modules | 14 directories |
 | Tools | 41+ |
 | Slash commands | 30+ |
@@ -454,6 +454,7 @@ src/
 | Git worktree isolation | **Yes** | No | No | No | Yes | **WorktreeManager + Mission** | Parity |
 | Sandbox (Seatbelt/bwrap) | **Yes** | **Yes** | No | No | Yes | **--safe → Seatbelt/bwrap** | Parity |
 | MCP server ecosystem | **Mature** | No | No | No | No | **Tool bridge + auto-inject** | Parity |
+| Terminal UI (ink/React TUI) | **Yes (ink)** | Raw ANSI | No | No | No | **ink + React 18 (CC-parity)** | Parity |
 | IDE integration (VS Code) | **Yes** | **Yes** | **Yes** | **Yes** | No | No | **GAP** |
 | Hooks system | **Yes** | No | No | No | No | **11 events (incl. MultiModelStart auto-preprocess)** | **LEAD** |
 | CJK-aware token estimation | No | No | No | No | No | **Yes** | **LEAD** |
@@ -502,6 +503,9 @@ src/
 | v0.8.0 Audit fix: 413 status check | DONE | checks err.status/statusCode property in addition to string matching |
 | v0.8.0 5-layer context defense | DONE | L1 injection dedup hint + L2 tool read guard + L3 cumulative budget (50K) + L4 hard stop (85%) + L5 nuclear. 100× reduction in duplicate-read token waste |
 | v0.8.0 1123 tests | DONE | +26 context-guard tests covering all 5 defense layers |
+| v0.8.0 MultiModelStart hook | DONE | 11th hook event, force universal file preprocessing for council/race/pipeline |
+| v0.8.0 ink TUI migration | DONE | React 18 + ink 5 component tree: StatusBar (fixed bottom) + InputArea + OutputArea + ThinkingSpinner + ToolCallBlock. ChatSessionEmitter event bus bridges business logic → ink. CC-parity terminal UI |
+| v0.8.0 1142 tests | DONE | +19 ink UI component tests (StatusBar, ThinkingSpinner, ToolCallBlock, InputArea, ChatSessionEmitter) |
 
 ---
 
