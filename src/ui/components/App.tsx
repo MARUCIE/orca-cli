@@ -25,10 +25,20 @@ import { PermissionPrompt } from './PermissionPrompt.js'
 import { MultiModelProgress } from './MultiModelProgress.js'
 import { Footer } from './Footer.js'
 import { MarkdownText } from './MarkdownText.js'
+import { Banner } from './Banner.js'
+
+export interface BannerInfo {
+  version: string
+  cwd: string
+  configFiles?: string[]
+  toolCount?: number
+  hookCount?: number
+}
 
 interface Props {
   session: ChatSessionEmitter
   initialStatus: StatusInfo
+  banner?: BannerInfo
 }
 
 /** A completed output block (static, won't re-render) */
@@ -41,7 +51,7 @@ interface OutputBlock {
   level?: 'info' | 'warn' | 'error'
 }
 
-export function App({ session, initialStatus }: Props): React.ReactElement {
+export function App({ session, initialStatus, banner }: Props): React.ReactElement {
   const { stdout } = useStdout()
   const rows = stdout?.rows || 24
 
@@ -211,6 +221,17 @@ export function App({ session, initialStatus }: Props): React.ReactElement {
     <Box flexDirection="column" height={rows}>
       {/* Output area: grows to fill available space */}
       <Box flexDirection="column" flexGrow={1} overflow="hidden">
+        {/* Banner (shown once at startup) */}
+        {banner && (
+          <Banner
+            version={banner.version}
+            cwd={banner.cwd}
+            configFiles={banner.configFiles}
+            toolCount={banner.toolCount}
+            hookCount={banner.hookCount}
+          />
+        )}
+
         {/* Static blocks (already rendered, won't re-render) */}
         <Static items={blocks}>
           {(block) => {

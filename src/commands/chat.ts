@@ -806,7 +806,15 @@ async function runREPL(
 
   if (useInk) {
     const { renderInkApp } = await import('../ui/render.js')
-    inkInstance = renderInkApp(session, getStatusInfo())
+    const configFiles = detectConfigFiles(cwd)
+    const bannerConfigFiles = detectConfigFiles(cwd)
+    inkInstance = renderInkApp(session, getStatusInfo(), {
+      version: '0.8.0',
+      cwd,
+      configFiles: bannerConfigFiles.length > 0 ? bannerConfigFiles : undefined,
+      toolCount: TOOL_DEFINITIONS.length,
+      hookCount: hooks.totalHooks || undefined,
+    })
   } else {
     const { attachLegacyRenderer } = await import('../ui/legacy-renderer.js')
     attachLegacyRenderer(session)

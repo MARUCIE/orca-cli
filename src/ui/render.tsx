@@ -9,6 +9,7 @@
 import React from 'react'
 import { render } from 'ink'
 import { App } from './components/App.js'
+import type { BannerInfo } from './components/App.js'
 import type { ChatSessionEmitter } from './session.js'
 import type { StatusInfo } from './types.js'
 
@@ -30,6 +31,7 @@ function stripAnsi(s: string): string {
 export function renderInkApp(
   session: ChatSessionEmitter,
   initialStatus: StatusInfo,
+  banner?: BannerInfo,
 ): InkInstance {
   // Save original console methods
   const origLog = console.log.bind(console)
@@ -65,7 +67,7 @@ export function renderInkApp(
   }) as typeof process.stderr.write
 
   const instance = render(
-    <App session={session} initialStatus={initialStatus} />,
+    <App session={session} initialStatus={initialStatus} banner={banner} />,
     {
       exitOnCtrlC: false,
     },
