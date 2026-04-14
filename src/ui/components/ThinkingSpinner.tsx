@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react'
 import { Box, Text } from 'ink'
 import Spinner from 'ink-spinner'
+import { useTheme } from '../theme.js'
 
 interface Props {
   /** Whether the model is currently thinking */
@@ -26,11 +27,13 @@ export function ThinkingSpinner({ active }: Props): React.ReactElement | null {
     return () => clearInterval(timer)
   }, [active])
 
+  const theme = useTheme()
+
   if (!active) return null
 
   return (
     <Box>
-      <Text color="cyan">
+      <Text color={theme.accent}>
         <Spinner type="dots" />
       </Text>
       <Text dimColor> Thinking... ({elapsed}s)</Text>

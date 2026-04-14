@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Box, Text, Static, useStdout } from 'ink'
 import type { ChatSessionEmitter } from '../session.js'
+import { useTheme } from '../theme.js'
 import type { UIEvent, StatusInfo, TurnSummaryInfo, ToolStartInfo, ToolEndInfo, ModelProgress } from '../types.js'
 import { StatusBar } from './StatusBar.js'
 import { InputArea } from './InputArea.js'
@@ -84,6 +85,7 @@ interface OutputBlock {
 /** Active tool call with animated spinner — lives outside <Static> so it can re-render */
 function ActiveToolCall({ start, startTime }: { start: ToolStartInfo; startTime: number }): React.ReactElement {
   const [elapsed, setElapsed] = useState(0)
+  const theme = useTheme()
   useEffect(() => {
     const timer = setInterval(() => setElapsed(Date.now() - startTime), 100)
     return () => clearInterval(timer)
@@ -100,7 +102,7 @@ function ActiveToolCall({ start, startTime }: { start: ToolStartInfo; startTime:
       borderRight={false}
       borderTop={false}
       borderBottom={false}
-      borderColor="cyan"
+      borderColor={theme.accent}
       paddingLeft={1}
       marginLeft={1}
     >
@@ -109,7 +111,7 @@ function ActiveToolCall({ start, startTime }: { start: ToolStartInfo; startTime:
         {shortLabel ? <Text dimColor> {shortLabel}</Text> : null}
       </Box>
       <Box>
-        <Text color="cyan">{'⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[Math.floor(elapsed / 80) % 10]}</Text>
+        <Text color={theme.accent}>{'⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[Math.floor(elapsed / 80) % 10]}</Text>
         <Text dimColor> {(elapsed / 1000).toFixed(1)}s</Text>
       </Box>
     </Box>

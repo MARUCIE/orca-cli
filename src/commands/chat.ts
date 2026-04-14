@@ -1270,50 +1270,95 @@ async function runREPL(
               console.log(`\x1b[33m  note: ${unavailable.join(', ')} unavailable (no endpoint), using ${available.length} models\x1b[0m`)
             }
             const models = available
-            console.log(`\n\x1b[36m  ╭── Council: ${models.length} models ──╮\x1b[0m`)
-            models.forEach(m => {
-              const ep = resolveEndpoint(m)
-              console.log(`\x1b[90m  │ ${m} → ${ep?.provider || '?'}\x1b[0m`)
-            })
-            // Live progress: show per-model elapsed timer that updates in-place
+
+            // Model progress tracking
             const modelStatus = new Map<string, { done: boolean; ms: number }>()
             models.forEach(m => modelStatus.set(m, { done: false, ms: 0 }))
             const councilStart = Date.now()
-            let lastLineLen = 0
 
-            const renderProgress = () => {
-              const elapsed = Date.now() - councilStart
-              const parts = models.map(m => {
-                const s = modelStatus.get(m)!
-                const name = m.length > 18 ? m.slice(0, 16) + '..' : m
-                if (s.done) return `\x1b[32m✓ ${name} ${(s.ms / 1000).toFixed(1)}s\x1b[0m`
-                return `\x1b[90m● ${name} ${(elapsed / 1000).toFixed(0)}s\x1b[0m`
+            if (useInk) {
+              // ink mode: emit multi-model progress events
+              const emitProgress = () => {
+                const elapsed = Date.now() - councilStart
+                session.emitMultiModelProgress('council', models.map(m => {
+                  const s = modelStatus.get(m)!
+                  return { model: m, done: s.done, elapsedMs: s.done ? s.ms : elapsed }
+                }))
+              }
+              emitProgress()
+
+              const result = await runCouncil({
+                prompt: mmPrompt, models, judgeModel: models[0]!, resolveEndpoint,
+                onModelStart: () => emitProgress(),
+                onModelDone: (m, ms) => {
+                  modelStatus.set(m, { done: true, ms })
+                  emitProgress()
+                  session.emitMultiModelResult('council', m, '', ms)
+                },
               })
-              const line = `  ${parts.join('  ')}`
-              const clearLen = Math.max(lastLineLen, line.length + 10)
-              process.stderr.write(`\r${' '.repeat(clearLen)}\r${line}`)
-              lastLineLen = line.length
-            }
 
-            const progressTimer = setInterval(renderProgress, 500)
+              // Emit results as text blocks
+              for (const r of result.responses) {
+                if (r.error) {
+                  session.emitSystemMessage(`✗ ${r.model}: ${r.error}`, 'error')
+                } else {
+                  session.emitText(`\n**${r.model}** (${(r.durationMs/1000).toFixed(1)}s)\n${r.text}\n`)
+                }
+              }
+              session.emitText(`\n**Verdict** (${result.verdict.model}, ${(result.verdict.durationMs/1000).toFixed(1)}s)\n${result.verdict.text}\n`)
 
-            const result = await runCouncil({
-              prompt: mmPrompt, models, judgeModel: models[0]!, resolveEndpoint,
-              onModelStart: () => renderProgress(),
-              onModelDone: (m, ms) => {
-                modelStatus.set(m, { done: true, ms })
-                renderProgress()
-              },
-            })
-            clearInterval(progressTimer)
-            process.stderr.write(`\r${' '.repeat(lastLineLen + 10)}\r`) // clear progress line
-            console.log()
-            for (const r of result.responses) {
-              if (r.error) { console.log(`\x1b[31m  ✗ ${r.model}: ${r.error}\x1b[0m`) }
-              else { console.log(`\x1b[90m  ── ${r.model} (${(r.durationMs/1000).toFixed(1)}s) ──\x1b[0m\n  ${r.text.slice(0, 500)}${r.text.length > 500 ? '...' : ''}\n`) }
+              // Cost comparison matrix
+              const pricing = await import('../model-catalog.js').then(m => m.getPricingForModel)
+              const costLines = result.responses.map(r => {
+                const p = pricing(r.model)
+                const cost = p ? ((r.inputTokens || 0) / 1e6 * p[0] + (r.outputTokens || 0) / 1e6 * p[1]) : 0
+                return `  ${r.model.padEnd(24)} ${(r.durationMs/1000).toFixed(1)}s  ${cost > 0 ? '$' + cost.toFixed(4) : 'n/a'}`
+              })
+              session.emitSystemMessage(`${result.responses.length} models · ${(result.totalDurationMs/1000).toFixed(1)}s · agreement: ${result.agreement}`, 'info')
+              if (costLines.some(l => l.includes('$'))) {
+                session.emitSystemMessage('Cost comparison:\n' + costLines.join('\n'), 'info')
+              }
+
+            } else {
+              // legacy mode
+              console.log(`\n\x1b[36m  ╭── Council: ${models.length} models ──╮\x1b[0m`)
+              models.forEach(m => {
+                const ep = resolveEndpoint(m)
+                console.log(`\x1b[90m  │ ${m} → ${ep?.provider || '?'}\x1b[0m`)
+              })
+              let lastLineLen = 0
+              const renderProgress = () => {
+                const elapsed = Date.now() - councilStart
+                const parts = models.map(m => {
+                  const s = modelStatus.get(m)!
+                  const name = m.length > 18 ? m.slice(0, 16) + '..' : m
+                  if (s.done) return `\x1b[32m✓ ${name} ${(s.ms / 1000).toFixed(1)}s\x1b[0m`
+                  return `\x1b[90m● ${name} ${(elapsed / 1000).toFixed(0)}s\x1b[0m`
+                })
+                const line = `  ${parts.join('  ')}`
+                const clearLen = Math.max(lastLineLen, line.length + 10)
+                process.stderr.write(`\r${' '.repeat(clearLen)}\r${line}`)
+                lastLineLen = line.length
+              }
+              const progressTimer = setInterval(renderProgress, 500)
+              const result = await runCouncil({
+                prompt: mmPrompt, models, judgeModel: models[0]!, resolveEndpoint,
+                onModelStart: () => renderProgress(),
+                onModelDone: (m, ms) => {
+                  modelStatus.set(m, { done: true, ms })
+                  renderProgress()
+                },
+              })
+              clearInterval(progressTimer)
+              process.stderr.write(`\r${' '.repeat(lastLineLen + 10)}\r`)
+              console.log()
+              for (const r of result.responses) {
+                if (r.error) { console.log(`\x1b[31m  ✗ ${r.model}: ${r.error}\x1b[0m`) }
+                else { console.log(`\x1b[90m  ── ${r.model} (${(r.durationMs/1000).toFixed(1)}s) ──\x1b[0m\n  ${r.text.slice(0, 500)}${r.text.length > 500 ? '...' : ''}\n`) }
+              }
+              console.log(`\x1b[36m  ★ Verdict\x1b[0m \x1b[90m(${result.verdict.model}, ${(result.verdict.durationMs/1000).toFixed(1)}s)\x1b[0m\n  ${result.verdict.text}\n`)
+              console.log(`\x1b[90m  ─ ${result.responses.length} models · ${(result.totalDurationMs/1000).toFixed(1)}s · agreement: ${result.agreement} ─\x1b[0m\n`)
             }
-            console.log(`\x1b[36m  ★ Verdict\x1b[0m \x1b[90m(${result.verdict.model}, ${(result.verdict.durationMs/1000).toFixed(1)}s)\x1b[0m\n  ${result.verdict.text}\n`)
-            console.log(`\x1b[90m  ─ ${result.responses.length} models · ${(result.totalDurationMs/1000).toFixed(1)}s · agreement: ${result.agreement} ─\x1b[0m\n`)
 
           } else if ((handled as string) === 'race') {
             const candidates = pickDiverseModels(5)
@@ -1322,41 +1367,68 @@ async function runREPL(
               console.log(`\x1b[31m  race: no models with available endpoints. Set multiple API keys.\x1b[0m\n`)
               continue
             }
-            console.log(`\n\x1b[33m  ╭── Race: ${models.length} models ──╮\x1b[0m`)
+
             const raceStatus = new Map<string, { done: boolean; ms: number; won: boolean }>()
             models.forEach(m => raceStatus.set(m, { done: false, ms: 0, won: false }))
             const raceStart = Date.now()
-            let raceLineLen = 0
 
-            const renderRaceProgress = () => {
-              const elapsed = Date.now() - raceStart
-              const parts = models.map(m => {
-                const s = raceStatus.get(m)!
-                const name = m.length > 16 ? m.slice(0, 14) + '..' : m
-                if (s.won) return `\x1b[32m★ ${name} ${(s.ms / 1000).toFixed(1)}s\x1b[0m`
-                if (s.done) return `\x1b[90m✓ ${name}\x1b[0m`
-                return `\x1b[90m◎ ${name} ${(elapsed / 1000).toFixed(0)}s\x1b[0m`
+            if (useInk) {
+              const emitRaceProgress = () => {
+                const elapsed = Date.now() - raceStart
+                session.emitMultiModelProgress('race', models.map(m => {
+                  const s = raceStatus.get(m)!
+                  return { model: m, done: s.done, elapsedMs: s.done ? s.ms : elapsed }
+                }))
+              }
+              emitRaceProgress()
+
+              const result = await runRace({
+                prompt: mmPrompt, models, resolveEndpoint,
+                onModelStart: () => emitRaceProgress(),
+                onModelDone: (m, ms, won) => {
+                  raceStatus.set(m, { done: true, ms, won: won || false })
+                  emitRaceProgress()
+                  session.emitMultiModelResult('race', m, '', ms)
+                },
               })
-              const line = `  ${parts.join('  ')}`
-              const clearLen = Math.max(raceLineLen, line.length + 10)
-              process.stderr.write(`\r${' '.repeat(clearLen)}\r${line}`)
-              raceLineLen = line.length
-            }
+              session.emitText(`\n**Winner: ${result.winner.model}** (${(result.winner.durationMs/1000).toFixed(1)}s)\n${result.winner.text}\n`)
+              if (result.cancelled.length > 0) {
+                session.emitSystemMessage(`cancelled: ${result.cancelled.join(', ')}`, 'info')
+              }
+              session.emitSystemMessage(`${(result.totalDurationMs/1000).toFixed(1)}s total`, 'info')
 
-            const raceTimer = setInterval(renderRaceProgress, 500)
-            const result = await runRace({
-              prompt: mmPrompt, models, resolveEndpoint,
-              onModelStart: () => renderRaceProgress(),
-              onModelDone: (m, ms, won) => {
-                raceStatus.set(m, { done: true, ms, won: won || false })
-                renderRaceProgress()
-              },
-            })
-            clearInterval(raceTimer)
-            process.stderr.write(`\r${' '.repeat(raceLineLen + 10)}\r`)
-            console.log(`\n\x1b[32m  Winner: ${result.winner.model} (${(result.winner.durationMs/1000).toFixed(1)}s)\x1b[0m\n  ${result.winner.text}\n`)
-            if (result.cancelled.length > 0) console.log(`\x1b[90m  cancelled: ${result.cancelled.join(', ')}\x1b[0m`)
-            console.log(`\x1b[90m  ─ ${(result.totalDurationMs/1000).toFixed(1)}s total ─\x1b[0m\n`)
+            } else {
+              console.log(`\n\x1b[33m  ╭── Race: ${models.length} models ──╮\x1b[0m`)
+              let raceLineLen = 0
+              const renderRaceProgress = () => {
+                const elapsed = Date.now() - raceStart
+                const parts = models.map(m => {
+                  const s = raceStatus.get(m)!
+                  const name = m.length > 16 ? m.slice(0, 14) + '..' : m
+                  if (s.won) return `\x1b[32m★ ${name} ${(s.ms / 1000).toFixed(1)}s\x1b[0m`
+                  if (s.done) return `\x1b[90m✓ ${name}\x1b[0m`
+                  return `\x1b[90m◎ ${name} ${(elapsed / 1000).toFixed(0)}s\x1b[0m`
+                })
+                const line = `  ${parts.join('  ')}`
+                const clearLen = Math.max(raceLineLen, line.length + 10)
+                process.stderr.write(`\r${' '.repeat(clearLen)}\r${line}`)
+                raceLineLen = line.length
+              }
+              const raceTimer = setInterval(renderRaceProgress, 500)
+              const result = await runRace({
+                prompt: mmPrompt, models, resolveEndpoint,
+                onModelStart: () => renderRaceProgress(),
+                onModelDone: (m, ms, won) => {
+                  raceStatus.set(m, { done: true, ms, won: won || false })
+                  renderRaceProgress()
+                },
+              })
+              clearInterval(raceTimer)
+              process.stderr.write(`\r${' '.repeat(raceLineLen + 10)}\r`)
+              console.log(`\n\x1b[32m  Winner: ${result.winner.model} (${(result.winner.durationMs/1000).toFixed(1)}s)\x1b[0m\n  ${result.winner.text}\n`)
+              if (result.cancelled.length > 0) console.log(`\x1b[90m  cancelled: ${result.cancelled.join(', ')}\x1b[0m`)
+              console.log(`\x1b[90m  ─ ${(result.totalDurationMs/1000).toFixed(1)}s total ─\x1b[0m\n`)
+            }
 
           } else if ((handled as string) === 'pipeline') {
             const stages: PipelineStage[] = [

@@ -13,6 +13,7 @@
 
 import React, { useState, useCallback } from 'react'
 import { Box, Text, useInput, useStdout } from 'ink'
+import { useTheme } from '../theme.js'
 
 interface Props {
   /** Called when user submits input (Enter) */
@@ -38,6 +39,7 @@ interface Props {
 export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onChange, active, pickerActive, history = [] }: Props): React.ReactElement {
   const { stdout } = useStdout()
   const cols = stdout?.columns || 80
+  const theme = useTheme()
   const [value, setValueRaw] = useState('')
   const [cursor, setCursor] = useState(0)
   const [historyIdx, setHistoryIdx] = useState(-1)
@@ -217,21 +219,21 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor={active ? 'cyan' : 'gray'}
+      borderColor={active ? theme.accent : 'gray'}
       width={cols}
       minHeight={3}
     >
       {lines.map((line, i) => (
         <Box key={i}>
           {i === 0 ? (
-            <Text color="cyan" bold>{active ? '> ' : '  '}</Text>
+            <Text color={theme.prompt} bold>{active ? '> ' : '  '}</Text>
           ) : (
             <Text color="gray">  </Text>
           )}
           {active && i === cursorLine ? (
             <Text>
               {line.slice(0, cursorCol)}
-              <Text color="cyan">|</Text>
+              <Text color={theme.prompt}>|</Text>
               {line.slice(cursorCol)}
             </Text>
           ) : (

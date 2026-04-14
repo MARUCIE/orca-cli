@@ -10,6 +10,7 @@ import React from 'react'
 import { render } from 'ink'
 import { App } from './components/App.js'
 import type { BannerInfo } from './components/App.js'
+import { ThemeProvider } from './theme.js'
 import type { ChatSessionEmitter } from './session.js'
 import type { StatusInfo } from './types.js'
 
@@ -71,7 +72,9 @@ export function renderInkApp(
   }) as typeof process.stderr.write
 
   const instance = render(
-    <App session={session} initialStatus={initialStatus} banner={banner} />,
+    <ThemeProvider>
+      <App session={session} initialStatus={initialStatus} banner={banner} />
+    </ThemeProvider>,
     {
       exitOnCtrlC: false,
     },

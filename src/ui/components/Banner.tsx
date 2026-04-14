@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Box, Text, useStdout } from 'ink'
+import { useTheme } from '../theme.js'
 
 // Orca pixel art (plain text, no ANSI — ink handles colors)
 const ORCA_LINES = [
@@ -41,6 +42,7 @@ export function Banner({ version, cwd, configFiles, toolCount, hookCount }: Prop
   const { stdout } = useStdout()
   const cols = stdout?.columns || 80
   const shortCwd = abbreviatePath(cwd)
+  const theme = useTheme()
 
   // Animation state
   const totalFrames = 20
@@ -77,7 +79,7 @@ export function Banner({ version, cwd, configFiles, toolCount, hookCount }: Prop
           const bodyWave = Math.round(Math.sin(t + i * 0.45) * 3 * tailFactor * dampFactor)
           const pad = Math.max(0, Math.min(maxPad, baseDrift + globalWave + bodyWave))
           return (
-            <Text key={i} color="cyan">{' '.repeat(pad)}{line}</Text>
+            <Text key={i} color={theme.accent}>{' '.repeat(pad)}{line}</Text>
           )
         })}
       </Box>
@@ -91,7 +93,7 @@ export function Banner({ version, cwd, configFiles, toolCount, hookCount }: Prop
 
       {/* Project context */}
       <Box marginLeft={2}>
-        <Text color="cyan">▸</Text>
+        <Text color={theme.accent}>▸</Text>
         <Text dimColor> {shortCwd}</Text>
       </Box>
 
