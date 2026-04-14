@@ -273,7 +273,7 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
               {cursorOn ? (
                 <Text backgroundColor={theme.accent} color="black">{line[cursorCol] || ' '}</Text>
               ) : (
-                <Text>{line[cursorCol] || ' '}</Text>
+                <Text color={theme.accent}>{line[cursorCol] || '\u2502'}</Text>
               )}
               {line.slice(cursorCol + 1)}
             </Text>
@@ -281,7 +281,7 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
             <Text>{line}</Text>
           )}
           {i === 0 && !value && (
-            <Text color={theme.muted}>{active ? '' : '|'} Type a message... (/help for commands)</Text>
+            <Text color={theme.muted}> Type a message... (/help for commands)</Text>
           )}
         </Box>
       ))}
