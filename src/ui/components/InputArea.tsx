@@ -226,7 +226,7 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
       {lines.map((line, i) => (
         <Box key={i}>
           {i === 0 ? (
-            <Text color={theme.prompt} bold>{active ? '> ' : '  '}</Text>
+            <Text color={active ? theme.prompt : 'gray'} bold={active}>{'> '}</Text>
           ) : (
             <Text color="gray">  </Text>
           )}
@@ -239,8 +239,8 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
           ) : (
             <Text>{line}</Text>
           )}
-          {active && i === 0 && !value && (
-            <Text color="gray"> Type a message... (/help for commands)</Text>
+          {i === 0 && !value && (
+            <Text color="gray">{active ? '' : '|'} Type a message... (/help for commands)</Text>
           )}
         </Box>
       ))}

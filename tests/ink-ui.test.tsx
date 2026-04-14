@@ -236,14 +236,16 @@ describe('Footer', () => {
     expect(lastFrame()).toContain('auto')
   })
 
-  it('renders nothing when idle', async () => {
+  it('shows basic hints when idle', async () => {
     const { Footer } = await import('../src/ui/components/Footer.js')
     const { lastFrame } = render(
       <Footer isGenerating={false} isInputActive={false} permMode="yolo" />,
     )
-    // No shortcuts when idle
-    expect(lastFrame()).not.toContain('esc')
-    expect(lastFrame()).not.toContain('enter')
+    // Shows basic hints even when idle (waiting for prompt_ready)
+    expect(lastFrame()).toContain('enter')
+    expect(lastFrame()).toContain('/help')
+    expect(lastFrame()).toContain('yolo')
+    expect(lastFrame()).not.toContain('esc') // no interrupt when not generating
   })
 })
 

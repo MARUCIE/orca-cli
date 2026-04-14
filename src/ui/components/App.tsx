@@ -368,13 +368,13 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
         )}
 
         {/* Empty state guide — shown when no output yet */}
-        {!hasContent && inputActive && (
+        {!hasContent && (
           <Box marginLeft={2} marginTop={1} marginBottom={1} flexDirection="column">
-            <Text dimColor>Ask anything, or try:</Text>
-            <Text dimColor>  /help      all commands</Text>
-            <Text dimColor>  /council   multi-model council</Text>
-            <Text dimColor>  /mission   autonomous execution</Text>
-            <Text dimColor>  !command   shell escape</Text>
+            <Text color="gray">Ask anything, or try:</Text>
+            <Text color="gray">  /help      all commands</Text>
+            <Text color="gray">  /council   multi-model council</Text>
+            <Text color="gray">  /mission   autonomous execution</Text>
+            <Text color="gray">  !command   shell escape</Text>
           </Box>
         )}
 
