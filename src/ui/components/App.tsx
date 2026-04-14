@@ -269,6 +269,18 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
           })
           break
 
+        case 'session_end': {
+          const si = event.info
+          const dur = (si.totalDuration / 1000).toFixed(0)
+          const tokens = si.totalInputTokens + si.totalOutputTokens
+          const cost = si.totalCostUsd > 0
+            ? (si.totalCostUsd < 0.01 ? `${(si.totalCostUsd * 100).toFixed(1)}c` : `$${si.totalCostUsd.toFixed(2)}`)
+            : ''
+          const summary = [`${si.turns} turns · ${tokens.toLocaleString()} tokens · ${dur}s`, cost].filter(Boolean).join(' · ')
+          setBlocks(b => [...b, { id: blockId(), type: 'system', content: summary, level: 'info' }])
+          break
+        }
+
         case 'abort':
           setThinking(false)
           setInputActive(false)

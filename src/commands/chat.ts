@@ -1178,13 +1178,25 @@ async function runREPL(
           if (stats.turns > 0) {
             autoSaveSession(currentModel, history, stats)
           }
-          printSessionSummary({
-            turns: stats.turns,
-            totalInputTokens: stats.totalInputTokens,
-            totalOutputTokens: stats.totalOutputTokens,
-            durationMs: Date.now() - stats.startTime,
-            model: currentModel,
-          })
+          if (useInk) {
+            const costUsd = computeCost(currentModel, stats.totalInputTokens, stats.totalOutputTokens)
+            session.emitSessionEnd({
+              turns: stats.turns,
+              totalInputTokens: stats.totalInputTokens,
+              totalOutputTokens: stats.totalOutputTokens,
+              totalCostUsd: costUsd,
+              totalDuration: Date.now() - stats.startTime,
+              toolCallsTotal: 0,
+            })
+          } else {
+            printSessionSummary({
+              turns: stats.turns,
+              totalInputTokens: stats.totalInputTokens,
+              totalOutputTokens: stats.totalOutputTokens,
+              durationMs: Date.now() - stats.startTime,
+              model: currentModel,
+            })
+          }
           recordUsage({
             provider: resolved.provider,
             model: currentModel,
@@ -1496,57 +1508,89 @@ async function runREPL(
             model: resolved.model,
           })
 
-          // Event handler for real-time progress
-          controller.onEvent((event: MissionEvent) => {
-            const colors: Record<string, string> = {
-              plan_created: '\x1b[36m',
-              milestone_started: '\x1b[35m',
-              milestone_passed: '\x1b[32m',
-              milestone_failed: '\x1b[31m',
-              feature_started: '\x1b[90m',
-              feature_completed: '\x1b[32m',
-              feature_failed: '\x1b[33m',
-              validation_started: '\x1b[36m',
-              validation_passed: '\x1b[32m',
-              validation_failed: '\x1b[31m',
-              mission_completed: '\x1b[32m',
-              mission_failed: '\x1b[31m',
-              mission_aborted: '\x1b[33m',
+          if (useInk) {
+            // ink mode: route mission events through session emitter
+            const levelMap: Record<string, 'info' | 'warn' | 'error'> = {
+              plan_created: 'info', milestone_started: 'info', milestone_passed: 'info',
+              milestone_failed: 'error', feature_started: 'info', feature_completed: 'info',
+              feature_failed: 'warn', validation_started: 'info', validation_passed: 'info',
+              validation_failed: 'error', mission_completed: 'info', mission_failed: 'error',
+              mission_aborted: 'warn',
             }
-            const color = colors[event.type] || '\x1b[90m'
-            console.log(`${color}  [mission] ${event.message}\x1b[0m`)
-          })
+            controller.onEvent((event: MissionEvent) => {
+              session.emitSystemMessage(`[mission] ${event.message}`, levelMap[event.type] || 'info')
+            })
 
-          console.log(`\n\x1b[36m  ╭── Mission: ${controller.getState().id} ──╮\x1b[0m`)
-          console.log(`\x1b[90m  │ Goal: ${missionGoal.slice(0, 60)}${missionGoal.length > 60 ? '...' : ''}\x1b[0m`)
-          console.log(`\x1b[90m  │ Phase 1: Planning...\x1b[0m`)
+            session.emitSystemMessage(`Mission: ${controller.getState().id}`, 'info')
+            session.emitSystemMessage(`Goal: ${missionGoal.slice(0, 80)}`, 'info')
+            session.emitThinkingStart()
 
-          try {
-            const plan = await controller.plan()
-            console.log(`\x1b[90m  │ ${plan.milestones.length} milestones, ${plan.features.length} features\x1b[0m`)
-            console.log(`\x1b[90m  │ Estimated runs: ~${plan.estimatedRuns}\x1b[0m`)
+            try {
+              const plan = await controller.plan()
+              session.emitThinkingEnd(Date.now())
 
-            // Show plan summary
-            for (const [i, ms] of plan.milestones.entries()) {
-              const featureNames = ms.featureIds
-                .map(fid => plan.features.find(f => f.id === fid)?.title || fid)
-                .map(t => t.slice(0, 50))
-              console.log(`\x1b[90m  │ M${i + 1}: ${ms.title}\x1b[0m`)
-              for (const fn of featureNames) {
-                console.log(`\x1b[90m  │   - ${fn}\x1b[0m`)
+              // Plan summary as markdown
+              const planLines = [`**Mission Plan** — ${plan.milestones.length} milestones, ${plan.features.length} features (~${plan.estimatedRuns} runs)`]
+              for (const [i, ms] of plan.milestones.entries()) {
+                const featureNames = ms.featureIds
+                  .map(fid => plan.features.find(f => f.id === fid)?.title || fid)
+                  .map(t => t.slice(0, 50))
+                planLines.push(`\n**M${i + 1}: ${ms.title}**`)
+                for (const fn of featureNames) planLines.push(`- ${fn}`)
               }
+              session.emitText(planLines.join('\n') + '\n')
+
+              // Execute with progress
+              session.emitThinkingStart()
+              const state = await controller.execute()
+              session.emitThinkingEnd(Date.now())
+
+              session.emitText(`\n${controller.getSummary()}\n`)
+              session.emitSystemMessage(`Mission ${state.phase}`, state.phase === 'completed' ? 'info' : 'error')
+            } catch (err) {
+              controller.abort()
+              session.emitThinkingEnd(Date.now())
+              session.emitSystemMessage(`mission error: ${err instanceof Error ? err.message : String(err)}`, 'error')
             }
-            console.log(`\x1b[90m  │ Phase 2: Executing...\x1b[0m`)
+          } else {
+            // legacy mode
+            controller.onEvent((event: MissionEvent) => {
+              const colors: Record<string, string> = {
+                plan_created: '\x1b[36m', milestone_started: '\x1b[35m', milestone_passed: '\x1b[32m',
+                milestone_failed: '\x1b[31m', feature_started: '\x1b[90m', feature_completed: '\x1b[32m',
+                feature_failed: '\x1b[33m', validation_started: '\x1b[36m', validation_passed: '\x1b[32m',
+                validation_failed: '\x1b[31m', mission_completed: '\x1b[32m', mission_failed: '\x1b[31m',
+                mission_aborted: '\x1b[33m',
+              }
+              const color = colors[event.type] || '\x1b[90m'
+              console.log(`${color}  [mission] ${event.message}\x1b[0m`)
+            })
 
-            const state = await controller.execute()
+            console.log(`\n\x1b[36m  ╭── Mission: ${controller.getState().id} ──╮\x1b[0m`)
+            console.log(`\x1b[90m  │ Goal: ${missionGoal.slice(0, 60)}${missionGoal.length > 60 ? '...' : ''}\x1b[0m`)
+            console.log(`\x1b[90m  │ Phase 1: Planning...\x1b[0m`)
 
-            console.log(`\x1b[90m  ╰── Mission ${state.phase} ──╯\x1b[0m`)
-            console.log()
-            console.log(controller.getSummary())
-            console.log()
-          } catch (err) {
-            controller.abort()
-            console.log(`\x1b[31m  mission error: ${err instanceof Error ? err.message : err}\x1b[0m`)
+            try {
+              const plan = await controller.plan()
+              console.log(`\x1b[90m  │ ${plan.milestones.length} milestones, ${plan.features.length} features\x1b[0m`)
+              console.log(`\x1b[90m  │ Estimated runs: ~${plan.estimatedRuns}\x1b[0m`)
+              for (const [i, ms] of plan.milestones.entries()) {
+                const featureNames = ms.featureIds
+                  .map(fid => plan.features.find(f => f.id === fid)?.title || fid)
+                  .map(t => t.slice(0, 50))
+                console.log(`\x1b[90m  │ M${i + 1}: ${ms.title}\x1b[0m`)
+                for (const fn of featureNames) console.log(`\x1b[90m  │   - ${fn}\x1b[0m`)
+              }
+              console.log(`\x1b[90m  │ Phase 2: Executing...\x1b[0m`)
+              const state = await controller.execute()
+              console.log(`\x1b[90m  ╰── Mission ${state.phase} ──╯\x1b[0m`)
+              console.log()
+              console.log(controller.getSummary())
+              console.log()
+            } catch (err) {
+              controller.abort()
+              console.log(`\x1b[31m  mission error: ${err instanceof Error ? err.message : err}\x1b[0m`)
+            }
           }
           continue
         }
@@ -2231,18 +2275,25 @@ function handleSlashCommand(
 
     case '/diff': {
       try {
-        // execSync imported at top level
         const diff = execSync('git diff --stat && echo "---" && git diff --no-color', {
           cwd, encoding: 'utf-8', timeout: 10_000, maxBuffer: 1024 * 1024,
         })
         if (diff.trim()) {
-          console.log(`\x1b[90m${diff.slice(0, 3000)}\x1b[0m`)
-          if (diff.length > 3000) console.log('\x1b[90m  ... (truncated)\x1b[0m')
+          if (session) {
+            session.emitText('```diff\n' + diff.slice(0, 4000) + '\n```\n')
+            if (diff.length > 4000) session.emitSystemMessage('(truncated)', 'info')
+          } else {
+            console.log(`\x1b[90m${diff.slice(0, 3000)}\x1b[0m`)
+            if (diff.length > 3000) console.log('\x1b[90m  ... (truncated)\x1b[0m')
+          }
         } else {
-          console.log('\x1b[90m  no changes.\x1b[0m')
+          if (session) session.emitSystemMessage('no changes.', 'info')
+          else console.log('\x1b[90m  no changes.\x1b[0m')
         }
       } catch (err) {
-        console.log(`\x1b[31m  git diff failed: ${err instanceof Error ? err.message : err}\x1b[0m`)
+        const msg = `git diff failed: ${err instanceof Error ? err.message : err}`
+        if (session) session.emitSystemMessage(msg, 'error')
+        else console.log(`\x1b[31m  ${msg}\x1b[0m`)
       }
       return 'handled'
     }
@@ -2395,16 +2446,31 @@ function handleSlashCommand(
       const cost = pricing
         ? (stats.totalInputTokens * pricing[0] + stats.totalOutputTokens * pricing[1]) / 1_000_000
         : 0
-      const pricingLabel = pricing ? `$${pricing[0]}/$${pricing[1]} per 1M in/out` : 'pricing unavailable'
-      console.log('\x1b[90m  Cost breakdown:\x1b[0m')
-      console.log(`\x1b[90m    model:   ${mc.getModel()} (${pricingLabel})\x1b[0m`)
-      console.log(`\x1b[90m    input:   ${stats.totalInputTokens.toLocaleString()} tokens\x1b[0m`)
-      console.log(`\x1b[90m    output:  ${stats.totalOutputTokens.toLocaleString()} tokens\x1b[0m`)
-      console.log(`\x1b[90m    total:   ${(stats.totalInputTokens + stats.totalOutputTokens).toLocaleString()} tokens\x1b[0m`)
       const costDisplay = cost >= 0.01 ? `$${cost.toFixed(2)}` : cost > 0 ? `${(cost * 100).toFixed(1)}c` : '$0'
-      console.log(`\x1b[90m    cost:    \x1b[36m${costDisplay}\x1b[0m`)
-      console.log(`\x1b[90m    turns:   ${stats.turns}\x1b[0m`)
-      console.log(`\x1b[90m    time:    ${((Date.now() - stats.startTime) / 1000 / 60).toFixed(1)} min\x1b[0m`)
+      if (session) {
+        const pricingLabel = pricing ? `$${pricing[0]}/$${pricing[1]} per 1M` : 'n/a'
+        session.emitText([
+          `**Cost** — ${mc.getModel()} (${pricingLabel})`,
+          `| Metric | Value |`,
+          `|--------|-------|`,
+          `| Input | ${stats.totalInputTokens.toLocaleString()} tokens |`,
+          `| Output | ${stats.totalOutputTokens.toLocaleString()} tokens |`,
+          `| Total | ${(stats.totalInputTokens + stats.totalOutputTokens).toLocaleString()} tokens |`,
+          `| Cost | **${costDisplay}** |`,
+          `| Turns | ${stats.turns} |`,
+          `| Time | ${((Date.now() - stats.startTime) / 1000 / 60).toFixed(1)} min |`,
+        ].join('\n') + '\n')
+      } else {
+        const pricingLabel = pricing ? `$${pricing[0]}/$${pricing[1]} per 1M in/out` : 'pricing unavailable'
+        console.log('\x1b[90m  Cost breakdown:\x1b[0m')
+        console.log(`\x1b[90m    model:   ${mc.getModel()} (${pricingLabel})\x1b[0m`)
+        console.log(`\x1b[90m    input:   ${stats.totalInputTokens.toLocaleString()} tokens\x1b[0m`)
+        console.log(`\x1b[90m    output:  ${stats.totalOutputTokens.toLocaleString()} tokens\x1b[0m`)
+        console.log(`\x1b[90m    total:   ${(stats.totalInputTokens + stats.totalOutputTokens).toLocaleString()} tokens\x1b[0m`)
+        console.log(`\x1b[90m    cost:    \x1b[36m${costDisplay}\x1b[0m`)
+        console.log(`\x1b[90m    turns:   ${stats.turns}\x1b[0m`)
+        console.log(`\x1b[90m    time:    ${((Date.now() - stats.startTime) / 1000 / 60).toFixed(1)} min\x1b[0m`)
+      }
       return 'handled'
     }
 
@@ -2414,15 +2480,30 @@ function handleSlashCommand(
       const ctxLine = budget
         ? `${budget.utilizationPct}% (${budget.historyTokensEst.toLocaleString()} / ${budget.contextWindow.toLocaleString()} tokens)`
         : `~${Math.ceil(history.reduce((s, m) => s + m.content.length, 0) / 4).toLocaleString()} tokens (est)`
-      console.log('\x1b[90m  Session status:\x1b[0m')
-      console.log(`\x1b[90m    provider: \x1b[36m${mc.getProvider()}/${mc.getModel()}\x1b[0m`)
-      console.log(`\x1b[90m    turns:    ${stats.turns}\x1b[0m`)
-      console.log(`\x1b[90m    messages: ${msgs}\x1b[0m`)
-      console.log(`\x1b[90m    context:  ${ctxLine}\x1b[0m`)
-      console.log(`\x1b[90m    consumed: ${(stats.totalInputTokens + stats.totalOutputTokens).toLocaleString()} tokens (cumulative)\x1b[0m`)
-      console.log(`\x1b[90m    cwd:      ${cwd}\x1b[0m`)
-      console.log(`\x1b[90m    hooks:    ${hooks.totalHooks}\x1b[0m`)
-      console.log(`\x1b[90m    mcp:      ${mcpClient.configuredCount} servers\x1b[0m`)
+      if (session) {
+        session.emitText([
+          `**Status** — ${mc.getProvider()}/${mc.getModel()}`,
+          `| | |`,
+          `|---|---|`,
+          `| Turns | ${stats.turns} |`,
+          `| Messages | ${msgs} |`,
+          `| Context | ${ctxLine} |`,
+          `| Consumed | ${(stats.totalInputTokens + stats.totalOutputTokens).toLocaleString()} tokens |`,
+          `| cwd | \`${cwd}\` |`,
+          `| Hooks | ${hooks.totalHooks} |`,
+          `| MCP | ${mcpClient.configuredCount} servers |`,
+        ].join('\n') + '\n')
+      } else {
+        console.log('\x1b[90m  Session status:\x1b[0m')
+        console.log(`\x1b[90m    provider: \x1b[36m${mc.getProvider()}/${mc.getModel()}\x1b[0m`)
+        console.log(`\x1b[90m    turns:    ${stats.turns}\x1b[0m`)
+        console.log(`\x1b[90m    messages: ${msgs}\x1b[0m`)
+        console.log(`\x1b[90m    context:  ${ctxLine}\x1b[0m`)
+        console.log(`\x1b[90m    consumed: ${(stats.totalInputTokens + stats.totalOutputTokens).toLocaleString()} tokens (cumulative)\x1b[0m`)
+        console.log(`\x1b[90m    cwd:      ${cwd}\x1b[0m`)
+        console.log(`\x1b[90m    hooks:    ${hooks.totalHooks}\x1b[0m`)
+        console.log(`\x1b[90m    mcp:      ${mcpClient.configuredCount} servers\x1b[0m`)
+      }
       return 'handled'
     }
 
