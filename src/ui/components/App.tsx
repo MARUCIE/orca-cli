@@ -29,6 +29,7 @@ import { MarkdownText } from './MarkdownText.js'
 import { Banner } from './Banner.js'
 import { CommandPicker } from './CommandPicker.js'
 import { DiffPreview } from './DiffPreview.js'
+import { ThemePicker } from './ThemePicker.js'
 import { ScrollBox } from './ScrollBox.js'
 import type { ScrollBoxHandle } from './ScrollBox.js'
 import { useMouseWheel } from '../useMouseWheel.js'
@@ -68,6 +69,9 @@ export interface BannerInfo {
   configFiles?: string[]
   toolCount?: number
   hookCount?: number
+  model?: string
+  permMode?: string
+  sessionId?: string
 }
 
 interface Props {
@@ -150,6 +154,8 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
   const [multiModelState, setMultiModelState] = useState<{ command: string; models: ModelProgress[] } | null>(null)
   const [activeTool, setActiveTool] = useState<{ id: string; start: ToolStartInfo; startTime: number } | null>(null)
   const [inputValue, setInputValue] = useState('')
+  // Theme picker: show on first launch if ORCA_THEME not set
+  const [showThemePicker, setShowThemePicker] = useState(!process.env.ORCA_THEME)
 
   // Command picker state
   const showPicker = inputActive && inputValue.startsWith('/') && inputValue.length > 0
@@ -368,6 +374,18 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
     session.emitCommand('undo')
   }, [session])
 
+  const handleThemeSelect = useCallback((themeId: string) => {
+    setShowThemePicker(false)
+    // Save preference hint — the actual theme is set at module load via ORCA_THEME
+    // Write a hint file so next launch uses the selected theme
+    import('fs').then(fs => {
+      const home = process.env.HOME || process.env.USERPROFILE || ''
+      const dir = `${home}/.orca`
+      try { fs.mkdirSync(dir, { recursive: true }) } catch {}
+      fs.writeFileSync(`${dir}/theme`, themeId, 'utf-8')
+    }).catch(() => {})
+  }, [])
+
   const hasContent = blocks.length > 0 || streamingText || thinking || activeTool || multiModelState
 
   return (
@@ -375,16 +393,24 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
       {/* Content area: scrollable, fills space above fixed bottom */}
       <ScrollBox
         ref={scrollRef}
-        keyboardActive={!inputActive && !permRequest}
+        keyboardActive={!inputActive && !permRequest && !showThemePicker}
       >
-        {/* Banner (shown once at startup) */}
-        {banner && (
+        {/* Theme picker (first launch only) */}
+        {showThemePicker && (
+          <ThemePicker onSelect={handleThemeSelect} active={showThemePicker} />
+        )}
+
+        {/* Banner (shown once at startup, after theme pick) */}
+        {banner && !showThemePicker && (
           <Banner
             version={banner.version}
             cwd={banner.cwd}
             configFiles={banner.configFiles}
             toolCount={banner.toolCount}
             hookCount={banner.hookCount}
+            model={banner.model}
+            permMode={banner.permMode}
+            sessionId={banner.sessionId}
           />
         )}
 
@@ -475,8 +501,8 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
           onModeCycle={handleModeCycle}
           onUndo={handleUndo}
           onChange={handleInputChange}
-          active={inputActive && !permRequest}
-          permissionBlocked={!!permRequest}
+          active={inputActive && !permRequest && !showThemePicker}
+          permissionBlocked={!!permRequest || showThemePicker}
           pickerActive={showPicker}
           history={inputHistory}
         />

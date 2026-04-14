@@ -19,6 +19,14 @@ export interface StatusInfo {
   turns: number
   /** Token usage per turn for sparkline (last N values) */
   sparkline?: number[]
+  /** Username / account display */
+  username?: string
+  /** Cache hit percentage (0-100) */
+  cachePct?: number
+  /** Session elapsed time in seconds */
+  sessionElapsed?: number
+  /** Permission level label (e.g. "L3 high") */
+  permLevel?: string
 }
 
 // ── Turn Summary ────────────────────────────────────────────

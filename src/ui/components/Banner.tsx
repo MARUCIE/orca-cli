@@ -1,35 +1,24 @@
 /**
- * Banner — Orca startup display with swimming animation.
+ * Banner — Codex-inspired startup display with bordered session info.
  *
- * The orca swims in from the right side, body-wave undulation,
- * then settles at its final position. Uses React state for frame animation.
+ * Layout:
+ * ┌─────────────────────────────────────────────┐
+ * │  >_ Orca CLI (v0.8.0)                       │
+ * │                                              │
+ * │    Model:        claude-sonnet-4.6           │
+ * │    Directory:    ~/Projects/orca-cli         │
+ * │    Permissions:  auto                        │
+ * │    Tools:        41 tools · 57 hooks         │
+ * │    Config:       CLAUDE.md, settings.json    │
+ * │    Session:      abc123...                   │
+ * └─────────────────────────────────────────────┘
  */
 
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { Box, Text } from 'ink'
 import { useTheme } from '../theme.js'
 import { useTerminalSize } from '../useTerminalSize.js'
-
-// Orca pixel art (plain text, no ANSI — ink handles colors)
-const ORCA_LINES = [
-  '                   ▄▄',
-  '                 ▄████▄',
-  '                ████████',
-  '          ▄▄▄████████████▄▄▄',
-  '      ▄████████████████████████▄',
-  '   ▄█████◕ ██████████████████████▄',
-  '  ████████████████████████████████████████▄',
-  ' █████████████████████████████████████████████',
-  '  ░░░░░░░░░░░░░░░░░░░░░░░░░████████████████████',
-  '    ░░░░░░░░░░░░░░░░░░░░░░░░░░░████████████████▀',
-  '       ░░░░░░░░░░░░░░░░░░░░░░░░░░░░██████████▀',
-  '           ░░░░░░░░░░░░░░░░░░░░░░░░░░░████▀▄██▀',
-  '                ░░░░░░░░░░░░░░░░░░░░░░░░▀████▀',
-  '                                         ▀████▄',
-  '                                           ▀▀',
-]
-
-const ART_WIDTH = Math.max(...ORCA_LINES.map(l => l.length))
+import { getFleetSummaryLine } from '../../fleet-env.js'
 
 interface Props {
   version: string
@@ -37,72 +26,65 @@ interface Props {
   configFiles?: string[]
   toolCount?: number
   hookCount?: number
+  model?: string
+  permMode?: string
+  sessionId?: string
 }
 
-export function Banner({ version, cwd, configFiles, toolCount, hookCount }: Props): React.ReactElement {
+export function Banner({ version, cwd, configFiles, toolCount, hookCount, model, permMode, sessionId }: Props): React.ReactElement {
   const { cols } = useTerminalSize()
-  const shortCwd = abbreviatePath(cwd)
   const theme = useTheme()
+  const shortCwd = abbreviatePath(cwd)
 
-  // Animation state
-  const totalFrames = 20
-  const canAnimate = cols > ART_WIDTH + 10
-  const [frame, setFrame] = useState(canAnimate ? 0 : totalFrames)
+  // Build key-value rows
+  const rows: Array<[string, string]> = []
+  if (model) rows.push(['Model:', model])
+  rows.push(['Directory:', shortCwd])
+  if (permMode) rows.push(['Permissions:', permMode === 'yolo' ? 'Full Access (yolo)' : permMode === 'plan' ? 'Plan Mode' : 'Auto'])
+  if (toolCount) {
+    const toolStr = hookCount ? `${toolCount} tools \u00B7 ${hookCount} hooks` : `${toolCount} tools`
+    rows.push(['Tools:', toolStr])
+  }
+  if (configFiles && configFiles.length > 0) {
+    rows.push(['Config:', configFiles.join(', ')])
+  }
+  if (sessionId) {
+    rows.push(['Session:', sessionId.length > 24 ? sessionId.slice(0, 22) + '..' : sessionId])
+  }
+  const fleetLine = getFleetSummaryLine()
+  if (fleetLine) {
+    rows.push(['Fleet:', fleetLine])
+  }
 
-  useEffect(() => {
-    if (!canAnimate || frame >= totalFrames) return
-    const timer = setTimeout(() => setFrame(f => f + 1), 60)
-    return () => clearTimeout(timer)
-  }, [frame, canAnimate])
-
-  // Calculate per-line offsets
-  const maxPad = Math.max(0, cols - ART_WIDTH - 4)
-  const startPad = maxPad
-  const endPad = 2
-  const progress = Math.min(1, frame / totalFrames)
-  const ease = 1 - Math.pow(1 - progress, 3) // cubic ease-out
-  const baseDrift = Math.round(startPad + (endPad - startPad) * ease)
-
-  // Body-wave undulation
-  const t = (frame / totalFrames) * Math.PI * 4
-  const amplitude = Math.min(Math.floor(maxPad / 6), 8)
-  const dampFactor = 1 - progress * 0.8
-  const globalWave = Math.round(Math.sin(t) * amplitude * dampFactor)
+  const boxWidth = Math.min(cols - 4, 64)
+  const labelWidth = 18
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      {/* Orca art with animation offsets */}
-      <Box flexDirection="column">
-        {ORCA_LINES.map((line, i) => {
-          // Per-line body wave (tail sways more than head)
-          const tailFactor = 0.3 + (i / ORCA_LINES.length) * 0.7
-          const bodyWave = Math.round(Math.sin(t + i * 0.45) * 3 * tailFactor * dampFactor)
-          const pad = Math.max(0, Math.min(maxPad, baseDrift + globalWave + bodyWave))
-          return (
-            <Text key={i} color={theme.accent}>{' '.repeat(pad)}{line}</Text>
-          )
-        })}
-      </Box>
-
-      {/* Compact info line: version · cwd · tools */}
-      <Box marginTop={1} marginLeft={2} flexWrap="wrap">
-        <Text bold color="white">Orca</Text>
-        <Text dimColor> v{version}</Text>
-        <Text dimColor>  ·  </Text>
-        <Text color={theme.accent}>{shortCwd}</Text>
-        {toolCount && (
-          <>
-            <Text dimColor>  ·  </Text>
-            <Text dimColor>{toolCount} tools</Text>
-            {hookCount ? <Text dimColor> · {hookCount} hooks</Text> : null}
-          </>
-        )}
-      </Box>
-      {configFiles && configFiles.length > 0 && (
-        <Box marginLeft={2}>
-          <Text dimColor>config  {configFiles.join(', ')}</Text>
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={theme.accent}
+        width={boxWidth}
+        marginLeft={2}
+        paddingLeft={1}
+        paddingRight={1}
+      >
+        {/* Title line */}
+        <Box marginBottom={1}>
+          <Text color={theme.accent} bold>{'>_ '}</Text>
+          <Text bold>Orca CLI</Text>
+          <Text dimColor> (v{version})</Text>
         </Box>
-      )}
+
+        {/* Key-value rows */}
+        {rows.map(([label, value], i) => (
+          <Box key={i}>
+            <Text dimColor>{label.padEnd(labelWidth)}</Text>
+            <Text>{value}</Text>
+          </Box>
+        ))}
+      </Box>
     </Box>
   )
 }

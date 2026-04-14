@@ -260,8 +260,8 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
           {cursorVisible && i === cursorLine ? (
             <Text>
               {line.slice(0, cursorCol)}
-              <Text color={theme.prompt}>|</Text>
-              {line.slice(cursorCol)}
+              <Text backgroundColor={theme.accent} color="black">{line[cursorCol] || ' '}</Text>
+              {line.slice(cursorCol + 1)}
             </Text>
           ) : (
             <Text>{line}</Text>

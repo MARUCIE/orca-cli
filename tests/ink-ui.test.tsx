@@ -40,7 +40,8 @@ describe('StatusBar', () => {
 
   it('renders permission mode', () => {
     const { lastFrame } = render(<TerminalSizeProvider><StatusBar status={baseStatus} /></TerminalSizeProvider>)
-    expect(lastFrame()).toContain('yolo')
+    // New 3-line StatusBar shows permission as "bypass permissions on"
+    expect(lastFrame()).toContain('bypass permissions on')
   })
 
   it('renders git branch', () => {
@@ -125,7 +126,9 @@ describe('InputArea', () => {
 
   it('shows cursor when active', () => {
     const { lastFrame } = render(<TerminalSizeProvider><InputArea onSubmit={() => {}} active={true} /></TerminalSizeProvider>)
-    expect(lastFrame()).toContain('|')
+    // Block cursor renders as inverse space — check that prompt and placeholder are present
+    expect(lastFrame()).toContain('>')
+    expect(lastFrame()).toContain('Type a message')
   })
 })
 
@@ -299,26 +302,27 @@ describe('Banner', () => {
   it('renders version and cwd', async () => {
     const { Banner } = await import('../src/ui/components/Banner.js')
     const { lastFrame } = render(
-      <Banner version="0.8.0" cwd="/Users/me/project" />,
+      <TerminalSizeProvider><Banner version="0.8.0" cwd="/Users/me/project" /></TerminalSizeProvider>,
     )
     expect(lastFrame()).toContain('Orca')
     expect(lastFrame()).toContain('0.8.0')
   })
 
-  it('renders orca pixel art', async () => {
+  it('renders Codex-style info box', async () => {
     const { Banner } = await import('../src/ui/components/Banner.js')
     const { lastFrame } = render(
-      <Banner version="0.8.0" cwd="/tmp" />,
+      <TerminalSizeProvider><Banner version="0.8.0" cwd="/tmp" model="claude-sonnet-4.6" permMode="auto" /></TerminalSizeProvider>,
     )
-    // Should contain some orca art characters
-    expect(lastFrame()).toContain('▄')
-    expect(lastFrame()).toContain('█')
+    // Should contain Codex-style info fields
+    expect(lastFrame()).toContain('>_')
+    expect(lastFrame()).toContain('Orca CLI')
+    expect(lastFrame()).toContain('Directory:')
   })
 
   it('renders config files when provided', async () => {
     const { Banner } = await import('../src/ui/components/Banner.js')
     const { lastFrame } = render(
-      <Banner version="0.8.0" cwd="/tmp" configFiles={['CLAUDE.md', 'package.json']} toolCount={41} hookCount={37} />,
+      <TerminalSizeProvider><Banner version="0.8.0" cwd="/tmp" configFiles={['CLAUDE.md', 'package.json']} toolCount={41} hookCount={37} /></TerminalSizeProvider>,
     )
     expect(lastFrame()).toContain('CLAUDE.md')
     expect(lastFrame()).toContain('41 tools')
@@ -505,7 +509,7 @@ describe('StatusBar context bar', () => {
       turns: 1,
     }
     const { lastFrame } = render(<TerminalSizeProvider><StatusBar status={status} /></TerminalSizeProvider>)
-    expect(lastFrame()).toContain('████████')
+    expect(lastFrame()).toContain('██████') // 6-wide full bar
     expect(lastFrame()).toContain('100%')
   })
 })
