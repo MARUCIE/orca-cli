@@ -61,9 +61,8 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
       // When picker is active, defer Enter/Esc/arrows to CommandPicker
       if (pickerActive && (key.return || key.escape || key.upArrow || key.downArrow)) return
 
-      // Enter: submit (only when active — prevents premature send)
+      // Enter: submit (always allowed — session buffers input if needed)
       if (key.return && !key.ctrl) {
-        if (!active) return // can't submit yet, but keep capturing text
         const trimmed = value.trim()
         onSubmit(trimmed)
         setValue('')

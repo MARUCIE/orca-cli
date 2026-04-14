@@ -121,19 +121,29 @@ export class ChatSessionEmitter extends EventEmitter {
   // ── Input from UI to business logic ───────────────────────
 
   private inputResolve: ((input: string | null) => void) | null = null
+  private bufferedInput: string | null | undefined = undefined
 
-  /** Called by UI when user submits input. Resolves the pending waitForInput promise. */
+  /** Called by UI when user submits input. Resolves pending waitForInput or buffers for later. */
   submitInput(input: string | null): void {
     if (this.inputResolve) {
       const resolve = this.inputResolve
       this.inputResolve = null
       resolve(input)
+    } else {
+      // Buffer: user pressed Enter before business logic called waitForInput
+      this.bufferedInput = input
     }
   }
 
-  /** Called by business logic to wait for user input. Returns the input string or null (EOF). */
+  /** Called by business logic to wait for user input. Returns buffered input or waits. */
   waitForInput(): Promise<string | null> {
     this.emitPromptReady()
+    // Return buffered input immediately if user already submitted
+    if (this.bufferedInput !== undefined) {
+      const input = this.bufferedInput
+      this.bufferedInput = undefined
+      return Promise.resolve(input)
+    }
     return new Promise((resolve) => {
       this.inputResolve = resolve
     })

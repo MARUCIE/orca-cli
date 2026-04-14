@@ -352,8 +352,8 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      {/* Content area: fills space above fixed bottom, content gravity = bottom */}
-      <Box flexDirection="column" flexGrow={1} overflow="hidden" justifyContent="flex-end">
+      {/* Content area: fills space above fixed bottom */}
+      <Box flexDirection="column" flexGrow={1} overflow="hidden">
         {/* Banner (shown once at startup) */}
         {banner && (
           <Banner
