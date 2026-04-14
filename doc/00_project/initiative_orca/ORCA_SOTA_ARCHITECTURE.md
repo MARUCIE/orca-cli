@@ -433,7 +433,7 @@ src/
 | Version | 0.8.0 |
 | LOC | 16,722 |
 | Tests | 1164 (54 files) |
-| Modules | 15 directories (incl. src/ui/) |
+| Modules | 15 directories (incl. src/ui/, 15 ink components + theme) |
 | Tools | 41+ |
 | Slash commands | 30+ |
 
