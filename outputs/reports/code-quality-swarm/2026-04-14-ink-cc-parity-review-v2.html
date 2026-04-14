@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orca CLI ink UI — CC Deep Dive 蜂群审查报告 v2</title>
+<style>
+  :root { --primary: #1B3A5C; --accent: #2E6BA6; --bg: #FAFBFD; --card: #FFF; --border: #E3E8EF; --text: #1A2332; --muted: #6B7A8D; --green: #0D7A3F; --red: #C41E3A; --yellow: #B8860B; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'SF Pro Text', sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+  .container { max-width: 960px; margin: 0 auto; padding: 60px 40px; }
+  h1 { font-size: 28px; font-weight: 700; color: var(--primary); margin-bottom: 8px; }
+  h2 { font-size: 20px; font-weight: 600; color: var(--primary); margin-top: 48px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--accent); }
+  h3 { font-size: 16px; font-weight: 600; color: var(--accent); margin-top: 24px; margin-bottom: 12px; }
+  .subtitle { font-size: 14px; color: var(--muted); margin-bottom: 32px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .stat { text-align: center; padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+  .stat-num { font-size: 32px; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th { background: var(--primary); color: white; padding: 10px 14px; text-align: left; font-weight: 600; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #F0F4F8; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .tag-done { background: #E8F5E9; color: var(--green); }
+  .tag-new { background: #E3F2FD; color: var(--accent); }
+  .tag-gap { background: #FFF3E0; color: #D2691E; }
+  .tag-critical { background: #FFEBEE; color: var(--red); }
+  .tag-fixed { background: #E0F2F1; color: #00796B; }
+  code { background: #F0F2F5; padding: 2px 6px; border-radius: 3px; font-size: 13px; font-family: 'SF Mono', monospace; }
+  .verdict { font-size: 18px; font-weight: 700; padding: 16px 24px; border-radius: 8px; margin-top: 24px; }
+  .verdict-progress { background: #FFF3E0; color: #E65100; border-left: 4px solid #E65100; }
+  footer { text-align: center; padding: 60px 20px 40px; color: #9B9B9D; font-size: 13px; line-height: 2.2; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Orca CLI ink UI — CC Deep Dive 蜂群审查报告 v2</h1>
+<p class="subtitle">2026-04-14 | 三路 CC 源码深挖（rendering + input + visual） | 基于 claude-code-deep-dive 仓库</p>
+
+<div class="summary-grid">
+  <div class="stat"><div class="stat-num">16</div><div class="stat-label">ink 组件 + theme</div></div>
+  <div class="stat"><div class="stat-num">1168</div><div class="stat-label">测试用例</div></div>
+  <div class="stat"><div class="stat-num">6</div><div class="stat-label">架构差距已修</div></div>
+  <div class="stat"><div class="stat-num">4</div><div class="stat-label">待实施项</div></div>
+</div>
+
+<h2>一、CC 架构核心模式（从源码提取）</h2>
+
+<table>
+  <tr><th>层</th><th>CC 实现</th><th>关键代码</th></tr>
+  <tr>
+    <td><strong>L0 AlternateScreen</strong></td>
+    <td><code>\x1b[?1049h</code> 进入备用屏幕缓冲区 + <code>\x1b[2J\x1b[H</code> 清屏 + <code>\x1b[?25l</code> 隐藏光标。<code>height={rows}</code> 天花板。退出时 <code>\x1b[?1049l</code> 恢复主屏幕</td>
+    <td>AlternateScreen.tsx:50-72</td>
+  </tr>
+  <tr>
+    <td><strong>L1 FullscreenLayout</strong></td>
+    <td>ScrollBox(<code>flexGrow=1</code>) + 底部区域(<code>flexShrink=0, maxHeight=50%</code>)。4-5 层嵌套 Box</td>
+    <td>FullscreenLayout.tsx:361-414</td>
+  </tr>
+  <tr>
+    <td><strong>L2 Input</strong></td>
+    <td><code>useInput</code> 用 <code>useLayoutEffect</code> 同步进入 raw mode。<code>focus</code> prop 控制激活，不是 prompt_ready 模式</td>
+    <td>use-input.ts:50-60, BaseTextInput.tsx:87-89</td>
+  </tr>
+  <tr>
+    <td><strong>L3 Submit</strong></td>
+    <td>Enter → <code>handleEnter()</code> → <code>onSubmit(originalValue)</code> → PromptInput → 业务逻辑。多行: Shift+Enter 换行</td>
+    <td>useTextInput.ts:247-267, 366-368</td>
+  </tr>
+  <tr>
+    <td><strong>L4 Theme</strong></td>
+    <td>88 种语义颜色，6 套主题（dark/light × normal/daltonized/ansi），RGB + ANSI 双模式</td>
+    <td>theme.ts (全文)</td>
+  </tr>
+  <tr>
+    <td><strong>L5 Console</strong></td>
+    <td>console.log/error/stderr 全量拦截 → <code>logForDebugging()</code>，stderr 写入触发 full-damage repaint</td>
+    <td>ink.tsx:1571-1639</td>
+  </tr>
+</table>
+
+<h2>二、Orca vs CC 差距矩阵（基于源码对比）</h2>
+
+<table>
+  <tr><th>维度</th><th>CC 实现</th><th>Orca 当前</th><th>状态</th></tr>
+  <tr>
+    <td><strong>AlternateScreen</strong></td>
+    <td><code>\x1b[?1049h</code> 备用缓冲区</td>
+    <td>已实现 AlternateScreen.tsx</td>
+    <td><span class="tag tag-fixed">FIXED</span></td>
+  </tr>
+  <tr>
+    <td><strong>Layout 天花板</strong></td>
+    <td><code>height={rows}</code> 在 AlternateScreen</td>
+    <td>AlternateScreen 提供天花板，App 用 <code>flexGrow=1</code></td>
+    <td><span class="tag tag-fixed">FIXED</span></td>
+  </tr>
+  <tr>
+    <td><strong>底部钉定</strong></td>
+    <td><code>flexShrink=0</code> on bottom</td>
+    <td>已实现 flexShrink=0 wrapper</td>
+    <td><span class="tag tag-fixed">FIXED</span></td>
+  </tr>
+  <tr>
+    <td><strong>内容重力</strong></td>
+    <td>ScrollBox + stickyScroll</td>
+    <td><code>justifyContent="flex-end"</code> 内容贴底</td>
+    <td><span class="tag tag-fixed">FIXED</span></td>
+  </tr>
+  <tr>
+    <td><strong>stdin 立即捕获</strong></td>
+    <td><code>useLayoutEffect</code> 同步 raw mode</td>
+    <td><code>isActive: !permissionBlocked</code> 始终捕获</td>
+    <td><span class="tag tag-fixed">FIXED</span></td>
+  </tr>
+  <tr>
+    <td><strong>React 状态更新</strong></td>
+    <td>onChange 通过 props callback</td>
+    <td>useEffect + useRef 避免 render-time setState</td>
+    <td><span class="tag tag-fixed">FIXED</span></td>
+  </tr>
+  <tr>
+    <td><strong>ScrollBox</strong></td>
+    <td>自定义 ScrollBox 组件，viewport culling，stickyScroll</td>
+    <td><code>overflow="hidden"</code> 静态裁剪，无滚动</td>
+    <td><span class="tag tag-gap">GAP</span></td>
+  </tr>
+  <tr>
+    <td><strong>Cursor 模型</strong></td>
+    <td>完整 Cursor 类（insert/delete/left/right/up/down/word nav）</td>
+    <td>手写 cursor 逻辑（基础但能用）</td>
+    <td><span class="tag tag-gap">GAP</span></td>
+  </tr>
+  <tr>
+    <td><strong>Theme 深度</strong></td>
+    <td>88 颜色 × 6 主题 × RGB+ANSI</td>
+    <td>5 颜色 × 5 主题 × 名称 only</td>
+    <td><span class="tag tag-gap">GAP</span></td>
+  </tr>
+  <tr>
+    <td><strong>Spinner 趣味</strong></td>
+    <td>204 个 verb + 颜色插值 + reduced motion</td>
+    <td>固定 "Thinking..." + dots</td>
+    <td><span class="tag tag-gap">GAP</span></td>
+  </tr>
+</table>
+
+<h2>三、已修复的关键 Bug</h2>
+
+<div class="card">
+  <h3>Bug 1: 空状态巨大空白（用户截图反馈 x3）</h3>
+  <p><strong>根因</strong>：<code>height={rows}</code> + <code>flexGrow=1</code> 在空状态下把输入框推到终端最底部</p>
+  <p><strong>修复</strong>：AlternateScreen（深色背景填充）+ <code>justifyContent="flex-end"</code>（内容贴近输入框）+ <code>flexShrink=0</code>（底部固定）</p>
+</div>
+
+<div class="card">
+  <h3>Bug 2: 键盘输入落到终端 shell（用户截图反馈 x2）</h3>
+  <p><strong>根因</strong>：<code>useInput({ isActive: false })</code> 在 <code>prompt_ready</code> 之前不进入 raw mode</p>
+  <p><strong>修复</strong>：<code>isActive: !permissionBlocked</code>（始终捕获 stdin）+ Enter 提交 gated on <code>active</code> prop</p>
+</div>
+
+<div class="card">
+  <h3>Bug 3: React "Cannot update App while rendering InputArea"</h3>
+  <p><strong>根因</strong>：<code>setValue</code> wrapper 在 render 期间调用 <code>onChange</code> → parent <code>setInputValue</code></p>
+  <p><strong>修复</strong>：onChange 改用 <code>useEffect</code> + <code>useRef</code>，在 commit phase 后通知 parent</p>
+</div>
+
+<h2>四、待实施改进项</h2>
+
+<table>
+  <tr><th>项目</th><th>CC 参考</th><th>影响</th><th>工作量</th></tr>
+  <tr>
+    <td><strong>ScrollBox 组件</strong><br>viewport culling + stickyScroll</td>
+    <td>ScrollBox.tsx: scrollTop/scrollHeight/viewportHeight API</td>
+    <td>高——长对话会溢出 overflow:hidden</td>
+    <td>高</td>
+  </tr>
+  <tr>
+    <td><strong>Theme 扩展</strong><br>88 色语义化主题 + light/dark 自适应</td>
+    <td>theme.ts: RGB/ANSI 双模式，daltonized 无障碍</td>
+    <td>中——视觉一致性</td>
+    <td>中</td>
+  </tr>
+  <tr>
+    <td><strong>Spinner verb 库</strong><br>204 个有趣动词 + 颜色插值</td>
+    <td>spinnerVerbs.ts + Spinner.tsx: stalledIntensity</td>
+    <td>低——趣味性</td>
+    <td>低</td>
+  </tr>
+  <tr>
+    <td><strong>Cursor 模型</strong><br>完整的文本编辑 cursor 类</td>
+    <td>useTextInput.ts: insert/delete/word nav/paste handler</td>
+    <td>中——编辑体验</td>
+    <td>中</td>
+  </tr>
+</table>
+
+<div class="verdict verdict-progress">
+  STATUS: 6/10 架构差距已修复。AlternateScreen + 底部钉定 + stdin 捕获是三个最关键的修复，解决了用户反馈的全部 UX 问题。剩余 4 项为体验增强，不阻塞基础可用性。
+</div>
+
+</div>
+<footer>
+  <p>Orca CLI v0.8.0 — CC Deep Dive Swarm Review v2</p>
+  <p>Maurice | maurice_wen@proton.me</p>
+  <p style="font-size:12px; margin-top:8px;">2026-04-14 | 数据来源：cc-rendering + cc-input + cc-visual 三路源码深挖</p>
+</footer>
+</body>
+</html>

@@ -72,7 +72,9 @@ describe('ThinkingSpinner', () => {
 
   it('renders spinner when active', () => {
     const { lastFrame } = render(<ThinkingSpinner active={true} />)
-    expect(lastFrame()).toContain('Thinking')
+    // Verb is randomly selected from 60 options, check for common pattern
+    expect(lastFrame()).toContain('...')
+    expect(lastFrame()).toContain('0s')
   })
 })
 
