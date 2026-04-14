@@ -240,7 +240,8 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
   const { line: cursorLine, col: cursorCol, lines } = C.getCursorDisplay(value, cursor)
   const isMultiLine = lines.length > 1
   // Show cursor when explicitly enabled or when input is active
-  const cursorVisible = showCursor ?? active
+  // Cursor always visible unless explicitly hidden — don't wait for prompt_ready
+  const cursorVisible = showCursor ?? true
 
   // Blinking cursor — toggles every 530ms (standard terminal blink rate)
   const [cursorOn, setCursorOn] = useState(true)
