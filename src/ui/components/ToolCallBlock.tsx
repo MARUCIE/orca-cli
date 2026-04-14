@@ -3,11 +3,13 @@
  *
  * Shows tool name + args summary, then result status + duration.
  * Uses a subtle left-border accent for visual grouping.
+ * File paths render as OSC 8 clickable links when terminal supports it.
  */
 
 import React from 'react'
 import { Box, Text } from 'ink'
 import type { ToolStartInfo, ToolEndInfo } from '../types.js'
+import { FileLink } from './FileLink.js'
 
 interface Props {
   start: ToolStartInfo
@@ -15,9 +17,10 @@ interface Props {
 }
 
 export function ToolCallBlock({ start, end }: Props): React.ReactElement {
+  const borderColor = end ? (end.success ? 'green' : 'red') : 'gray'
+  const hasPath = 'path' in start.args && typeof start.args.path === 'string'
   const label = start.label || summarizeArgs(start.args)
   const shortLabel = label.length > 60 ? label.slice(0, 57) + '...' : label
-  const borderColor = end ? (end.success ? 'green' : 'red') : 'gray'
 
   return (
     <Box
@@ -33,7 +36,11 @@ export function ToolCallBlock({ start, end }: Props): React.ReactElement {
     >
       <Box>
         <Text color="yellow" bold>{start.name}</Text>
-        {shortLabel ? <Text dimColor> {shortLabel}</Text> : null}
+        {hasPath ? (
+          <Text> <FileLink path={String(start.args.path)} color="gray" /></Text>
+        ) : shortLabel ? (
+          <Text dimColor> {shortLabel}</Text>
+        ) : null}
       </Box>
       {end && (
         <Box>

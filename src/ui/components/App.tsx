@@ -27,6 +27,7 @@ import { Footer } from './Footer.js'
 import { MarkdownText } from './MarkdownText.js'
 import { Banner } from './Banner.js'
 import { CommandPicker } from './CommandPicker.js'
+import { DiffPreview } from './DiffPreview.js'
 import type { CommandDef } from './CommandPicker.js'
 
 const SLASH_COMMANDS: CommandDef[] = [
@@ -137,7 +138,10 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
   const [inputActive, setInputActive] = useState(false)
   const [inputHistory, setInputHistory] = useState<string[]>([])
   const [lastTurnSummary, setLastTurnSummary] = useState<TurnSummaryInfo | null>(null)
-  const [permRequest, setPermRequest] = useState<{ toolName: string; preview: string; resolve: (b: boolean) => void } | null>(null)
+  const [permRequest, setPermRequest] = useState<{
+    toolName: string; preview: string; resolve: (b: boolean) => void
+    diff?: { filePath: string; oldContent: string; newContent: string }
+  } | null>(null)
   const [multiModelState, setMultiModelState] = useState<{ command: string; models: ModelProgress[] } | null>(null)
   const [activeTool, setActiveTool] = useState<{ id: string; start: ToolStartInfo; startTime: number } | null>(null)
   const [inputValue, setInputValue] = useState('')
@@ -239,6 +243,7 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
           setPermRequest({
             toolName: event.request.toolName,
             preview: event.request.preview,
+            diff: event.request.diff,
             resolve: (allowed) => {
               event.request.resolve(allowed)
               setPermRequest(null)
@@ -383,7 +388,14 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
           <TurnSummary info={lastTurnSummary} />
         )}
 
-        {/* Permission prompt */}
+        {/* Diff preview + Permission prompt */}
+        {permRequest && permRequest.diff && (
+          <DiffPreview
+            filePath={permRequest.diff.filePath}
+            oldContent={permRequest.diff.oldContent}
+            newContent={permRequest.diff.newContent}
+          />
+        )}
         {permRequest && (
           <PermissionPrompt
             toolName={permRequest.toolName}

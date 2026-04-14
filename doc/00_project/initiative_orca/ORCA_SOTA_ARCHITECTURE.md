@@ -432,7 +432,7 @@ src/
 |---|---|
 | Version | 0.8.0 |
 | LOC | 16,722 |
-| Tests | 1159 (54 files) |
+| Tests | 1164 (54 files) |
 | Modules | 15 directories (incl. src/ui/) |
 | Tools | 41+ |
 | Slash commands | 30+ |

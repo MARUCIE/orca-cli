@@ -69,11 +69,15 @@ export class ChatSessionEmitter extends EventEmitter {
   }
 
   /** Emit permission request and wait for UI response. Returns true if allowed. */
-  emitPermissionRequest(req: { toolName: string; preview: string }): Promise<boolean> {
+  emitPermissionRequest(req: {
+    toolName: string
+    preview: string
+    diff?: { filePath: string; oldContent: string; newContent: string }
+  }): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       this.emitUI({
         type: 'permission_request',
-        request: { toolName: req.toolName, preview: req.preview, resolve },
+        request: { toolName: req.toolName, preview: req.preview, resolve, diff: req.diff },
       })
     })
   }

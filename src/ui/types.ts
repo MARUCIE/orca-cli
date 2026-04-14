@@ -77,6 +77,12 @@ export interface PermissionRequest {
   toolName: string
   preview: string
   resolve: (allowed: boolean) => void
+  /** Diff data for file write permissions */
+  diff?: {
+    filePath: string
+    oldContent: string
+    newContent: string
+  }
 }
 
 // ── UI Event Union ──────────────────────────────────────────

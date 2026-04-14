@@ -2764,24 +2764,29 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
               preview = `${name}: ${JSON.stringify(args).slice(0, 80)}`
             }
 
-            // Diff preview for file writes in safe mode
+            // Diff data for file writes in safe mode
+            let diffData: { filePath: string; oldContent: string; newContent: string } | undefined
             if ((name === 'write_file' || name === 'edit_file') && args.path) {
               const { resolve: resolvePath } = await import('node:path')
               const fullPath = resolvePath(cwd, String(args.path))
               if (existsSync(fullPath)) {
                 try {
                   const old = readFileSync(fullPath, 'utf-8')
-                  if (name === 'write_file') printDiffPreview(old, String(args.content || ''))
-                  else printDiffPreview(old, old.replace(String(args.old_string || ''), String(args.new_string || '')))
+                  const newContent = name === 'write_file'
+                    ? String(args.content || '')
+                    : old.replace(String(args.old_string || ''), String(args.new_string || ''))
+                  diffData = { filePath: String(args.path), oldContent: old, newContent }
                 } catch { /* ignore */ }
               }
             }
 
             let allowed: boolean
             if (emitterOpt) {
-              // ink mode: route through session emitter → PermissionPrompt component
-              allowed = await emitterOpt.emitPermissionRequest({ toolName: name, preview })
+              // ink mode: route through session emitter with diff data → DiffPreview + PermissionPrompt
+              allowed = await emitterOpt.emitPermissionRequest({ toolName: name, preview, diff: diffData })
             } else {
+              // legacy mode: print diff + ask permission via readline
+              if (diffData) printDiffPreview(diffData.oldContent, diffData.newContent)
               allowed = await askPermission(name, preview)
             }
             if (!allowed) {
