@@ -1,19 +1,23 @@
 /**
  * useMouseWheel — SGR mouse protocol for wheel scrolling in ink.
  *
- * Enables SGR mouse reporting (\x1b[?1003h\x1b[?1006h) which sends
- * wheel events as escape sequences: \x1b[<64;col;rowM (up) / \x1b[<65;col;rowM (down).
+ * Uses Normal Mouse Tracking (\x1b[?1000h) + SGR encoding (\x1b[?1006h).
+ * Normal mode only reports button press/release (including wheel), NOT motion.
+ * This prevents flooding stdin with mouse-move escape sequences.
  *
- * Parses raw stdin for mouse wheel events and calls onWheel callback.
- * Cleans up mouse mode on unmount.
+ * Wheel events: \x1b[<64;col;rowM (up) / \x1b[<65;col;rowM (down).
+ *
+ * IMPORTANT: Do NOT use \x1b[?1003h (Any Event Tracking) — it reports
+ * every mouse motion as escape sequences that ink's useInput interprets
+ * as text input, filling the InputArea with garbage.
  */
 
 import { useEffect, useRef } from 'react'
 import { useStdin } from 'ink'
 
-// SGR mouse mode: reports all events including wheel, in SGR format
-const ENABLE_MOUSE = '\x1b[?1003h\x1b[?1006h'
-const DISABLE_MOUSE = '\x1b[?1003l\x1b[?1006l'
+// Normal Mouse Tracking (button press/release/wheel only) + SGR encoding
+const ENABLE_MOUSE = '\x1b[?1000h\x1b[?1006h'
+const DISABLE_MOUSE = '\x1b[?1000l\x1b[?1006l'
 
 // SGR mouse event: \x1b[<button;col;row(M|m)
 // button 64 = wheel up, 65 = wheel down

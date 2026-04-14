@@ -80,6 +80,10 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
 
   useInput(
     (input, key) => {
+      // Filter out mouse escape sequences that leak through from SGR mouse mode.
+      // These look like \x1b[<N;N;N(M|m) and should never be treated as text input.
+      if (input && /\x1b\[<|;.*[Mm]$/.test(input)) return
+
       // When picker is active, defer Enter/Esc/arrows to CommandPicker
       if (pickerActive && (key.return || key.escape || key.upArrow || key.downArrow)) return
 
@@ -225,8 +229,8 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
         return
       }
 
-      // Regular character input
-      if (input && !key.ctrl && !key.meta) {
+      // Regular character input (reject escape sequences and control chars)
+      if (input && !key.ctrl && !key.meta && !input.includes('\x1b')) {
         applyState(C.insert({ text: value, pos: cursor }, input))
       }
     },
