@@ -98,6 +98,58 @@ Orca CLI is a command-first product. User journeys are structured around termina
 3. The REPL surfaces completion notifications before the next prompt.
 4. `/jobs` provides a quick state view without falling back to raw PID inspection.
 
+### 5. ink Terminal UI Interaction Model
+
+The REPL now uses ink (React for terminals) as the rendering engine. The UI is a fullscreen alternate-screen layout:
+
+```
+┌─────────────────────────────────┐
+│  ScrollBox (content area)       │  ← scrollable: PageUp/Down, g/G, mouse wheel
+│  banner, markdown, tool calls   │  ← stickyScroll: auto-follows bottom
+│  thinking spinner, diff preview │
+├─────────────────────────────────┤
+│  CommandPicker (when / typed)   │  ← slash command autocomplete
+├─────────────────────────────────┤
+│  > InputArea                    │  ← multi-line: Ctrl+J/Meta+Enter/Shift+Enter
+│    cursor, kill/yank, paste     │  ← word nav: Option+Arrow, Ctrl+W, Ctrl+K/Y
+├─────────────────────────────────┤
+│  model · mode · branch · cost   │  ← StatusBar line 1 (inverse video)
+│  ████░░░░ 12% · 3 turns · ▃▅█  │  ← StatusBar line 2 (context bar + sparkline)
+├─────────────────────────────────┤
+│  enter send · ctrl+j newline    │  ← Footer (context-aware keyboard hints)
+└─────────────────────────────────┘
+```
+
+Key ink UI components (18 files in `src/ui/`):
+
+| Component | Purpose |
+| --- | --- |
+| AlternateScreen | Terminal alternate buffer + SIGCONT resume |
+| ScrollBox | Viewport scroll with stickyScroll + PageUp/Down + g/G + mouse wheel |
+| InputArea | Multi-line input with Cursor model, kill/yank, paste, history |
+| StatusBar | 2-line inverse status: model/cost/branch + context bar/sparkline |
+| Banner | Animated orca swimming art + version info |
+| Footer | Context-aware keyboard shortcut hints |
+| ThinkingSpinner | 204 verbs + stalledIntensity color shift + reduced-motion |
+| ToolCallBlock | Graduated error rendering (6 error types) |
+| DiffPreview | Inline colored diff for file modifications |
+| MarkdownText | highlight.js ANSI syntax highlighting |
+| FileLink | OSC 8 clickable file paths |
+| PermissionPrompt | Tool permission allow/deny dialog |
+| CommandPicker | Slash command autocomplete overlay |
+| MultiModelProgress | Council/race/pipeline progress display |
+
+Hooks and modules:
+
+| Module | Purpose |
+| --- | --- |
+| useTerminalSize | Reactive terminal dimensions via SIGWINCH |
+| useMouseWheel | SGR mouse protocol for wheel scrolling |
+| usePasteHandler | Bracketed paste mode detection |
+| cursor.ts | Pure-function text editing model (word boundary, kill/yank) |
+| theme.tsx | 25 semantic color tokens + dark/light auto-detection |
+| session.ts | ChatSessionEmitter: typed event bridge between business logic and UI |
+
 ## UX Constraints
 
 - No browser dependency for core workflows

@@ -50,6 +50,30 @@ flowchart TD
   Tests --> Hooks
   Tests --> Provider
   Tests --> Tools
+
+  subgraph InkUI[ink Terminal UI]
+    Render[src/ui/render.tsx]
+    App[src/ui/components/App.tsx]
+    ScrollBox[src/ui/components/ScrollBox.tsx]
+    InputArea[src/ui/components/InputArea.tsx]
+    StatusBar[src/ui/components/StatusBar.tsx]
+    TermSize[src/ui/useTerminalSize.tsx]
+    Theme[src/ui/theme.tsx]
+    Cursor[src/ui/cursor.ts]
+    Session[src/ui/session.ts]
+    MouseWheel[src/ui/useMouseWheel.ts]
+    PasteHandler[src/ui/usePasteHandler.ts]
+  end
+
+  Runtime --> Session --> App
+  App --> ScrollBox
+  App --> InputArea
+  App --> StatusBar
+  InputArea --> Cursor
+  InputArea --> PasteHandler
+  App --> MouseWheel
+  Render --> TermSize
+  Render --> Theme
 ```
 
 ## Layer Breakdown
@@ -62,7 +86,8 @@ flowchart TD
 | Runtime/config | `src/config.ts`, `src/context.ts`, `src/system-prompt.ts`, `src/token-budget.ts`, `src/model-catalog.ts`, `src/doctor.ts` | Resolve providers, model metadata, runtime diagnostics, context, prompts, and runtime limits |
 | Provider bridge | `src/providers/openai-compat.ts` | Provider-neutral transport and model interaction |
 | Agent runtime | `src/tools.ts`, `src/background-jobs.ts`, `src/logger.ts`, `src/hooks.ts`, `src/mcp-client.ts`, `src/retry-intelligence.ts`, `src/auto-verify.ts` | Tool execution, detached job tracking, local runtime logging, hooks, MCP, retry behavior, verification helpers |
-| Presentation | `src/output.ts`, `src/markdown.ts`, `src/command-picker.ts` | Terminal rendering and output formatting |
+| ink UI | `src/ui/` (18 files) | React terminal UI: App, ScrollBox, InputArea, StatusBar, Banner, Footer, ThinkingSpinner, ToolCallBlock, DiffPreview, MarkdownText, FileLink, PermissionPrompt, MultiModelProgress, CommandPicker, TurnSummary, AlternateScreen + hooks (useTerminalSize, useMouseWheel, usePasteHandler) + modules (cursor, theme, session, types, utils) |
+| Presentation (legacy) | `src/output.ts`, `src/markdown.ts`, `src/command-picker.ts` | Legacy terminal rendering (pre-ink fallback) |
 | Persistence | `src/usage-db.ts` | Persistent usage/cost tracking |
 | Verification | `tests/*.test.ts` | Automated verification across tool, runtime, hook, SOTA, and multi-model paths |
 

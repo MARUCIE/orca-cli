@@ -6,7 +6,8 @@
  */
 
 import React from 'react'
-import { Box, Text, useStdout } from 'ink'
+import { Box, Text } from 'ink'
+import { useTerminalSize } from '../useTerminalSize.js'
 
 interface Props {
   /** Whether the model is currently generating */
@@ -18,8 +19,7 @@ interface Props {
 }
 
 export function Footer({ isGenerating, isInputActive, permMode }: Props): React.ReactElement {
-  const { stdout } = useStdout()
-  const cols = stdout?.columns || 80
+  const { cols } = useTerminalSize()
 
   const shortcuts: Array<{ key: string; label: string }> = []
 

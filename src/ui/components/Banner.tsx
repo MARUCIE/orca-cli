@@ -6,8 +6,9 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { Box, Text, useStdout } from 'ink'
+import { Box, Text } from 'ink'
 import { useTheme } from '../theme.js'
+import { useTerminalSize } from '../useTerminalSize.js'
 
 // Orca pixel art (plain text, no ANSI — ink handles colors)
 const ORCA_LINES = [
@@ -39,8 +40,7 @@ interface Props {
 }
 
 export function Banner({ version, cwd, configFiles, toolCount, hookCount }: Props): React.ReactElement {
-  const { stdout } = useStdout()
-  const cols = stdout?.columns || 80
+  const { cols } = useTerminalSize()
   const shortCwd = abbreviatePath(cwd)
   const theme = useTheme()
 

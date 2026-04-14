@@ -8,16 +8,18 @@
  */
 
 import React from 'react'
-import { Box, Text, useStdout } from 'ink'
+import { Box, Text } from 'ink'
 import type { StatusInfo } from '../types.js'
+import { useTerminalSize } from '../useTerminalSize.js'
+import { useTheme } from '../theme.js'
 
 interface Props {
   status: StatusInfo
 }
 
 export function StatusBar({ status }: Props): React.ReactElement {
-  const { stdout } = useStdout()
-  const cols = stdout?.columns || 80
+  const { cols } = useTerminalSize()
+  const theme = useTheme()
 
   // ── Line 1: model · mode · branch · cost · tok/s ──
   const modelName = status.model.length > 24 ? status.model.slice(0, 22) + '..' : status.model
@@ -37,7 +39,7 @@ export function StatusBar({ status }: Props): React.ReactElement {
   const barWidth = 10
   const filled = Math.round((ctxPct / 100) * barWidth)
   const ctxBar = '█'.repeat(filled) + '░'.repeat(barWidth - filled)
-  const ctxColor = ctxPct > 60 ? 'red' : ctxPct > 40 ? 'yellow' : 'green'
+  const ctxColor = ctxPct > 60 ? theme.ctxRed : ctxPct > 40 ? theme.ctxYellow : theme.ctxGreen
 
   const line2Parts: string[] = []
   if (status.turns > 0) line2Parts.push(`${status.turns} turns`)

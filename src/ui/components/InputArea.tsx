@@ -4,16 +4,21 @@
  * Features:
  * - Rounded border box with accent color (CC-style)
  * - Multi-line editing via newline character (\n) in buffer
- * - Ctrl+J / Ctrl+Enter to insert newline
+ * - Ctrl+J / Ctrl+Enter / Meta+Enter / Shift+Enter to insert newline
+ * - Word-boundary operations (Ctrl+W, Option+Left/Right)
+ * - Kill/yank buffer (Ctrl+K / Ctrl+Y)
  * - Command history (up/down arrows when on first line)
  * - Esc to abort during generation
- * - Minimum height for visual presence
+ * - Bracketed paste handling (Enter → newline during paste)
  * - Cursor position tracking for mid-text editing
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react'
-import { Box, Text, useInput, useStdout } from 'ink'
+import { Box, Text, useInput } from 'ink'
 import { useTheme } from '../theme.js'
+import { useTerminalSize } from '../useTerminalSize.js'
+import { usePasteHandler } from '../usePasteHandler.js'
+import * as C from '../cursor.js'
 
 interface Props {
   /** Called when user submits input (Enter) */
@@ -34,17 +39,31 @@ interface Props {
   pickerActive?: boolean
   /** When true, stdin capture is suspended (permission prompt is active) */
   permissionBlocked?: boolean
+  /** Show cursor even when input is not active (e.g., during modal) */
+  showCursor?: boolean
   /** Command history for up/down navigation */
   history?: string[]
 }
 
-export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onChange, active, pickerActive, permissionBlocked, history = [] }: Props): React.ReactElement {
-  const { stdout } = useStdout()
-  const cols = stdout?.columns || 80
+export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onChange, active, pickerActive, permissionBlocked, showCursor, history = [] }: Props): React.ReactElement {
+  const { cols } = useTerminalSize()
   const theme = useTheme()
   const [value, setValue] = useState('')
   const [cursor, setCursor] = useState(0)
   const [historyIdx, setHistoryIdx] = useState(-1)
+  const [killRing, setKillRing] = useState('')
+
+  // Bracketed paste: detect paste mode, insert content with newlines preserved
+  const { isPasting } = usePasteHandler({
+    isActive: !permissionBlocked,
+    onPaste: useCallback((text: string) => {
+      setValue(prev => {
+        const result = C.insert({ text: prev, pos: cursor }, text)
+        setCursor(result.pos)
+        return result.text
+      })
+    }, [cursor]),
+  })
 
   // Notify parent of value changes via useEffect (not during render)
   const onChangeRef = useRef(onChange)
@@ -53,28 +72,33 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
     onChangeRef.current?.(value)
   }, [value])
 
+  // Helper: apply a CursorState update
+  const applyState = useCallback((newState: C.CursorState) => {
+    setValue(newState.text)
+    setCursor(newState.pos)
+  }, [])
+
   useInput(
     (input, key) => {
-      // Always capture text input (buffer before prompt_ready).
-      // Only block Enter-submit when not yet active.
-
       // When picker is active, defer Enter/Esc/arrows to CommandPicker
       if (pickerActive && (key.return || key.escape || key.upArrow || key.downArrow)) return
 
-      // Enter: submit (always allowed — session buffers input if needed)
-      if (key.return && !key.ctrl) {
-        const trimmed = value.trim()
-        onSubmit(trimmed)
-        setValue('')
-        setCursor(0)
-        setHistoryIdx(-1)
+      // Ctrl+J / Ctrl+Enter / Meta+Enter / Shift+Enter: insert newline (must check BEFORE plain Enter)
+      if ((key.ctrl && input === 'j') || (key.return && key.ctrl) || (key.return && key.meta) || (key.return && key.shift)) {
+        applyState(C.insert({ text: value, pos: cursor }, '\n'))
         return
       }
 
-      // Ctrl+J or Ctrl+Enter: insert newline
-      if ((key.ctrl && input === 'j') || (key.return && key.ctrl)) {
-        setValue(prev => prev.slice(0, cursor) + '\n' + prev.slice(cursor))
-        setCursor(prev => prev + 1)
+      // Enter: submit (unless pasting — paste Enter becomes literal newline)
+      if (key.return) {
+        if (isPasting) {
+          applyState(C.insert({ text: value, pos: cursor }, '\n'))
+          return
+        }
+        const trimmed = value.trim()
+        onSubmit(trimmed)
+        applyState(C.clear())
+        setHistoryIdx(-1)
         return
       }
 
@@ -83,11 +107,9 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
         return
       }
 
+      // Backspace/Delete
       if (key.backspace || key.delete) {
-        if (cursor > 0) {
-          setValue(prev => prev.slice(0, cursor - 1) + prev.slice(cursor))
-          setCursor(prev => prev - 1)
-        }
+        applyState(C.deleteCharBefore({ text: value, pos: cursor }))
         return
       }
 
@@ -112,30 +134,59 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
         return
       }
 
+      // Ctrl+W: delete word before cursor (kill ring)
+      if (key.ctrl && input === 'w') {
+        const result = C.deleteWordBefore({ text: value, pos: cursor })
+        applyState(result.state)
+        if (result.killed) setKillRing(result.killed)
+        return
+      }
+
+      // Ctrl+K: delete to end of line (kill ring)
+      if (key.ctrl && input === 'k') {
+        const result = C.deleteToLineEnd({ text: value, pos: cursor })
+        applyState(result.state)
+        if (result.killed) setKillRing(result.killed)
+        return
+      }
+
+      // Ctrl+Y: yank (paste from kill ring)
+      if (key.ctrl && input === 'y') {
+        if (killRing) {
+          applyState(C.insert({ text: value, pos: cursor }, killRing))
+        }
+        return
+      }
+
+      // Ctrl+U: delete to start of line (kill ring)
+      if (key.ctrl && input === 'u') {
+        const result = C.deleteToLineStart({ text: value, pos: cursor })
+        applyState(result.state)
+        if (result.killed) setKillRing(result.killed)
+        return
+      }
+
       // Ctrl+A: beginning of line
       if (key.ctrl && input === 'a') {
-        const lineStart = value.lastIndexOf('\n', cursor - 1) + 1
-        setCursor(lineStart)
+        setCursor(C.moveLineStart(value, cursor))
         return
       }
 
       // Ctrl+E: end of line
       if (key.ctrl && input === 'e') {
-        let lineEnd = value.indexOf('\n', cursor)
-        if (lineEnd === -1) lineEnd = value.length
-        setCursor(lineEnd)
+        setCursor(C.moveLineEnd(value, cursor))
         return
       }
 
-      // Left arrow
+      // Left arrow (Option+Left = word left via meta key)
       if (key.leftArrow) {
-        setCursor(prev => Math.max(0, prev - 1))
+        setCursor(key.meta ? C.moveWordLeft(value, cursor) : C.moveLeft(cursor))
         return
       }
 
-      // Right arrow
+      // Right arrow (Option+Right = word right via meta key)
       if (key.rightArrow) {
-        setCursor(prev => Math.min(value.length, prev + 1))
+        setCursor(key.meta ? C.moveWordRight(value, cursor) : C.moveRight(value, cursor))
         return
       }
 
@@ -143,17 +194,13 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
       if (key.upArrow) {
         const lineStart = value.lastIndexOf('\n', cursor - 1)
         if (lineStart === -1 && history.length > 0) {
-          // On first line: navigate history
           const next = Math.min(historyIdx + 1, history.length - 1)
           setHistoryIdx(next)
           const hVal = history[history.length - 1 - next] || ''
           setValue(hVal)
           setCursor(hVal.length)
         } else if (lineStart >= 0) {
-          // Move cursor to previous line
-          const prevLineStart = value.lastIndexOf('\n', lineStart - 1) + 1
-          const colOffset = cursor - lineStart - 1
-          setCursor(Math.min(prevLineStart + colOffset, lineStart))
+          setCursor(C.moveUp(value, cursor))
         }
         return
       }
@@ -162,12 +209,10 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
       if (key.downArrow) {
         const nextNewline = value.indexOf('\n', cursor)
         if (nextNewline === -1) {
-          // On last line: history backward
           const next = historyIdx - 1
           if (next < 0) {
             setHistoryIdx(-1)
-            setValue('')
-            setCursor(0)
+            applyState(C.clear())
           } else {
             setHistoryIdx(next)
             const hVal = history[history.length - 1 - next] || ''
@@ -175,64 +220,40 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
             setCursor(hVal.length)
           }
         } else {
-          // Move cursor to next line
-          const lineStart = value.lastIndexOf('\n', cursor - 1) + 1
-          const colOffset = cursor - lineStart
-          const nextLineEnd = value.indexOf('\n', nextNewline + 1)
-          const nextLineLen = (nextLineEnd === -1 ? value.length : nextLineEnd) - (nextNewline + 1)
-          setCursor(nextNewline + 1 + Math.min(colOffset, nextLineLen))
+          setCursor(C.moveDown(value, cursor))
         }
-        return
-      }
-
-      // Ctrl+U: clear line
-      if (key.ctrl && input === 'u') {
-        setValue('')
-        setCursor(0)
         return
       }
 
       // Regular character input
       if (input && !key.ctrl && !key.meta) {
-        setValue(prev => prev.slice(0, cursor) + input + prev.slice(cursor))
-        setCursor(prev => prev + input.length)
+        applyState(C.insert({ text: value, pos: cursor }, input))
       }
     },
-    { isActive: !permissionBlocked },  // Capture stdin unless permission prompt is active
+    { isActive: !permissionBlocked },
   )
 
-  const lines = value.split('\n')
+  const { line: cursorLine, col: cursorCol, lines } = C.getCursorDisplay(value, cursor)
   const isMultiLine = lines.length > 1
-
-  // Calculate cursor position for display
-  let charsBeforeCursor = 0
-  let cursorLine = 0
-  let cursorCol = 0
-  for (let i = 0; i < lines.length; i++) {
-    if (charsBeforeCursor + lines[i]!.length >= cursor) {
-      cursorLine = i
-      cursorCol = cursor - charsBeforeCursor
-      break
-    }
-    charsBeforeCursor += lines[i]!.length + 1 // +1 for \n
-  }
+  // Show cursor when explicitly enabled or when input is active
+  const cursorVisible = showCursor ?? active
 
   return (
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor={active ? theme.accent : 'gray'}
+      borderColor={active ? theme.border : theme.borderDim}
       width={cols}
       minHeight={3}
     >
       {lines.map((line, i) => (
         <Box key={i}>
           {i === 0 ? (
-            <Text color={active ? theme.prompt : 'gray'} bold={active}>{'> '}</Text>
+            <Text color={active ? theme.prompt : theme.dim} bold={active}>{'> '}</Text>
           ) : (
-            <Text color="gray">  </Text>
+            <Text color={theme.dim}>  </Text>
           )}
-          {active && i === cursorLine ? (
+          {cursorVisible && i === cursorLine ? (
             <Text>
               {line.slice(0, cursorCol)}
               <Text color={theme.prompt}>|</Text>
@@ -242,7 +263,7 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
             <Text>{line}</Text>
           )}
           {i === 0 && !value && (
-            <Text color="gray">{active ? '' : '|'} Type a message... (/help for commands)</Text>
+            <Text color={theme.muted}>{active ? '' : '|'} Type a message... (/help for commands)</Text>
           )}
         </Box>
       ))}

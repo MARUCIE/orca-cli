@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { Box, Text, useStdout } from 'ink'
+import { Box, Text } from 'ink'
 import type { ChatSessionEmitter } from '../session.js'
 import { useTheme } from '../theme.js'
 import type { UIEvent, StatusInfo, TurnSummaryInfo, ToolStartInfo, ToolEndInfo, ModelProgress } from '../types.js'
@@ -29,6 +29,9 @@ import { MarkdownText } from './MarkdownText.js'
 import { Banner } from './Banner.js'
 import { CommandPicker } from './CommandPicker.js'
 import { DiffPreview } from './DiffPreview.js'
+import { ScrollBox } from './ScrollBox.js'
+import type { ScrollBoxHandle } from './ScrollBox.js'
+import { useMouseWheel } from '../useMouseWheel.js'
 import { truncateLabel } from '../utils.js'
 import type { CommandDef } from './CommandPicker.js'
 
@@ -108,7 +111,7 @@ function ActiveToolCall({ start, startTime }: { start: ToolStartInfo; startTime:
       marginLeft={1}
     >
       <Box>
-        <Text color="yellow" bold>{start.name}</Text>
+        <Text color={theme.tool} bold>{start.name}</Text>
         {shortLabel ? <Text dimColor> {shortLabel}</Text> : null}
       </Box>
       <Box>
@@ -130,8 +133,7 @@ function summarizeToolArgs(args: Record<string, unknown>): string {
 }
 
 export function App({ session, initialStatus, banner }: Props): React.ReactElement {
-  const { stdout } = useStdout()
-  const rows = stdout?.rows || 24
+  const theme = useTheme()
 
   // State
   const [status, setStatus] = useState<StatusInfo>(initialStatus)
@@ -152,6 +154,17 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
   // Command picker state
   const showPicker = inputActive && inputValue.startsWith('/') && inputValue.length > 0
   const pickerFilter = inputValue.slice(1) // strip leading /
+
+  // ScrollBox ref for imperative scroll control
+  const scrollRef = useRef<ScrollBoxHandle>(null)
+
+  // Mouse wheel → ScrollBox.scrollBy
+  useMouseWheel({
+    isActive: true,
+    onWheel: useCallback((delta: number) => {
+      scrollRef.current?.scrollBy(delta)
+    }, []),
+  })
 
   // Batched text streaming: accumulate tokens, flush at 20fps
   const textBuffer = useRef('')
@@ -359,8 +372,11 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      {/* Content area: fills space above fixed bottom */}
-      <Box flexDirection="column" flexGrow={1} overflow="hidden">
+      {/* Content area: scrollable, fills space above fixed bottom */}
+      <ScrollBox
+        ref={scrollRef}
+        keyboardActive={!inputActive && !permRequest}
+      >
         {/* Banner (shown once at startup) */}
         {banner && (
           <Banner
@@ -393,7 +409,7 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
             )
           }
           if (block.type === 'system') {
-            const color = block.level === 'error' ? 'red' : block.level === 'warn' ? 'yellow' : 'gray'
+            const color = block.level === 'error' ? theme.error : block.level === 'warn' ? theme.warning : theme.info
             return <Text key={block.id} color={color}>  {block.content}</Text>
           }
           return <MarkdownText key={block.id}>{block.content}</MarkdownText>
@@ -436,7 +452,7 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
             active={!!permRequest}
           />
         )}
-      </Box>
+      </ScrollBox>
 
       {/* ── Fixed bottom section (never shrinks, pinned to bottom) ── */}
       <Box flexDirection="column" flexShrink={0}>

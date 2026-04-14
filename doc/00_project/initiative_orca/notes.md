@@ -83,3 +83,64 @@
 - Boundary reminder:
   - Hermes-inspired runtime, model-catalog, logs, and doctor slices all remain Orca-local
   - `MARUCIE-open-agent-sdk` still intentionally unchanged because no provider-neutral seam has been proven yet
+
+## 2026-04-14
+
+- ink UI CC-parity deep source comparison (3-round swarm audit)
+- Round 1: Rendering pipeline (AlternateScreen, FullscreenLayout, ScrollBox, Resize)
+- Round 2: Input system (Cursor class, paste handler, focus model, submit flow)
+- Round 3: Visual UX (theme depth, spinner, tool call states, keyboard hints)
+- P0 implementations completed:
+  1. **useTerminalSize** — reactive terminal dimensions via SIGWINCH + stdout.resize
+     - TerminalSizeProvider at render root, useTerminalSize() hook
+     - All 6 components migrated from static useStdout() to reactive context
+     - Files: `src/ui/useTerminalSize.tsx`, updated AlternateScreen/App/StatusBar/Banner/Footer/InputArea/render.tsx
+  2. **ScrollBox** — scrollable content area with stickyScroll
+     - Negative marginTop trick for ink/Yoga scroll simulation
+     - stickyScroll auto-follows bottom, keyboard nav (PageUp/PageDown, g/G)
+     - Imperative API: scrollTo/scrollBy/scrollToBottom/isSticky/getScrollTop
+     - measureElement for content height tracking
+     - Files: `src/ui/components/ScrollBox.tsx`, integrated into App.tsx
+  3. **usePasteHandler** — bracketed paste mode detection
+     - Enables \x1b[?2004h on mount, detects \x1b[200~ / \x1b[201~ brackets
+     - During paste, Enter becomes literal newline (prevents accidental submit)
+     - onPaste callback for content insertion
+     - Files: `src/ui/usePasteHandler.ts`, integrated into InputArea.tsx
+- Orca advantages over CC identified (6 items): SIGCONT resume, dual-line StatusBar, Sparkline, context-aware Footer, DiffPreview, OSC 8 FileLink
+- Test count: 1173 (up from 1168)
+- Review report v3 generated: `outputs/reports/code-quality-swarm/2026-04-14-ink-cc-parity-review-v3.html`
+- P1 implementations completed:
+  4. **Cursor model** — pure-function text editing with word-boundary ops
+     - prevWord/nextWord (Option+Left/Right), deleteWordBefore (Ctrl+W)
+     - deleteToLineEnd (Ctrl+K), deleteToLineStart (Ctrl+U upgrade), yank (Ctrl+Y)
+     - kill ring buffer for cut/paste workflow
+     - 28 unit tests in tests/cursor.test.ts
+     - Files: `src/ui/cursor.ts`, InputArea.tsx rewritten to use Cursor module
+  5. **Theme expansion** — 25 semantic color tokens + dark/light mode
+     - Role-based tokens: accent/success/error/warning/tool/model/filePath/diffAdd/diffRemove/ctxGreen/ctxYellow/ctxRed...
+     - Auto dark/light detection via COLORFGBG env var
+     - 6 themes: default/light/dark/ocean/warm/mono
+     - Components migrated: ToolCallBlock, StatusBar, App (system messages), InputArea
+  6. **Mouse wheel scrolling** — SGR mouse protocol integration
+     - useMouseWheel hook: enables \x1b[?1003h\x1b[?1006h, parses SGR events
+     - Wheel up/down → ScrollBox.scrollBy(+/-3 rows)
+     - Clean teardown on unmount
+     - File: `src/ui/useMouseWheel.ts`, wired in App.tsx
+  7. **Focus fine-grained control** — showCursor prop + theme-aware borders
+     - Independent showCursor prop (cursor visible even when input blocked)
+     - Border color from theme.border/theme.borderDim
+     - Placeholder/dim text from theme tokens
+- Test count: 1203 (up from 1173)
+- P2 implementations completed:
+  8. **Spinner upgrade** — 204 verbs (CC-parity), stalledIntensity 颜色渐变（accent→warning→error）
+     - prefers-reduced-motion 检测（REDUCE_MOTION / NO_MOTION env）
+     - 三段式着色：<10s accent, 10-30s warning, >30s error
+  9. **Tool call graduated error** — 6 种错误类型定制渲染
+     - rejected/permission/timeout/not_found/validation/generic
+     - 每种类型独立 icon + label + 颜色（rejected 用 warning, 其余用 error）
+     - errorType 字段添加到 ToolEndInfo 接口
+  10. **Meta+Enter / Shift+Enter 换行** — CC 兼容多键换行
+     - Ctrl+J / Ctrl+Enter / Meta+Enter / Shift+Enter 全部支持
+     - 修复了键序：新行检测在 submit 之前，避免 Shift+Enter 误提交
+- Final test count: 1203
+- Final parity: 15/17 差距修复（88%），CC parity 65/80（81%）

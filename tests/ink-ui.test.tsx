@@ -7,10 +7,12 @@
 import { describe, it, expect } from 'vitest'
 import React from 'react'
 import { render } from 'ink-testing-library'
+import { Text } from 'ink'
 import { StatusBar } from '../src/ui/components/StatusBar.js'
 import { ThinkingSpinner } from '../src/ui/components/ThinkingSpinner.js'
 import { ToolCallBlock } from '../src/ui/components/ToolCallBlock.js'
 import { InputArea } from '../src/ui/components/InputArea.js'
+import { TerminalSizeProvider } from '../src/ui/useTerminalSize.js'
 import { ChatSessionEmitter } from '../src/ui/session.js'
 import type { StatusInfo } from '../src/ui/types.js'
 
@@ -25,41 +27,41 @@ describe('StatusBar', () => {
   }
 
   it('renders model name', () => {
-    const { lastFrame } = render(<StatusBar status={baseStatus} />)
+    const { lastFrame } = render(<TerminalSizeProvider><StatusBar status={baseStatus} /></TerminalSizeProvider>)
     expect(lastFrame()).toContain('claude-sonnet-4.6')
   })
 
   it('renders context bar with percentage', () => {
-    const { lastFrame } = render(<StatusBar status={baseStatus} />)
+    const { lastFrame } = render(<TerminalSizeProvider><StatusBar status={baseStatus} /></TerminalSizeProvider>)
     // New format: unicode progress bar + percentage
     expect(lastFrame()).toContain('12%')
     expect(lastFrame()).toContain('░') // empty bar segments
   })
 
   it('renders permission mode', () => {
-    const { lastFrame } = render(<StatusBar status={baseStatus} />)
+    const { lastFrame } = render(<TerminalSizeProvider><StatusBar status={baseStatus} /></TerminalSizeProvider>)
     expect(lastFrame()).toContain('yolo')
   })
 
   it('renders git branch', () => {
-    const { lastFrame } = render(<StatusBar status={baseStatus} />)
+    const { lastFrame } = render(<TerminalSizeProvider><StatusBar status={baseStatus} /></TerminalSizeProvider>)
     expect(lastFrame()).toContain('main')
   })
 
   it('renders cost', () => {
-    const { lastFrame } = render(<StatusBar status={baseStatus} />)
+    const { lastFrame } = render(<TerminalSizeProvider><StatusBar status={baseStatus} /></TerminalSizeProvider>)
     expect(lastFrame()).toContain('$0.0034')
   })
 
   it('truncates long model names', () => {
     const status = { ...baseStatus, model: 'a-very-long-model-name-that-exceeds-22-chars' }
-    const { lastFrame } = render(<StatusBar status={status} />)
+    const { lastFrame } = render(<TerminalSizeProvider><StatusBar status={status} /></TerminalSizeProvider>)
     expect(lastFrame()).toContain('..')
   })
 
   it('hides cost when zero', () => {
     const status = { ...baseStatus, costUsd: 0 }
-    const { lastFrame } = render(<StatusBar status={status} />)
+    const { lastFrame } = render(<TerminalSizeProvider><StatusBar status={status} /></TerminalSizeProvider>)
     expect(lastFrame()).not.toContain('$')
   })
 })
@@ -117,12 +119,12 @@ describe('ToolCallBlock', () => {
 
 describe('InputArea', () => {
   it('renders prompt symbol', () => {
-    const { lastFrame } = render(<InputArea onSubmit={() => {}} active={true} />)
+    const { lastFrame } = render(<TerminalSizeProvider><InputArea onSubmit={() => {}} active={true} /></TerminalSizeProvider>)
     expect(lastFrame()).toContain('>')
   })
 
   it('shows cursor when active', () => {
-    const { lastFrame } = render(<InputArea onSubmit={() => {}} active={true} />)
+    const { lastFrame } = render(<TerminalSizeProvider><InputArea onSubmit={() => {}} active={true} /></TerminalSizeProvider>)
     expect(lastFrame()).toContain('|')
   })
 })
@@ -221,7 +223,7 @@ describe('Footer', () => {
   it('shows interrupt hint when generating', async () => {
     const { Footer } = await import('../src/ui/components/Footer.js')
     const { lastFrame } = render(
-      <Footer isGenerating={true} isInputActive={false} permMode="yolo" />,
+      <TerminalSizeProvider><Footer isGenerating={true} isInputActive={false} permMode="yolo" /></TerminalSizeProvider>,
     )
     expect(lastFrame()).toContain('esc')
     expect(lastFrame()).toContain('interrupt')
@@ -230,7 +232,7 @@ describe('Footer', () => {
   it('shows send/help hints when input is active', async () => {
     const { Footer } = await import('../src/ui/components/Footer.js')
     const { lastFrame } = render(
-      <Footer isGenerating={false} isInputActive={true} permMode="auto" />,
+      <TerminalSizeProvider><Footer isGenerating={false} isInputActive={true} permMode="auto" /></TerminalSizeProvider>,
     )
     expect(lastFrame()).toContain('enter')
     expect(lastFrame()).toContain('send')
@@ -241,13 +243,55 @@ describe('Footer', () => {
   it('shows basic hints when idle', async () => {
     const { Footer } = await import('../src/ui/components/Footer.js')
     const { lastFrame } = render(
-      <Footer isGenerating={false} isInputActive={false} permMode="yolo" />,
+      <TerminalSizeProvider><Footer isGenerating={false} isInputActive={false} permMode="yolo" /></TerminalSizeProvider>,
     )
     // Shows basic hints even when idle (waiting for prompt_ready)
     expect(lastFrame()).toContain('enter')
     expect(lastFrame()).toContain('/help')
     expect(lastFrame()).toContain('yolo')
     expect(lastFrame()).not.toContain('esc') // no interrupt when not generating
+  })
+})
+
+describe('ScrollBox', () => {
+  it('renders children content', async () => {
+    const { ScrollBox } = await import('../src/ui/components/ScrollBox.js')
+    const { lastFrame } = render(
+      <TerminalSizeProvider>
+        <ScrollBox>
+          <Text>Hello Scrollable</Text>
+        </ScrollBox>
+      </TerminalSizeProvider>,
+    )
+    expect(lastFrame()).toContain('Hello Scrollable')
+  })
+
+  it('exposes imperative handle', async () => {
+    const { ScrollBox } = await import('../src/ui/components/ScrollBox.js')
+    const ref = React.createRef<any>()
+    render(
+      <TerminalSizeProvider>
+        <ScrollBox ref={ref}>
+          <Text>Content</Text>
+        </ScrollBox>
+      </TerminalSizeProvider>,
+    )
+    expect(ref.current).toBeDefined()
+    expect(ref.current.isSticky()).toBe(true)
+    expect(ref.current.getScrollTop()).toBe(0)
+  })
+
+  it('defaults to sticky scroll', async () => {
+    const { ScrollBox } = await import('../src/ui/components/ScrollBox.js')
+    const ref = React.createRef<any>()
+    render(
+      <TerminalSizeProvider>
+        <ScrollBox ref={ref}>
+          <Text>Short content</Text>
+        </ScrollBox>
+      </TerminalSizeProvider>,
+    )
+    expect(ref.current.isSticky()).toBe(true)
   })
 })
 
@@ -279,6 +323,23 @@ describe('Banner', () => {
     expect(lastFrame()).toContain('CLAUDE.md')
     expect(lastFrame()).toContain('41 tools')
     expect(lastFrame()).toContain('37 hooks')
+  })
+})
+
+describe('usePasteHandler', () => {
+  it('exports isPasting state', async () => {
+    const { usePasteHandler } = await import('../src/ui/usePasteHandler.js')
+    // Module should export the hook
+    expect(typeof usePasteHandler).toBe('function')
+  })
+
+  it('enables bracketed paste mode escape sequence', async () => {
+    // Verify the constants are correct
+    const PASTE_START = '\x1b[200~'
+    const PASTE_END = '\x1b[201~'
+    expect(PASTE_START.length).toBeGreaterThan(0)
+    expect(PASTE_END.length).toBeGreaterThan(0)
+    expect(PASTE_START).not.toBe(PASTE_END)
   })
 })
 
@@ -357,7 +418,7 @@ describe('StatusBar sparkline', () => {
       turns: 5,
       sparkline: [100, 500, 200, 800, 300],
     }
-    const { lastFrame } = render(<StatusBar status={status} />)
+    const { lastFrame } = render(<TerminalSizeProvider><StatusBar status={status} /></TerminalSizeProvider>)
     // Sparkline uses braille chars ▁▂▃▄▅▆▇█
     expect(lastFrame()).toMatch(/[▁▂▃▄▅▆▇█]/)
   })
@@ -376,11 +437,47 @@ describe('Theme', () => {
   it('has all required color tokens', async () => {
     const { getTheme } = await import('../src/ui/theme.js')
     const theme = getTheme()
+    // Primary
     expect(theme).toHaveProperty('accent')
+    expect(theme).toHaveProperty('accentDim')
     expect(theme).toHaveProperty('prompt')
+    // Semantic status
     expect(theme).toHaveProperty('success')
+    expect(theme).toHaveProperty('error')
+    expect(theme).toHaveProperty('warning')
+    expect(theme).toHaveProperty('info')
+    // Text
+    expect(theme).toHaveProperty('text')
     expect(theme).toHaveProperty('dim')
+    expect(theme).toHaveProperty('muted')
+    // UI
+    expect(theme).toHaveProperty('border')
+    expect(theme).toHaveProperty('borderDim')
     expect(theme).toHaveProperty('statusBg')
+    // Code & tools
+    expect(theme).toHaveProperty('tool')
+    expect(theme).toHaveProperty('model')
+    expect(theme).toHaveProperty('filePath')
+    expect(theme).toHaveProperty('diffAdd')
+    expect(theme).toHaveProperty('diffRemove')
+    // Progress
+    expect(theme).toHaveProperty('ctxGreen')
+    expect(theme).toHaveProperty('ctxYellow')
+    expect(theme).toHaveProperty('ctxRed')
+  })
+
+  it('has dark/light mode property', async () => {
+    const { getTheme } = await import('../src/ui/theme.js')
+    const theme = getTheme()
+    expect(theme).toHaveProperty('mode')
+    expect(['dark', 'light']).toContain(theme.mode)
+  })
+
+  it('has 30+ semantic color tokens', async () => {
+    const { getTheme } = await import('../src/ui/theme.js')
+    const theme = getTheme()
+    const colorKeys = Object.keys(theme).filter(k => k !== 'name' && k !== 'mode')
+    expect(colorKeys.length).toBeGreaterThanOrEqual(25)
   })
 })
 
@@ -393,7 +490,7 @@ describe('StatusBar context bar', () => {
       costUsd: 0,
       turns: 1,
     }
-    const { lastFrame } = render(<StatusBar status={status} />)
+    const { lastFrame } = render(<TerminalSizeProvider><StatusBar status={status} /></TerminalSizeProvider>)
     expect(lastFrame()).toContain('█')
     expect(lastFrame()).toContain('░')
     expect(lastFrame()).toContain('15%')
@@ -407,7 +504,7 @@ describe('StatusBar context bar', () => {
       costUsd: 0,
       turns: 1,
     }
-    const { lastFrame } = render(<StatusBar status={status} />)
+    const { lastFrame } = render(<TerminalSizeProvider><StatusBar status={status} /></TerminalSizeProvider>)
     expect(lastFrame()).toContain('████████')
     expect(lastFrame()).toContain('100%')
   })

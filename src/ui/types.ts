@@ -59,6 +59,8 @@ export interface ToolEndInfo {
   success: boolean
   output: string
   durationMs: number
+  /** Categorized error type for graduated rendering */
+  errorType?: 'rejected' | 'permission' | 'timeout' | 'not_found' | 'validation' | 'generic'
 }
 
 // ── Multi-Model ─────────────────────────────────────────────

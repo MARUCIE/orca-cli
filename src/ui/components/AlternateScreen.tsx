@@ -11,7 +11,8 @@
  */
 
 import React, { useEffect } from 'react'
-import { Box, useStdout } from 'ink'
+import { Box } from 'ink'
+import { useTerminalSize } from '../useTerminalSize.js'
 
 const ENTER_ALT_SCREEN = '\x1b[?1049h'
 const EXIT_ALT_SCREEN = '\x1b[?1049l'
@@ -25,8 +26,7 @@ interface Props {
 }
 
 export function AlternateScreen({ children }: Props): React.ReactElement {
-  const { stdout } = useStdout()
-  const rows = stdout?.rows || 24
+  const { rows } = useTerminalSize()
 
   useEffect(() => {
     // Enter alternate screen buffer on mount

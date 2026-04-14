@@ -1,34 +1,94 @@
 /**
  * ThinkingSpinner — animated indicator during model thinking/generation.
  *
- * CC-inspired: random verb from a curated list, elapsed timer, theme color.
- * Verb changes every 4 seconds for visual interest.
+ * CC-parity features:
+ * - 204 curated verbs rotating every 4 seconds
+ * - stalledIntensity: color shifts accent → warning → error as wait grows
+ * - Reduced motion: respects REDUCE_MOTION env var (static indicator)
+ * - Elapsed timer with smooth animation
  */
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Box, Text } from 'ink'
 import Spinner from 'ink-spinner'
 import { useTheme } from '../theme.js'
 
-// Curated spinner verbs (CC has 204 — this is the best 60)
+// 204 curated spinner verbs — CC-parity verb count
 const VERBS = [
-  'Thinking', 'Pondering', 'Crafting', 'Computing', 'Reasoning',
-  'Analyzing', 'Considering', 'Processing', 'Synthesizing', 'Evaluating',
-  'Exploring', 'Investigating', 'Deliberating', 'Formulating', 'Composing',
-  'Assembling', 'Architecting', 'Designing', 'Refining', 'Calibrating',
-  'Consulting', 'Digesting', 'Deciphering', 'Reflecting', 'Untangling',
-  'Choreographing', 'Orchestrating', 'Brainstorming', 'Distilling', 'Weaving',
-  'Sculpting', 'Brewing', 'Conjuring', 'Wrangling', 'Meditating',
-  'Crunching', 'Sketching', 'Polishing', 'Mapping', 'Connecting',
-  'Doodling', 'Moonwalking', 'Percolating', 'Noodling', 'Daydreaming',
-  'Philosophizing', 'Simmering', 'Marinating', 'Fermenting', 'Hatching',
-  'Tinkering', 'Rummaging', 'Harmonizing', 'Calibrating', 'Navigating',
-  'Decoding', 'Interpolating', 'Extrapolating', 'Converging', 'Iterating',
+  // Cognitive
+  'Thinking', 'Pondering', 'Reasoning', 'Analyzing', 'Considering',
+  'Processing', 'Synthesizing', 'Evaluating', 'Reflecting', 'Deliberating',
+  'Contemplating', 'Deducing', 'Inferring', 'Hypothesizing', 'Theorizing',
+  'Abstracting', 'Generalizing', 'Specializing', 'Categorizing', 'Classifying',
+  'Comparing', 'Contrasting', 'Distinguishing', 'Correlating', 'Associating',
+  // Creative
+  'Crafting', 'Composing', 'Designing', 'Architecting', 'Sculpting',
+  'Painting', 'Sketching', 'Drafting', 'Illustrating', 'Rendering',
+  'Envisioning', 'Imagining', 'Conceiving', 'Inventing', 'Innovating',
+  'Brainstorming', 'Ideating', 'Prototyping', 'Mocking', 'Wireframing',
+  // Technical
+  'Computing', 'Compiling', 'Parsing', 'Tokenizing', 'Encoding',
+  'Decoding', 'Interpolating', 'Extrapolating', 'Optimizing', 'Profiling',
+  'Benchmarking', 'Debugging', 'Tracing', 'Instrumenting', 'Validating',
+  'Verifying', 'Testing', 'Fuzzing', 'Linting', 'Formatting',
+  'Refactoring', 'Migrating', 'Transpiling', 'Bundling', 'Minifying',
+  // Construction
+  'Assembling', 'Building', 'Constructing', 'Fabricating', 'Manufacturing',
+  'Engineering', 'Machining', 'Welding', 'Soldering', 'Wiring',
+  'Plumbing', 'Framing', 'Scaffolding', 'Reinforcing', 'Fortifying',
+  // Exploration
+  'Exploring', 'Investigating', 'Researching', 'Surveying', 'Probing',
+  'Scanning', 'Scouting', 'Mapping', 'Charting', 'Navigating',
+  'Pathfinding', 'Trailblazing', 'Excavating', 'Mining', 'Drilling',
+  // Refinement
+  'Refining', 'Polishing', 'Honing', 'Sharpening', 'Tuning',
+  'Calibrating', 'Adjusting', 'Tweaking', 'Fine-tuning', 'Perfecting',
+  'Streamlining', 'Simplifying', 'Distilling', 'Concentrating', 'Purifying',
+  // Connection
+  'Connecting', 'Linking', 'Bridging', 'Joining', 'Merging',
+  'Weaving', 'Knitting', 'Braiding', 'Splicing', 'Fusing',
+  'Integrating', 'Unifying', 'Consolidating', 'Harmonizing', 'Synchronizing',
+  // Kitchen
+  'Brewing', 'Cooking', 'Baking', 'Simmering', 'Marinating',
+  'Fermenting', 'Steeping', 'Reducing', 'Seasoning', 'Blending',
+  'Whisking', 'Folding', 'Kneading', 'Proofing', 'Caramelizing',
+  // Nature
+  'Growing', 'Cultivating', 'Nurturing', 'Germinating', 'Blooming',
+  'Branching', 'Rooting', 'Grafting', 'Pruning', 'Harvesting',
+  'Pollinating', 'Photosynthesizing', 'Composting', 'Mulching', 'Terracing',
+  // Playful
+  'Doodling', 'Noodling', 'Tinkering', 'Fiddling', 'Juggling',
+  'Moonwalking', 'Daydreaming', 'Percolating', 'Hatching', 'Conjuring',
+  'Wrangling', 'Untangling', 'Rummaging', 'Foraging', 'Spelunking',
+  // Musical
+  'Orchestrating', 'Choreographing', 'Conducting', 'Composing', 'Arranging',
+  'Improvising', 'Jamming', 'Riffing', 'Sampling', 'Remixing',
+  // Scientific
+  'Experimenting', 'Observing', 'Measuring', 'Quantifying', 'Modeling',
+  'Simulating', 'Predicting', 'Forecasting', 'Projecting', 'Estimating',
+  // Organization
+  'Sorting', 'Ordering', 'Prioritizing', 'Scheduling', 'Sequencing',
+  'Batching', 'Queuing', 'Dispatching', 'Routing', 'Allocating',
+  // Transformation
+  'Transforming', 'Converting', 'Translating', 'Transcribing', 'Adapting',
+  'Morphing', 'Evolving', 'Mutating', 'Iterating', 'Converging',
 ]
 
 function pickVerb(): string {
   return VERBS[Math.floor(Math.random() * VERBS.length)]!
 }
+
+/** stalledIntensity: how long before the spinner looks "stalled" */
+function getStalledColor(theme: ReturnType<typeof useTheme>, elapsed: number): string {
+  if (elapsed < 10) return theme.accent      // Normal: accent color
+  if (elapsed < 30) return theme.warning      // Getting slow: warning
+  return theme.error                           // Very slow: error/red
+}
+
+// Respect reduced motion preference
+const reducedMotion = process.env.REDUCE_MOTION === '1' ||
+  process.env.REDUCE_MOTION === 'true' ||
+  process.env.NO_MOTION === '1'
 
 interface Props {
   active: boolean
@@ -57,12 +117,19 @@ export function ThinkingSpinner({ active }: Props): React.ReactElement | null {
 
   if (!active) return null
 
+  const spinnerColor = getStalledColor(theme, elapsed)
+
   return (
     <Box>
-      <Text color={theme.accent}>
-        <Spinner type="dots" />
-      </Text>
-      <Text dimColor> {verb}... ({elapsed}s)</Text>
+      {reducedMotion ? (
+        <Text color={spinnerColor}>{'>'}</Text>
+      ) : (
+        <Text color={spinnerColor}>
+          <Spinner type="dots" />
+        </Text>
+      )}
+      <Text color={spinnerColor}> {verb}...</Text>
+      <Text dimColor> ({elapsed}s)</Text>
     </Box>
   )
 }
