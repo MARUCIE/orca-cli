@@ -11,7 +11,7 @@
  * - Cursor position tracking for mid-text editing
  */
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { Box, Text, useInput, useStdout } from 'ink'
 import { useTheme } from '../theme.js'
 
@@ -42,17 +42,16 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
   const { stdout } = useStdout()
   const cols = stdout?.columns || 80
   const theme = useTheme()
-  const [value, setValueRaw] = useState('')
+  const [value, setValue] = useState('')
   const [cursor, setCursor] = useState(0)
   const [historyIdx, setHistoryIdx] = useState(-1)
 
-  const setValue = useCallback((v: string | ((prev: string) => string)) => {
-    setValueRaw(prev => {
-      const next = typeof v === 'function' ? v(prev) : v
-      if (next !== prev) onChange?.(next)
-      return next
-    })
-  }, [onChange])
+  // Notify parent of value changes via useEffect (not during render)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  useEffect(() => {
+    onChangeRef.current?.(value)
+  }, [value])
 
   useInput(
     (input, key) => {

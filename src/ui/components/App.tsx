@@ -348,14 +348,12 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
     session.emitCommand('undo')
   }, [session])
 
-  // Use full height only when there's content to display (avoid giant empty gap)
   const hasContent = blocks.length > 0 || streamingText || thinking || activeTool || multiModelState
-  const layoutHeight = hasContent ? rows : undefined
 
   return (
-    <Box flexDirection="column" height={layoutHeight}>
-      {/* Output area */}
-      <Box flexDirection="column" flexGrow={hasContent ? 1 : 0} overflow="hidden">
+    <Box flexDirection="column" height={rows}>
+      {/* Scrollable content area: fills all space above the fixed bottom */}
+      <Box flexDirection="column" flexGrow={1} overflow="hidden">
         {/* Banner (shown once at startup) */}
         {banner && (
           <Banner
@@ -435,19 +433,20 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
         )}
       </Box>
 
-      {/* Command picker (above input box, like autocomplete dropdown) */}
-      {showPicker && (
-        <CommandPicker
-          commands={SLASH_COMMANDS}
-          filter={pickerFilter}
-          onSelect={handleCommandSelect}
-          onCancel={handleCommandCancel}
-          active={showPicker}
-        />
-      )}
+      {/* ── Fixed bottom section (never shrinks, pinned to bottom) ── */}
+      <Box flexDirection="column" flexShrink={0}>
+        {/* Command picker (above input box) */}
+        {showPicker && (
+          <CommandPicker
+            commands={SLASH_COMMANDS}
+            filter={pickerFilter}
+            onSelect={handleCommandSelect}
+            onCancel={handleCommandCancel}
+            active={showPicker}
+          />
+        )}
 
-      {/* Input area */}
-      <Box>
+        {/* Input area */}
         <InputArea
           onSubmit={handleSubmit}
           onAbort={handleAbort}
@@ -460,17 +459,17 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
           pickerActive={showPicker}
           history={inputHistory}
         />
+
+        {/* Status bar */}
+        <StatusBar status={status} />
+
+        {/* Footer: keyboard shortcuts */}
+        <Footer
+          isGenerating={thinking}
+          isInputActive={inputActive && !permRequest}
+          permMode={status.permMode}
+        />
       </Box>
-
-      {/* Fixed status bar at bottom */}
-      <StatusBar status={status} />
-
-      {/* Footer: keyboard shortcuts */}
-      <Footer
-        isGenerating={thinking}
-        isInputActive={inputActive && !permRequest}
-        permMode={status.permMode}
-      />
     </Box>
   )
 }
