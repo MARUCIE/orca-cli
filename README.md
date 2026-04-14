@@ -1,8 +1,17 @@
+<div align="center">
+
 # Orca CLI
 
 **Provider-neutral coding agent — 9 providers · 41 tools · MCP server · 5 modes · multi-model collaboration.**
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/Node-%3E%3D18-green.svg)](https://nodejs.org)
+[![Tests](https://img.shields.io/badge/Tests-732%20passing-brightgreen.svg)](#sota-agent-capabilities)
+[![TypeScript](https://img.shields.io/badge/TypeScript-ESM-3178C6.svg)](https://www.typescriptlang.org/)
+
 The one CLI that can do what no single-vendor CLI can: ask Claude, GPT, and Gemini the same question simultaneously, race them, or chain them as specialists. Works with any OpenAI-compatible provider.
+
+</div>
 
 ```
        ..:::....
@@ -39,6 +48,7 @@ export OPENROUTER_API_KEY=...    # OpenRouter (aggregator)
 ```bash
 orca chat                                    # interactive REPL
 orca chat "explain this codebase"            # one-shot
+orca chat --image screenshot.png "what is broken in this UI?"   # proxy multimodal one-shot
 orca run "fix the failing tests"             # task execution
 orca run "add tests" --done-when "tests pass"  # goal-loop: repeat until criteria met
 orca council "SQL or NoSQL for this?" -n 5   # 5 models + judge
@@ -53,6 +63,35 @@ orca serve --port 9100                       # headless HTTP server
 orca serve --mcp                             # MCP server over stdio
 orca providers                               # list configured providers
 ```
+
+## VS Code Integration
+
+Orca now includes a zero-dependency VS Code extension skeleton at `integrations/vscode-orca/`.
+
+It provides terminal-backed commands for:
+
+- `Orca: Open Chat`
+- `Orca: Analyze Current File`
+- `Orca: Review Selection`
+- `Orca: Start MCP Server`
+- `Orca: Run Doctor`
+
+The extension launches the installed `orca` executable directly instead of shelling out through a quoted command string, so file paths and prompts stay argv-safe.
+
+## Multimodal One-Shot
+
+For OpenAI-compatible proxy providers, `orca chat` now accepts local image attachments:
+
+```bash
+orca chat --image ./bug.png "describe the issue"
+orca chat --image ./screen1.png ./screen2.png "compare these UIs"
+```
+
+Current scope:
+
+- one-shot proxy path only
+- local image files are encoded as data URLs and sent as multimodal content parts
+- interactive REPL image paste is not yet implemented
 
 ## Multi-Model Collaboration (Unique Feature)
 
@@ -321,10 +360,22 @@ Tested: 732 tests across 47 files, 10/10 SOTA benchmark.
 CLI flags  >  ENV vars  >  .orca.json  >  ~/.orca/config.json
 ```
 
+## Contributing
+
+Contributions welcome. Please open an issue to discuss before submitting large PRs.
+
+```bash
+git clone https://github.com/MARUCIE/orca-cli.git
+cd orca-cli
+npm install
+npm run build
+npm test
+```
+
 ## License
 
 MIT
 
 ---
 
-Maurice | maurice_wen@proton.me
+<p align="center"><sub>Maurice | maurice_wen@proton.me</sub></p>
