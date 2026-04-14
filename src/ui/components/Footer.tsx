@@ -36,7 +36,7 @@ export function Footer({ isGenerating, isInputActive, permMode }: Props): React.
     // Idle / waiting for prompt_ready — still show basic hints
     shortcuts.push({ key: 'enter', label: 'send' })
     shortcuts.push({ key: '/help', label: 'commands' })
-    shortcuts.push({ key: permMode, label: 'mode' })
+    shortcuts.push({ key: 'shift+tab', label: permMode })
   }
 
   if (shortcuts.length === 0) return <Box height={0} />

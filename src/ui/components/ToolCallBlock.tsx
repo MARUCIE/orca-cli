@@ -10,6 +10,7 @@ import React from 'react'
 import { Box, Text } from 'ink'
 import type { ToolStartInfo, ToolEndInfo } from '../types.js'
 import { FileLink } from './FileLink.js'
+import { truncateLabel } from '../utils.js'
 
 interface Props {
   start: ToolStartInfo
@@ -20,7 +21,7 @@ export function ToolCallBlock({ start, end }: Props): React.ReactElement {
   const borderColor = end ? (end.success ? 'green' : 'red') : 'gray'
   const hasPath = 'path' in start.args && typeof start.args.path === 'string'
   const label = start.label || summarizeArgs(start.args)
-  const shortLabel = label.length > 60 ? label.slice(0, 57) + '...' : label
+  const shortLabel = truncateLabel(label)
 
   return (
     <Box

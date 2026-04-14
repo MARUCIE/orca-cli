@@ -29,6 +29,7 @@ import { MarkdownText } from './MarkdownText.js'
 import { Banner } from './Banner.js'
 import { CommandPicker } from './CommandPicker.js'
 import { DiffPreview } from './DiffPreview.js'
+import { truncateLabel } from '../utils.js'
 import type { CommandDef } from './CommandPicker.js'
 
 const SLASH_COMMANDS: CommandDef[] = [
@@ -92,7 +93,7 @@ function ActiveToolCall({ start, startTime }: { start: ToolStartInfo; startTime:
   }, [startTime])
 
   const label = start.label || summarizeToolArgs(start.args)
-  const shortLabel = label.length > 60 ? label.slice(0, 57) + '...' : label
+  const shortLabel = truncateLabel(label)
 
   return (
     <Box
