@@ -8,6 +8,7 @@
 
 import chalk from 'chalk'
 import { logError, logWarning } from './logger.js'
+import { getFleetSummaryLine } from './fleet-env.js'
 
 export type OutputMode = 'streaming' | 'json'
 
@@ -223,6 +224,10 @@ export async function printRichBanner(opts: {
     const hooksLabel = hookCount ? `${hookCount} hooks` : ''
     const sep = hooksLabel ? ' · ' : ''
     console.log(`  ${label}${toolCount} tools${sep}${hooksLabel}${reset}`)
+  }
+  const fleetLine = getFleetSummaryLine()
+  if (fleetLine) {
+    console.log(`  ${label}fleet   ${fleetLine}${reset}`)
   }
   console.log()
 }
