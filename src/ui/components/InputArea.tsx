@@ -242,6 +242,16 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
   // Show cursor when explicitly enabled or when input is active
   const cursorVisible = showCursor ?? active
 
+  // Blinking cursor — toggles every 530ms (standard terminal blink rate)
+  const [cursorOn, setCursorOn] = useState(true)
+  useEffect(() => {
+    if (!cursorVisible) return
+    const timer = setInterval(() => setCursorOn(prev => !prev), 530)
+    return () => clearInterval(timer)
+  }, [cursorVisible])
+  // Reset blink on cursor move (always show after keystroke)
+  useEffect(() => { setCursorOn(true) }, [cursor, value])
+
   return (
     <Box
       flexDirection="column"
@@ -260,7 +270,11 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
           {cursorVisible && i === cursorLine ? (
             <Text>
               {line.slice(0, cursorCol)}
-              <Text backgroundColor={theme.accent} color="black">{line[cursorCol] || ' '}</Text>
+              {cursorOn ? (
+                <Text backgroundColor={theme.accent} color="black">{line[cursorCol] || ' '}</Text>
+              ) : (
+                <Text>{line[cursorCol] || ' '}</Text>
+              )}
               {line.slice(cursorCol + 1)}
             </Text>
           ) : (

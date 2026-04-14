@@ -134,12 +134,29 @@ const THEMES: Record<string, InkTheme> = {
   mono:     darkTheme('mono',     'white',  'gray',    'white'),
 }
 
+function readThemeFile(): string | null {
+  try {
+    const fs = require('fs') as typeof import('fs')
+    const home = process.env.HOME || process.env.USERPROFILE || ''
+    if (!home) return null
+    return fs.readFileSync(`${home}/.orca/theme`, 'utf-8').trim().toLowerCase()
+  } catch {
+    return null
+  }
+}
+
 function resolveTheme(): InkTheme {
+  // Priority: env var > file > auto-detect
   const envTheme = (process.env.ORCA_THEME || '').toLowerCase()
   if (envTheme && THEMES[envTheme]) return THEMES[envTheme]!
+  const fileTheme = readThemeFile()
+  if (fileTheme && THEMES[fileTheme]) return THEMES[fileTheme]!
   // Auto-detect: dark → default (cyan), light → light (blue)
   return isDark ? THEMES['default']! : THEMES['light']!
 }
+
+/** Available theme IDs for external use (e.g. ThemePicker) */
+export const THEME_IDS = Object.keys(THEMES)
 
 const currentTheme: InkTheme = resolveTheme()
 
