@@ -351,7 +351,7 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
   const hasContent = blocks.length > 0 || streamingText || thinking || activeTool || multiModelState
 
   return (
-    <Box flexDirection="column" height={rows}>
+    <Box flexDirection="column" flexGrow={1}>
       {/* Content area: fills space above fixed bottom, content gravity = bottom */}
       <Box flexDirection="column" flexGrow={1} overflow="hidden" justifyContent="flex-end">
         {/* Banner (shown once at startup) */}

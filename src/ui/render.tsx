@@ -11,6 +11,7 @@ import { render } from 'ink'
 import { App } from './components/App.js'
 import type { BannerInfo } from './components/App.js'
 import { ThemeProvider } from './theme.js'
+import { AlternateScreen } from './components/AlternateScreen.js'
 import type { ChatSessionEmitter } from './session.js'
 import type { StatusInfo } from './types.js'
 
@@ -73,7 +74,9 @@ export function renderInkApp(
 
   const instance = render(
     <ThemeProvider>
-      <App session={session} initialStatus={initialStatus} banner={banner} />
+      <AlternateScreen>
+        <App session={session} initialStatus={initialStatus} banner={banner} />
+      </AlternateScreen>
     </ThemeProvider>,
     {
       exitOnCtrlC: false,
