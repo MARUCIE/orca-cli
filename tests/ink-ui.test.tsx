@@ -359,6 +359,56 @@ describe('StatusBar sparkline', () => {
   })
 })
 
+describe('Theme', () => {
+  it('provides default theme', async () => {
+    const { getTheme } = await import('../src/ui/theme.js')
+    const theme = getTheme()
+    expect(theme.name).toBe('default')
+    expect(theme.accent).toBe('cyan')
+    expect(theme.prompt).toBe('cyan')
+    expect(theme.success).toBe('green')
+  })
+
+  it('has all required color tokens', async () => {
+    const { getTheme } = await import('../src/ui/theme.js')
+    const theme = getTheme()
+    expect(theme).toHaveProperty('accent')
+    expect(theme).toHaveProperty('prompt')
+    expect(theme).toHaveProperty('success')
+    expect(theme).toHaveProperty('dim')
+    expect(theme).toHaveProperty('statusBg')
+  })
+})
+
+describe('StatusBar context bar', () => {
+  it('renders green bar for low context usage', () => {
+    const status = {
+      model: 'test-model',
+      contextPct: 15,
+      permMode: 'yolo' as const,
+      costUsd: 0,
+      turns: 1,
+    }
+    const { lastFrame } = render(<StatusBar status={status} />)
+    expect(lastFrame()).toContain('█')
+    expect(lastFrame()).toContain('░')
+    expect(lastFrame()).toContain('15%')
+  })
+
+  it('renders full bar for 100% context', () => {
+    const status = {
+      model: 'test-model',
+      contextPct: 100,
+      permMode: 'yolo' as const,
+      costUsd: 0,
+      turns: 1,
+    }
+    const { lastFrame } = render(<StatusBar status={status} />)
+    expect(lastFrame()).toContain('████████')
+    expect(lastFrame()).toContain('100%')
+  })
+})
+
 describe('ChatSessionEmitter', () => {
   it('emitText fires text event', () => {
     const session = new ChatSessionEmitter()

@@ -1436,19 +1436,46 @@ async function runREPL(
               { role: 'code', model: 'gpt-5.4' },
               { role: 'review', model: 'gemini-3.1-pro' },
             ]
-            console.log(`\n\x1b[35m  ╭── Pipeline: ${stages.length} stages ──╮\x1b[0m`)
-            const result = await runPipeline({
-              prompt: mmPrompt, stages, resolveEndpoint,
-              onStageStart: (s, i) => process.stdout.write(`\x1b[90m  ${i+1}. ${s.role} (${s.model})...\x1b[0m`),
-              onStageDone: (_s, _i, ms) => console.log(` \x1b[32m${(ms/1000).toFixed(1)}s\x1b[0m`),
-            })
-            console.log()
-            for (const { stage, response } of result.stages) {
-              console.log(`\x1b[90m  ── ${stage.role} · ${response.model} (${(response.durationMs/1000).toFixed(1)}s) ──\x1b[0m`)
-              if (response.error) { console.log(`\x1b[31m  error: ${response.error}\x1b[0m\n`) }
-              else { console.log(`  ${response.text.slice(0, 800)}${response.text.length > 800 ? '...' : ''}\n`) }
+
+            if (useInk) {
+              // ink mode: emit progress as each stage runs
+              const stageModels = stages.map(s => ({ model: `${s.role}: ${s.model}`, done: false, elapsedMs: 0 }))
+              session.emitMultiModelProgress('pipeline', stageModels)
+
+              const result = await runPipeline({
+                prompt: mmPrompt, stages, resolveEndpoint,
+                onStageStart: (_s, i) => {
+                  stageModels[i] = { ...stageModels[i]!, done: false, elapsedMs: 0 }
+                  session.emitMultiModelProgress('pipeline', [...stageModels])
+                },
+                onStageDone: (_s, i, ms) => {
+                  stageModels[i] = { ...stageModels[i]!, done: true, elapsedMs: ms }
+                  session.emitMultiModelProgress('pipeline', [...stageModels])
+                },
+              })
+              for (const { stage, response } of result.stages) {
+                if (response.error) {
+                  session.emitSystemMessage(`${stage.role} (${response.model}): ${response.error}`, 'error')
+                } else {
+                  session.emitText(`\n**${stage.role}** (${response.model}, ${(response.durationMs/1000).toFixed(1)}s)\n${response.text}\n`)
+                }
+              }
+              session.emitSystemMessage(`${result.stages.length} stages · ${(result.totalDurationMs/1000).toFixed(1)}s total`, 'info')
+            } else {
+              console.log(`\n\x1b[35m  ╭── Pipeline: ${stages.length} stages ──╮\x1b[0m`)
+              const result = await runPipeline({
+                prompt: mmPrompt, stages, resolveEndpoint,
+                onStageStart: (s, i) => process.stdout.write(`\x1b[90m  ${i+1}. ${s.role} (${s.model})...\x1b[0m`),
+                onStageDone: (_s, _i, ms) => console.log(` \x1b[32m${(ms/1000).toFixed(1)}s\x1b[0m`),
+              })
+              console.log()
+              for (const { stage, response } of result.stages) {
+                console.log(`\x1b[90m  ── ${stage.role} · ${response.model} (${(response.durationMs/1000).toFixed(1)}s) ──\x1b[0m`)
+                if (response.error) { console.log(`\x1b[31m  error: ${response.error}\x1b[0m\n`) }
+                else { console.log(`  ${response.text.slice(0, 800)}${response.text.length > 800 ? '...' : ''}\n`) }
+              }
+              console.log(`\x1b[90m  ─ ${result.stages.length} stages · ${(result.totalDurationMs/1000).toFixed(1)}s total ─\x1b[0m\n`)
             }
-            console.log(`\x1b[90m  ─ ${result.stages.length} stages · ${(result.totalDurationMs/1000).toFixed(1)}s total ─\x1b[0m\n`)
           }
           continue
         }
@@ -2967,6 +2994,28 @@ async function runProxyTurn(options: ProxyTurnOptions): Promise<{ inputTokens: n
           if (reason) console.log(`\x1b[90m  waiting ${seconds}s: ${reason}\x1b[0m`)
           await new Promise(r => setTimeout(r, seconds * 1000))
           return { success: true, output: `Waited ${seconds}s.` }
+        }
+
+        // Live diff preview: emit diff before write_file/edit_file executes
+        if (emitterOpt && (name === 'write_file' || name === 'edit_file') && args.path) {
+          const { resolve: resolvePath } = await import('node:path')
+          const fullPath = resolvePath(cwd, String(args.path))
+          if (existsSync(fullPath)) {
+            try {
+              const old = readFileSync(fullPath, 'utf-8')
+              const newContent = name === 'write_file'
+                ? String(args.content || '')
+                : old.replace(String(args.old_string || ''), String(args.new_string || ''))
+              // Compute a compact diff summary
+              const oldLines = old.split('\n')
+              const newLines = newContent.split('\n')
+              const added = newLines.filter((l, i) => l !== oldLines[i]).length
+              const removed = oldLines.filter((l, i) => l !== newLines[i]).length
+              if (added > 0 || removed > 0) {
+                emitterOpt.emitSystemMessage(`diff ${String(args.path)}: +${added} -${removed} lines`, 'info')
+              }
+            } catch { /* best-effort */ }
+          }
         }
 
         const result = executeTool(name, args, cwd, injectedPaths)
