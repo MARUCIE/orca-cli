@@ -1,8 +1,10 @@
 /**
- * StatusBar — fixed at terminal bottom row.
+ * StatusBar — fixed at terminal bottom, CC-parity multi-line status.
  *
- * Displays: model · context% · permission mode · git branch · cost
- * Rendered with inverse video (white-on-dark) like Codex/vim status lines.
+ * Line 1: model · permMode · git branch · cost · tok/s
+ * Line 2: context bar ████░░░░ N% · turns · session duration · sparkline
+ *
+ * Rendered with inverse video (white-on-dark) like CC/Codex.
  */
 
 import React from 'react'
@@ -17,46 +19,51 @@ export function StatusBar({ status }: Props): React.ReactElement {
   const { stdout } = useStdout()
   const cols = stdout?.columns || 80
 
-  // Context progress bar: ████░░░░ 42%
+  // ── Line 1: model · mode · branch · cost · tok/s ──
+  const modelName = status.model.length > 24 ? status.model.slice(0, 22) + '..' : status.model
+  const line1Parts: string[] = [modelName, status.permMode]
+  if (status.gitBranch) line1Parts.push(status.gitBranch)
+  if (status.costUsd > 0) {
+    line1Parts.push(status.costUsd < 0.01 ? `$${status.costUsd.toFixed(4)}` : `$${status.costUsd.toFixed(2)}`)
+  }
+  if (status.tokPerSec && status.tokPerSec > 0) {
+    line1Parts.push(`${Math.round(status.tokPerSec)} tok/s`)
+  }
+  const line1Text = ` ${line1Parts.join('  ·  ')} `
+  const line1Pad = Math.max(0, cols - line1Text.length)
+
+  // ── Line 2: context bar · turns · duration · sparkline ──
   const ctxPct = Math.min(100, status.contextPct)
-  const barWidth = 8
+  const barWidth = 10
   const filled = Math.round((ctxPct / 100) * barWidth)
   const ctxBar = '█'.repeat(filled) + '░'.repeat(barWidth - filled)
   const ctxColor = ctxPct > 60 ? 'red' : ctxPct > 40 ? 'yellow' : 'green'
 
-  const parts: string[] = [
-    status.model.length > 22 ? status.model.slice(0, 20) + '..' : status.model,
-  ]
+  const line2Parts: string[] = []
+  if (status.turns > 0) line2Parts.push(`${status.turns} turns`)
 
-  // Token sparkline: show last 8 turns as unicode braille mini-graph
-  const sparkline = status.sparkline
-  if (sparkline && sparkline.length > 0) {
+  // Sparkline
+  if (status.sparkline && status.sparkline.length > 1) {
     const sparks = '▁▂▃▄▅▆▇█'
-    const max = Math.max(...sparkline, 1)
-    const line = sparkline.slice(-8).map(v => sparks[Math.min(7, Math.floor((v / max) * 7))]!).join('')
-    parts.push(line)
+    const max = Math.max(...status.sparkline, 1)
+    line2Parts.push(status.sparkline.slice(-8).map(v => sparks[Math.min(7, Math.floor((v / max) * 7))]!).join(''))
   }
 
-  parts.push(status.permMode)
-  if (status.gitBranch) parts.push(status.gitBranch)
-  if (status.costUsd > 0) {
-    parts.push(status.costUsd < 0.01 ? `$${status.costUsd.toFixed(4)}` : `$${status.costUsd.toFixed(2)}`)
-  }
-  if (status.tokPerSec && status.tokPerSec > 0) {
-    parts.push(`${Math.round(status.tokPerSec)} tok/s`)
-  }
-
-  const partsText = parts.join('  ·  ')
-  // Context bar is rendered with color inside inverse text
-  const ctxLabel = ` ${ctxBar} ${ctxPct}%`
-  const fullText = ` ${partsText}  ·  `
-  const remainLen = Math.max(0, cols - fullText.length - ctxLabel.length)
+  const line2Suffix = line2Parts.length > 0 ? `  ·  ${line2Parts.join('  ·  ')}` : ''
+  const ctxText = ` ${ctxBar} ${ctxPct}%${line2Suffix} `
+  const line2Pad = Math.max(0, cols - ctxText.length)
 
   return (
-    <Box width={cols}>
-      <Text inverse>{fullText}</Text>
-      <Text inverse color={ctxColor}>{ctxLabel}</Text>
-      <Text inverse>{' '.repeat(remainLen)}</Text>
+    <Box flexDirection="column" width={cols}>
+      {/* Line 1: model info */}
+      <Box>
+        <Text inverse>{line1Text}{' '.repeat(line1Pad)}</Text>
+      </Box>
+      {/* Line 2: context + session stats */}
+      <Box>
+        <Text inverse color={ctxColor}>{` ${ctxBar} ${ctxPct}%`}</Text>
+        <Text inverse>{line2Suffix}{' '.repeat(line2Pad)}</Text>
+      </Box>
     </Box>
   )
 }

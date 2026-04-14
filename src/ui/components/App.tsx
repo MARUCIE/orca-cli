@@ -348,10 +348,14 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
     session.emitCommand('undo')
   }, [session])
 
+  // Use full height only when there's content to display (avoid giant empty gap)
+  const hasContent = blocks.length > 0 || streamingText || thinking || activeTool || multiModelState
+  const layoutHeight = hasContent ? rows : undefined
+
   return (
-    <Box flexDirection="column" height={rows}>
-      {/* Output area: grows to fill available space */}
-      <Box flexDirection="column" flexGrow={1} overflow="hidden">
+    <Box flexDirection="column" height={layoutHeight}>
+      {/* Output area */}
+      <Box flexDirection="column" flexGrow={hasContent ? 1 : 0} overflow="hidden">
         {/* Banner (shown once at startup) */}
         {banner && (
           <Banner
@@ -361,6 +365,17 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
             toolCount={banner.toolCount}
             hookCount={banner.hookCount}
           />
+        )}
+
+        {/* Empty state guide — shown when no output yet */}
+        {!hasContent && inputActive && (
+          <Box marginLeft={2} marginTop={1} marginBottom={1} flexDirection="column">
+            <Text dimColor>Ask anything, or try:</Text>
+            <Text dimColor>  /help      all commands</Text>
+            <Text dimColor>  /council   multi-model council</Text>
+            <Text dimColor>  /mission   autonomous execution</Text>
+            <Text dimColor>  !command   shell escape</Text>
+          </Box>
         )}
 
         {/* Static blocks (already rendered, won't re-render) */}
