@@ -17,6 +17,8 @@ export interface StatusInfo {
   tokPerSec?: number
   /** Total turns in this session */
   turns: number
+  /** Token usage per turn for sparkline (last N values) */
+  sparkline?: number[]
 }
 
 // ── Turn Summary ────────────────────────────────────────────

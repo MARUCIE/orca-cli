@@ -539,6 +539,8 @@ interface SessionStats {
   totalInputTokens: number
   totalOutputTokens: number
   startTime: number
+  /** Output tokens per turn for sparkline visualization */
+  turnTokens: number[]
 }
 
 // ── One-shot Mode ───────────────────────────────────────────────
@@ -717,6 +719,7 @@ async function runREPL(
     totalInputTokens: 0,
     totalOutputTokens: 0,
     startTime: Date.now(),
+    turnTokens: [],
   }
 
   // Session resume: --continue flag loads most recent session
@@ -853,6 +856,7 @@ async function runREPL(
       costUsd,
       tokPerSec: lastTokPerSec,
       turns: stats.turns,
+      sparkline: stats.turnTokens.length > 1 ? stats.turnTokens : undefined,
     }
   }
 
@@ -1645,6 +1649,7 @@ async function runREPL(
         stats.turns++
         stats.totalInputTokens += result.inputTokens
         stats.totalOutputTokens += result.outputTokens
+        stats.turnTokens.push(result.outputTokens)
         tokenBudget.recordUsage(result.inputTokens, result.outputTokens)
         contextMonitor.recordUsage(result.inputTokens, result.outputTokens)
 

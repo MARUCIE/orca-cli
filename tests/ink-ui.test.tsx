@@ -29,9 +29,11 @@ describe('StatusBar', () => {
     expect(lastFrame()).toContain('claude-sonnet-4.6')
   })
 
-  it('renders context percentage', () => {
+  it('renders context bar with percentage', () => {
     const { lastFrame } = render(<StatusBar status={baseStatus} />)
-    expect(lastFrame()).toContain('ctx 12%')
+    // New format: unicode progress bar + percentage
+    expect(lastFrame()).toContain('12%')
+    expect(lastFrame()).toContain('░') // empty bar segments
   })
 
   it('renders permission mode', () => {
@@ -291,6 +293,69 @@ describe('MarkdownText', () => {
       <MarkdownText>{''}</MarkdownText>,
     )
     expect(lastFrame()).toBe('')
+  })
+})
+
+describe('DiffPreview', () => {
+  it('renders file path and diff stats', async () => {
+    const { DiffPreview } = await import('../src/ui/components/DiffPreview.js')
+    const { lastFrame } = render(
+      <DiffPreview
+        oldContent="line1\nline2\nline3"
+        newContent="line1\nmodified\nline3"
+        filePath="/tmp/test.ts"
+      />,
+    )
+    expect(lastFrame()).toContain('/tmp/test.ts')
+    expect(lastFrame()).toContain('+')
+    expect(lastFrame()).toContain('-')
+  })
+
+  it('shows added and removed lines', async () => {
+    const { DiffPreview } = await import('../src/ui/components/DiffPreview.js')
+    const { lastFrame } = render(
+      <DiffPreview
+        oldContent="old line"
+        newContent="new line"
+        filePath="test.ts"
+      />,
+    )
+    expect(lastFrame()).toContain('old line')
+    expect(lastFrame()).toContain('new line')
+  })
+})
+
+describe('FileLink', () => {
+  it('renders file path as text', async () => {
+    const { FileLink } = await import('../src/ui/components/FileLink.js')
+    const { lastFrame } = render(
+      <FileLink path="/tmp/test.ts" />,
+    )
+    expect(lastFrame()).toContain('/tmp/test.ts')
+  })
+
+  it('renders custom display text', async () => {
+    const { FileLink } = await import('../src/ui/components/FileLink.js')
+    const { lastFrame } = render(
+      <FileLink path="/tmp/test.ts">test.ts</FileLink>,
+    )
+    expect(lastFrame()).toContain('test.ts')
+  })
+})
+
+describe('StatusBar sparkline', () => {
+  it('renders sparkline when data provided', () => {
+    const status = {
+      model: 'test-model',
+      contextPct: 30,
+      permMode: 'yolo' as const,
+      costUsd: 0,
+      turns: 5,
+      sparkline: [100, 500, 200, 800, 300],
+    }
+    const { lastFrame } = render(<StatusBar status={status} />)
+    // Sparkline uses braille chars ▁▂▃▄▅▆▇█
+    expect(lastFrame()).toMatch(/[▁▂▃▄▅▆▇█]/)
   })
 })
 
