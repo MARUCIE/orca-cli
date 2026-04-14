@@ -158,7 +158,8 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
   const [showThemePicker, setShowThemePicker] = useState(!process.env.ORCA_THEME)
 
   // Command picker state
-  const showPicker = inputActive && inputValue.startsWith('/') && inputValue.length > 0
+  // Show picker whenever input starts with / — don't wait for prompt_ready
+  const showPicker = inputValue.startsWith('/') && inputValue.length > 0
   const pickerFilter = inputValue.slice(1) // strip leading /
 
   // ScrollBox ref for imperative scroll control
