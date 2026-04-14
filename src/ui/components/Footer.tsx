@@ -42,12 +42,11 @@ export function Footer({ isGenerating, isInputActive, permMode }: Props): React.
   if (shortcuts.length === 0) return <Box height={0} />
 
   return (
-    <Box width={cols} justifyContent="center">
+    <Box width={cols} marginLeft={1}>
       {shortcuts.map((s, i) => (
-        <Box key={s.key} marginRight={2}>
-          <Text dimColor>{s.key}</Text>
-          <Text dimColor>{' '}{s.label}</Text>
-          {i < shortcuts.length - 1 && <Text dimColor>  </Text>}
+        <Box key={s.key} marginRight={i < shortcuts.length - 1 ? 2 : 0}>
+          <Text dimColor bold>{s.key}</Text>
+          <Text dimColor> {s.label}</Text>
         </Box>
       ))}
     </Box>
