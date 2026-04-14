@@ -240,7 +240,7 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
             <Text>{line}</Text>
           )}
           {active && i === 0 && !value && (
-            <Text dimColor> type a message or /help</Text>
+            <Text color="gray"> Type a message... (/help for commands)</Text>
           )}
         </Box>
       ))}

@@ -84,33 +84,23 @@ export function Banner({ version, cwd, configFiles, toolCount, hookCount }: Prop
         })}
       </Box>
 
-      {/* Version info */}
-      <Box marginTop={1} marginLeft={2}>
+      {/* Compact info line: version · cwd · tools */}
+      <Box marginTop={1} marginLeft={2} flexWrap="wrap">
         <Text bold color="white">Orca</Text>
         <Text dimColor> v{version}</Text>
-        <Text dimColor>  provider-neutral agent runtime</Text>
+        <Text dimColor>  ·  </Text>
+        <Text color={theme.accent}>{shortCwd}</Text>
+        {toolCount && (
+          <>
+            <Text dimColor>  ·  </Text>
+            <Text dimColor>{toolCount} tools</Text>
+            {hookCount ? <Text dimColor> · {hookCount} hooks</Text> : null}
+          </>
+        )}
       </Box>
-
-      {/* Project context */}
-      <Box marginLeft={2}>
-        <Text color={theme.accent}>▸</Text>
-        <Text dimColor> {shortCwd}</Text>
-      </Box>
-
-      {/* Config */}
       {configFiles && configFiles.length > 0 && (
         <Box marginLeft={2}>
           <Text dimColor>config  {configFiles.join(', ')}</Text>
-        </Box>
-      )}
-
-      {/* Tool/hook counts */}
-      {toolCount && (
-        <Box marginLeft={2}>
-          <Text dimColor>
-            {toolCount} tools
-            {hookCount ? ` · ${hookCount} hooks` : ''}
-          </Text>
         </Box>
       )}
     </Box>
