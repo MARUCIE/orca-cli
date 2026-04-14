@@ -32,11 +32,13 @@ interface Props {
   active: boolean
   /** When true, CommandPicker handles Enter/Esc/arrows — InputArea only handles text */
   pickerActive?: boolean
+  /** When true, stdin capture is suspended (permission prompt is active) */
+  permissionBlocked?: boolean
   /** Command history for up/down navigation */
   history?: string[]
 }
 
-export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onChange, active, pickerActive, history = [] }: Props): React.ReactElement {
+export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onChange, active, pickerActive, permissionBlocked, history = [] }: Props): React.ReactElement {
   const { stdout } = useStdout()
   const cols = stdout?.columns || 80
   const theme = useTheme()
@@ -54,13 +56,15 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
 
   useInput(
     (input, key) => {
-      if (!active) return
+      // Always capture text input (buffer before prompt_ready).
+      // Only block Enter-submit when not yet active.
 
       // When picker is active, defer Enter/Esc/arrows to CommandPicker
       if (pickerActive && (key.return || key.escape || key.upArrow || key.downArrow)) return
 
-      // Enter: submit (Ctrl+J inserts newline)
+      // Enter: submit (only when active — prevents premature send)
       if (key.return && !key.ctrl) {
+        if (!active) return // can't submit yet, but keep capturing text
         const trimmed = value.trim()
         onSubmit(trimmed)
         setValue('')
@@ -196,7 +200,7 @@ export function InputArea({ onSubmit, onAbort, onClear, onModeCycle, onUndo, onC
         setCursor(prev => prev + input.length)
       }
     },
-    { isActive: active },
+    { isActive: !permissionBlocked },  // Capture stdin unless permission prompt is active
   )
 
   const lines = value.split('\n')

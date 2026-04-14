@@ -456,6 +456,7 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
           onUndo={handleUndo}
           onChange={handleInputChange}
           active={inputActive && !permRequest}
+          permissionBlocked={!!permRequest}
           pickerActive={showPicker}
           history={inputHistory}
         />
