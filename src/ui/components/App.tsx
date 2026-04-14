@@ -144,7 +144,8 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
   const [blocks, setBlocks] = useState<OutputBlock[]>([])
   const [streamingText, setStreamingText] = useState('')
   const [thinking, setThinking] = useState(false)
-  const [inputActive, setInputActive] = useState(false)
+  // Start active — user can type immediately, don't wait for prompt_ready
+  const [inputActive, setInputActive] = useState(true)
   const [inputHistory, setInputHistory] = useState<string[]>([])
   const [lastTurnSummary, setLastTurnSummary] = useState<TurnSummaryInfo | null>(null)
   const [permRequest, setPermRequest] = useState<{
