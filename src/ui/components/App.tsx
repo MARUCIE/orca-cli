@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { Box, Text, Static, useStdout } from 'ink'
+import { Box, Text, useStdout } from 'ink'
 import type { ChatSessionEmitter } from '../session.js'
 import { useTheme } from '../theme.js'
 import type { UIEvent, StatusInfo, TurnSummaryInfo, ToolStartInfo, ToolEndInfo, ModelProgress } from '../types.js'
@@ -216,30 +216,36 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
           setBlocks(b => [...b, { id: blockId(), type: 'system', content: event.text, level: event.level }])
           break
 
-        case 'turn_summary':
-          // Flush streaming text
+        case 'turn_summary': {
+          // Flush both textBuffer and streamingText (textBuffer may have unflushed tokens)
+          const turnRemaining = textBuffer.current
+          textBuffer.current = ''
           setStreamingText(prev => {
-            if (prev) {
-              setBlocks(b => [...b, { id: blockId(), type: 'text', content: prev }])
+            const allText = prev + turnRemaining
+            if (allText) {
+              setBlocks(b => [...b, { id: blockId(), type: 'text', content: allText }])
             }
             return ''
           })
-          textBuffer.current = ''
           setLastTurnSummary(event.info)
           break
+        }
 
-        case 'prompt_ready':
-          // Flush any remaining text
+        case 'prompt_ready': {
+          // Flush both textBuffer and streamingText
+          const promptRemaining = textBuffer.current
+          textBuffer.current = ''
           setStreamingText(prev => {
-            if (prev) {
-              setBlocks(b => [...b, { id: blockId(), type: 'text', content: prev }])
+            const allText = prev + promptRemaining
+            if (allText) {
+              setBlocks(b => [...b, { id: blockId(), type: 'text', content: allText }])
             }
             return ''
           })
-          textBuffer.current = ''
           setInputActive(true)
           setMultiModelState(null)
           break
+        }
 
         case 'permission_request':
           setPermRequest({
@@ -376,23 +382,21 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
           </Box>
         )}
 
-        {/* Static blocks (already rendered, won't re-render) */}
-        <Static items={blocks}>
-          {(block) => {
-            if (block.type === 'tool' && block.toolStart) {
-              return (
-                <Box key={block.id}>
-                  <ToolCallBlock start={block.toolStart} end={block.toolEnd} />
-                </Box>
-              )
-            }
-            if (block.type === 'system') {
-              const color = block.level === 'error' ? 'red' : block.level === 'warn' ? 'yellow' : 'gray'
-              return <Text key={block.id} color={color}>  {block.content}</Text>
-            }
-            return <MarkdownText key={block.id}>{block.content}</MarkdownText>
-          }}
-        </Static>
+        {/* Output blocks (regular render — Static incompatible with fullscreen layout) */}
+        {blocks.map((block) => {
+          if (block.type === 'tool' && block.toolStart) {
+            return (
+              <Box key={block.id}>
+                <ToolCallBlock start={block.toolStart} end={block.toolEnd} />
+              </Box>
+            )
+          }
+          if (block.type === 'system') {
+            const color = block.level === 'error' ? 'red' : block.level === 'warn' ? 'yellow' : 'gray'
+            return <Text key={block.id} color={color}>  {block.content}</Text>
+          }
+          return <MarkdownText key={block.id}>{block.content}</MarkdownText>
+        })}
 
         {/* Currently streaming text (raw during stream, markdown on flush) */}
         {streamingText && <Text>{streamingText}</Text>}
