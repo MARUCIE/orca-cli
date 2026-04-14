@@ -414,14 +414,36 @@ export function App({ session, initialStatus, banner }: Props): React.ReactEleme
           />
         )}
 
-        {/* Empty state guide — shown when no output yet */}
+        {/* Empty state guide — SOTA feature showcase */}
         {!hasContent && (
           <Box marginLeft={2} marginTop={1} marginBottom={1} flexDirection="column">
-            <Text color="gray">Ask anything, or try:</Text>
-            <Text color="gray">  /help      all commands</Text>
-            <Text color="gray">  /council   multi-model council</Text>
-            <Text color="gray">  /mission   autonomous execution</Text>
-            <Text color="gray">  !command   shell escape</Text>
+            <Text color={theme.accent} bold>Quick start</Text>
+            <Text dimColor>  Ask anything in natural language, or use commands below.</Text>
+            <Text> </Text>
+            <Text color={theme.accent} bold>Multi-Model Collaboration</Text>
+            <Text dimColor>  /council    Ask N models, judge synthesizes best answer</Text>
+            <Text dimColor>  /race       First model to answer wins (speed race)</Text>
+            <Text dimColor>  /pipeline   Plan {'\u2192'} Code {'\u2192'} Review chain across models</Text>
+            <Text> </Text>
+            <Text color={theme.accent} bold>Autonomous Execution</Text>
+            <Text dimColor>  /mission    Autonomous multi-step task execution</Text>
+            <Text dimColor>  /plan       Task decomposition with acceptance criteria</Text>
+            <Text dimColor>  /commit     Stage, diff, and commit changes</Text>
+            <Text> </Text>
+            <Text color={theme.accent} bold>Session Control</Text>
+            <Text dimColor>  /model      Show or switch model</Text>
+            <Text dimColor>  /effort     Set reasoning effort (low/medium/high)</Text>
+            <Text dimColor>  /mode       Switch behavioral profile</Text>
+            <Text dimColor>  /compact    Smart context compaction</Text>
+            <Text> </Text>
+            <Text color={theme.accent} bold>Tools & Diagnostics</Text>
+            <Text dimColor>  /status     Session overview with context/cost/tokens</Text>
+            <Text dimColor>  /diff       Show git diff of current changes</Text>
+            <Text dimColor>  /doctor     Runtime health check</Text>
+            <Text dimColor>  /mcp        Connected MCP servers</Text>
+            <Text dimColor>  !command    Shell escape (run any terminal command)</Text>
+            <Text> </Text>
+            <Text dimColor>  /help       Full command reference</Text>
           </Box>
         )}
 
